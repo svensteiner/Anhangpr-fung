@@ -1,0 +1,55 @@
+# ===========================================================================
+#  VERTRAULICHKEIT — NIEMALS einchecken/pushen:
+#  Mandantendaten, Beispiel-PDFs, fachliche Fremdunterlagen, Auswertungen.
+#  (Wirtschaftsprüfer-Verschwiegenheitspflicht / Urheberrecht Dritter)
+# ===========================================================================
+
+# Mandantendaten (echte Prüfungsunterlagen)
+Accilium/
+*.pdf
+*.PDF
+*.xlsx
+*.xls
+*.rtf
+
+# Anwender-Ordner: Inhalte ignorieren, Ordner per Platzhalter behalten
+01_PDFs_hier_ablegen/*
+!01_PDFs_hier_ablegen/_Hier*
+Ergebnisse/*
+!Ergebnisse/_Ergebnisse*
+_pruefungsfortschritt.json
+
+# Fachliche Unterlagen (UGB-Gesetzestext, PwC-Checkliste, Wissensbasis)
+Fachliche Unterlagen/
+
+# ===========================================================================
+#  Build / Caches / Temp (regenerierbar)
+# ===========================================================================
+build/
+dist/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+_Programm/build/
+_Programm/dist/
+_Programm/*.egg-info/
+_tmp_web/
+output/
+*.log
+
+# Backups
+*.bak
+*.bak_encoding
+*.bak_*
+
+# OS / Editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+*.swp

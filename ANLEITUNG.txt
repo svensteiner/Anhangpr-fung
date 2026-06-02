@@ -1,0 +1,97 @@
+============================================================
+  LLP ANHANGSPRUEFER
+  Pruefungsunterstuetzung fuer Anhaenge zum Jahresabschluss
+============================================================
+
+EIN TOOL - DREI MODI - DOPPELKLICK GENUEGT:
+-------------------------------------------
+
+  Anhangspruefer.exe   (im Ordner dist\)
+  ~~~~~~~~~~~~~~~~~~~~
+  EINFACHSTE VARIANTE - KEIN PYTHON NOETIG.
+  Doppelklick auf die EXE. Die Web-Oberflaeche oeffnet sich
+  automatisch im Browser (http://localhost:5555).
+  Zum Beenden: das schwarze Konsolenfenster schliessen.
+
+  (Alternativ fuer Entwickler: Starten.bat - braucht Python.)
+
+
+MANDANT & FORTSCHRITT (auf der Startseite):
+-------------------------------------------
+Oben tragen Sie den MANDANTEN ein. Darunter sehen Sie auf
+einen Blick, welche der 3 Pruefungsstufen fuer diesen
+Mandanten schon erledigt sind (mit Datum) und welche offen:
+
+  Stufe 1 - Vorjahresvergleich   (gegen Vorjahres-Anhang)
+  Stufe 2 - Detailpruefung       (gegen Detailbelege)
+  Stufe 3 - UGB-Inhaltspruefung  (gegen SS 236-243 UGB)
+
+Der Stand bleibt gespeichert - auch nach Neustart des Tools.
+Ein Klick auf eine Stufe startet den jeweiligen Modus:
+
+
+MODUS 1 - VORJAHRESVERGLEICH
+-----------------------------
+Prueft, ob die Vorjahreszahlen im aktuellen Anhang korrekt
+aus dem Vorjahres-Anhang uebernommen wurden.
+
+  1. Aktuellen Anhang (z.B. 2025) hochladen
+  2. Vorjahres-Anhang (z.B. 2024) hochladen
+  3. "Vergleich starten" klicken
+
+  Ergebnis: Excel mit allen verglichenen Positionen.
+  Blatt "Abweichungen" zeigt nur die abweichenden Posten.
+
+
+MODUS 2 - DETAILZAHLENVERGLEICH (BELEGPRUEFUNG)
+------------------------------------------------
+Prueft, ob die Zahlen im Anhang mit den Detailunterlagen
+uebereinstimmen (z.B. Bankgarantien, Personalstand).
+
+  1. Anhang (PDF) hochladen
+  2. Detailunterlagen hinzufuegen - beliebig viele:
+       - Bankgarantien / Haftungsobligo (PDF)
+       - Personalstand / Mitarbeiter   (Excel)
+     Das Tool erkennt den Typ automatisch.
+  3. "Pruefung starten" klicken
+
+  Ergebnis: Excel mit Status OK / ABWEICHUNG je Position.
+  Hinweis: Bei Haftungen mehrere Bankbelege hochladen
+  (Tool summiert automatisch auf).
+
+
+MODUS 3 - UGB-INHALTSPRUEFUNG
+------------------------------
+Prueft, ob die nach den UGB-Vorschriften erforderlichen
+Angaben (insbesondere §§ 236-243 UGB) im Anhang enthalten sind.
+
+  1. Anhang (PDF) hochladen
+  2. "Inhaltspruefung starten" klicken
+
+  Ergebnis: Markdown-Protokoll mit Findings je Pflichtangabe.
+
+
+ERGEBNISSE:
+-----------
+  Alle Auswertungen landen im Ordner: Ergebnisse\
+    vergleich_DATUM_UHRZEIT.xlsx        (Modus 1)
+    pruefung_DATUM_UHRZEIT.xlsx         (Modus 2)
+    ugb_protokoll_DATUM_UHRZEIT.md      (Modus 3)
+
+
+VORAUSSETZUNGEN:
+----------------
+  Python 3.11+ (https://www.python.org/downloads/)
+  Beim Setup: Haekchen bei "Add Python to PATH" setzen!
+
+  Erster Start: kurze Internetverbindung noetig (Bibliotheken).
+  Danach: vollstaendig offline, kein Datenversand.
+
+
+HAFTUNGSAUSSCHLUSS:
+-------------------
+  Dieses Tool dient ausschliesslich der Pruefungsunterstuetzung.
+  Es ersetzt NICHT die fachliche Beurteilung durch den Pruefer.
+  Alle Ergebnisse sind manuell zu validieren.
+
+============================================================

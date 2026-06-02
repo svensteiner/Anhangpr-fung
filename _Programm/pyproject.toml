@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anhangspruefer"
+version = "0.1.0"
+description = "Audit support tool for reviewing notes to financial statements under Austrian UGB"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Proprietary - Internal Use Only"}
+authors = [
+    {name = "Audit Support Tool Development"}
+]
+keywords = ["audit", "UGB", "financial statements", "notes", "Anhang"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Office/Business :: Financial :: Accounting",
+]
+
+dependencies = [
+    "pypdf>=4.0.0",
+    "pdfplumber>=0.10.0",
+    "openpyxl>=3.1.0",
+    "flask>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+rtf = [
+    "striprtf>=0.0.26",
+]
+all = [
+    "pypdf>=4.0.0",
+    "pdfplumber>=0.10.0",
+    "openpyxl>=3.1.0",
+    "flask>=3.0.0",
+    "striprtf>=0.0.26",
+]
+
+[project.scripts]
+anhangspruefer = "anhangspruefer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["anhangspruefer*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
