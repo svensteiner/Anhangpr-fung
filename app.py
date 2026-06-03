@@ -21,7 +21,9 @@ Vollständig lokal, keine externen Aufrufe.
 from __future__ import annotations
 
 import json
+import os
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
@@ -163,6 +165,11 @@ HTML = r"""<!DOCTYPE html>
   .header-title { margin-left: auto; font-size: 14px; color: var(--muted); letter-spacing: .5px; }
   .header-back { margin-left: 16px; font-size: 13px; color: var(--maroon); text-decoration: none; padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; background: var(--white); }
   .header-back:hover { background: var(--bg); }
+  .header-quit { margin-left: 10px; font-size: 13px; color: var(--error); text-decoration: none; padding: 6px 14px; border: 1px solid var(--error); border-radius: 6px; cursor: pointer; background: var(--white); }
+  .header-quit:hover { background: var(--error); color: #fff; }
+  .quit-screen { max-width: 540px; margin: 80px auto; text-align: center; background: var(--white); border: 2px solid var(--border); border-radius: 14px; padding: 48px 32px; box-shadow: var(--shadow); }
+  .quit-screen h2 { font-size: 22px; margin: 0 0 12px; color: var(--maroon); }
+  .quit-screen p { color: var(--muted); font-size: 15px; }
 
   /* Hero */
   .hero { background: linear-gradient(135deg, var(--maroon) 0%, #A52020 50%, var(--orange) 100%); color: #fff; padding: 48px 40px 44px; text-align: center; }
@@ -240,13 +247,16 @@ HTML = r"""<!DOCTYPE html>
   .progress-bar { height: 100%; background: linear-gradient(90deg, var(--maroon), var(--orange)); border-radius: 100px; width: 0%; transition: width .4s ease; }
   .progress-text { font-size: 13px; color: var(--muted); text-align: center; }
 
-  .result-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+  .result-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 16px; margin-bottom: 14px; }
   .stat-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
   .stat-val { font-size: 32px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
   .stat-lbl { font-size: 11px; color: var(--muted); letter-spacing: .5px; text-transform: uppercase; }
   .stat-ok    .stat-val { color: var(--success); }
   .stat-abw   .stat-val { color: var(--error); }
   .stat-total .stat-val { color: var(--maroon); }
+  .stat-text  .stat-val { color: var(--orange); }
+  .result-note { font-size: 13px; color: var(--muted); background: var(--bg); border-left: 3px solid var(--orange); padding: 10px 14px; border-radius: 4px; margin-bottom: 16px; }
+  .result-saved { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
 
   .error-box { background: #FFF5F5; border: 1px solid #FFCDD2; border-radius: 8px; padding: 20px; color: var(--error); font-size: 14px; line-height: 1.5; }
 
@@ -286,6 +296,7 @@ HTML = r"""<!DOCTYPE html>
   </div>
   <div class="header-title">AI Tools · Prüfungsunterstützung</div>
   <button class="header-back hidden" id="btn-back" onclick="showModePicker()">← Modus wechseln</button>
+  <button class="header-quit" id="btn-quit" onclick="quitApp()">⏻ Beenden</button>
 </header>
 
 <div class="hero">
@@ -396,8 +407,11 @@ HTML = r"""<!DOCTYPE html>
         <div class="stat-box stat-ok"><div class="stat-val" id="vj-ok">—</div><div class="stat-lbl">Übereinstimmend</div></div>
         <div class="stat-box stat-abw"><div class="stat-val" id="vj-abw">—</div><div class="stat-lbl">Abweichungen</div></div>
         <div class="stat-box stat-total"><div class="stat-val" id="vj-tot">—</div><div class="stat-lbl">Geprüfte Posten</div></div>
+        <div class="stat-box stat-text"><div class="stat-val" id="vj-newtext">—</div><div class="stat-lbl">Neue Textteile</div></div>
       </div>
-      <a class="btn-download" id="vj-dl" href="#" download>⬇ Excel-Bericht herunterladen</a>
+      <div class="result-note">Zwei Bereiche im Bericht: <strong>Zahlenvergleich</strong> (Vorjahreszahlen ↔ Vorjahresbericht) und <strong>Neue Textteile</strong> (eigenes Tabellenblatt).</div>
+      <div class="result-saved" id="vj-saved"></div>
+      <button class="btn-download" id="vj-dl" onclick="openResults()">📂 Ergebnis-Ordner öffnen</button>
     </div>
   </section>
 
@@ -451,7 +465,8 @@ HTML = r"""<!DOCTYPE html>
         <div class="stat-box stat-total"><div class="stat-val" id="bg-tot">—</div><div class="stat-lbl">Geprüfte Positionen</div></div>
       </div>
       <div id="bg-erkannt" style="font-size:13px;color:var(--muted);margin-bottom:12px"></div>
-      <a class="btn-download" id="bg-dl" href="#" download>⬇ Excel-Bericht herunterladen</a>
+      <div class="result-saved" id="bg-saved"></div>
+      <button class="btn-download" id="bg-dl" onclick="openResults()">📂 Ergebnis-Ordner öffnen</button>
     </div>
   </section>
 
@@ -493,7 +508,8 @@ HTML = r"""<!DOCTYPE html>
         <div class="stat-box stat-abw"><div class="stat-val" id="ug-fehl">—</div><div class="stat-lbl">Fehlend / unklar</div></div>
         <div class="stat-box stat-total"><div class="stat-val" id="ug-tot">—</div><div class="stat-lbl">Geprüfte Items</div></div>
       </div>
-      <a class="btn-download" id="ug-dl" href="#" download>⬇ Protokoll herunterladen</a>
+      <div class="result-saved" id="ug-saved"></div>
+      <button class="btn-download" id="ug-dl" onclick="openResults()">📂 Ergebnis-Ordner öffnen</button>
     </div>
   </section>
 
@@ -643,9 +659,8 @@ function vjShowResult(data) {
   document.getElementById('vj-ok').textContent  = data.ok;
   document.getElementById('vj-abw').textContent = data.abweichungen;
   document.getElementById('vj-tot').textContent = data.gesamt;
-  const lnk = document.getElementById('vj-dl');
-  lnk.href = '/download/' + encodeURIComponent(data.filename);
-  lnk.download = data.filename;
+  document.getElementById('vj-newtext').textContent = (data.neue_textteile != null ? data.neue_textteile : '—');
+  resultReady('vj', data.filename);
   refreshStatusAfterRun();
 }
 function vjError(msg) {
@@ -740,9 +755,7 @@ function bgShowResult(data) {
   if (data.erkannte_belege && data.erkannte_belege.length) {
     document.getElementById('bg-erkannt').textContent = 'Erkannte Belegtypen: ' + data.erkannte_belege.join(' · ');
   }
-  const lnk = document.getElementById('bg-dl');
-  lnk.href = '/download/' + encodeURIComponent(data.filename);
-  lnk.download = data.filename;
+  resultReady('bg', data.filename);
   refreshStatusAfterRun();
 }
 function bgError(msg) {
@@ -789,15 +802,43 @@ function ugShowResult(data) {
   document.getElementById('ug-ok').textContent   = data.ok;
   document.getElementById('ug-fehl').textContent = data.fehlend;
   document.getElementById('ug-tot').textContent  = data.gesamt;
-  const lnk = document.getElementById('ug-dl');
-  lnk.href = '/download/' + encodeURIComponent(data.filename);
-  lnk.download = data.filename;
+  resultReady('ug', data.filename);
   refreshStatusAfterRun();
 }
 function ugError(msg) {
   hide('ug-progress'); show('ug-error'); show('ug-upload');
   document.getElementById('ug-err-text').textContent = msg;
   setStep('ug', 1);
+}
+
+/* ===================================================================
+   ERGEBNIS-ORDNER ÖFFNEN
+   =================================================================== */
+let lastResultFile = '';
+function resultReady(prefix, filename) {
+  lastResultFile = filename || '';
+  const saved = document.getElementById(prefix + '-saved');
+  if (saved) saved.textContent = 'Gespeichert im Ordner „Ergebnisse" als: ' + (filename || '');
+}
+async function openResults() {
+  try {
+    const fd = new FormData();
+    if (lastResultFile) fd.append('file', lastResultFile);
+    await fetch('/open_results', { method: 'POST', body: fd });
+  } catch (e) {}
+}
+
+/* ===================================================================
+   BEENDEN
+   =================================================================== */
+async function quitApp() {
+  if (!confirm('Anhangsprüfer wirklich beenden?')) return;
+  try { await fetch('/shutdown', { method: 'POST' }); } catch (e) {}
+  document.body.innerHTML =
+    '<div class="quit-screen">'
+    + '<h2>✓ Anhangsprüfer wurde beendet</h2>'
+    + '<p>Sie können dieses Browserfenster jetzt schließen.</p>'
+    + '</div>';
 }
 
 /* ===================================================================
@@ -837,6 +878,43 @@ def status_route():
     return jsonify({"mandanten": _load_status(), "stages": list(STAGES)})
 
 
+@app.route("/open_results", methods=["POST"])
+def open_results_route():
+    """Öffnet den Ergebnisse-Ordner im Windows-Explorer (lokales Tool).
+
+    Wenn ein Dateiname übergeben wird, wird die Datei im Explorer markiert,
+    sonst nur der Ordner geöffnet. So landen Ergebnisse nicht im Downloads-
+    Wirrwarr, sondern im festen Ergebnis-Ordner.
+    """
+    fname = (request.form.get("file") or "").strip()
+    try:
+        target = OUTPUT_DIR / Path(fname).name if fname else None
+        if target is not None and target.exists():
+            subprocess.Popen(f'explorer /select,"{target}"')
+        else:
+            os.startfile(str(OUTPUT_DIR))  # type: ignore[attr-defined]
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    return jsonify({"ok": True})
+
+
+@app.route("/shutdown", methods=["POST"])
+def shutdown_route():
+    """Beendet das Programm sauber (für den 'Beenden'-Knopf in der Oberfläche).
+
+    Da die EXE ohne Konsolenfenster läuft, ist dies der vorgesehene Weg zum
+    Stoppen. Antwort wird gesendet, dann beendet sich der Prozess kurz darauf.
+    """
+    def _kill() -> None:
+        import os
+        import time
+        time.sleep(0.5)
+        os._exit(0)
+
+    threading.Thread(target=_kill, daemon=True).start()
+    return jsonify({"ok": True})
+
+
 # ---------- Modus 1: Vorjahresvergleich ----------
 @app.route("/compare", methods=["POST"])
 def compare_route():
@@ -867,7 +945,13 @@ def compare_route():
 
     ok_count  = sum(1 for r in result.rows if r.status == "OK")
     abw_count = sum(1 for r in result.rows if r.status == "ABWEICHUNG")
-    summary = {"ok": ok_count, "abweichungen": abw_count, "gesamt": len(result.rows)}
+    text_count = len(result.new_text_blocks)
+    summary = {
+        "ok": ok_count,
+        "abweichungen": abw_count,
+        "gesamt": len(result.rows),
+        "neue_textteile": text_count,
+    }
     _record_stage(request.form.get("mandant", ""), "vorjahr", out_fname, summary)
     return jsonify({**summary, "filename": out_fname})
 
@@ -1005,18 +1089,73 @@ def _free_port(default: int) -> int:
 
 
 def _open_browser(port: int) -> None:
+    """Öffnet den Browser, sobald der Server WIRKLICH erreichbar ist.
+
+    Statt stur 1,2 s zu warten (was beim ersten EXE-Start zu kurz ist, weil
+    PyInstaller sich erst entpacken muss), wird aktiv gepollt, bis der Port
+    Verbindungen annimmt – erst dann wird der Browser aufgerufen. Zusätzlich
+    mehrere Öffnungsmethoden als Fallback (Windows: os.startfile).
+    """
+    import os
     import time
-    time.sleep(1.2)
-    webbrowser.open(f"http://localhost:{port}")
+
+    url = f"http://localhost:{port}"
+
+    # 1) Warten bis der Server lauscht (max. 60 s – deckt langsame Erststarts ab)
+    deadline = 60.0
+    waited = 0.0
+    while waited < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+                break
+        except OSError:
+            time.sleep(0.4)
+            waited += 0.4
+
+    # 2) Browser öffnen – robust über mehrere Wege
+    time.sleep(0.3)  # dem Server kurz Luft geben, die erste Seite zu liefern
+    for _ in range(3):
+        opened = False
+        try:
+            opened = webbrowser.open(url, new=2)
+        except Exception:
+            opened = False
+        if not opened:
+            try:
+                os.startfile(url)  # type: ignore[attr-defined]  # Windows-Fallback
+                opened = True
+            except Exception:
+                opened = False
+        if opened:
+            return
+        time.sleep(1.0)
 
 
-if __name__ == "__main__":
+def _main() -> None:
     port = _free_port(5555)
     print("=" * 60)
     print("  LLP Anhangsprüfer  —  3 Modi: Vorjahr · Beleg · UGB")
     print("=" * 60)
     print(f"  Oberfläche : http://localhost:{port}")
-    print("  Beenden    : dieses Fenster schließen")
+    print("  Beenden    : Knopf 'Beenden' in der Oberfläche")
     print()
     threading.Thread(target=_open_browser, args=(port,), daemon=True).start()
     app.run(host="127.0.0.1", port=port, debug=False)
+
+
+if __name__ == "__main__":
+    # Da die EXE ohne Konsolenfenster läuft, ist bei einem Startfehler nichts
+    # sichtbar. Deshalb wird jeder Fehler in eine Log-Datei NEBEN der EXE
+    # geschrieben, damit er diagnostizierbar bleibt.
+    try:
+        _main()
+    except Exception:
+        import traceback
+        try:
+            log = HERE / "_Startfehler.log"
+            with open(log, "w", encoding="utf-8") as fh:
+                fh.write("Anhangsprüfer konnte nicht starten:\n\n")
+                fh.write(traceback.format_exc())
+        except Exception:
+            pass
+        raise

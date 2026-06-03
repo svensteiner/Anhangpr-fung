@@ -2,12 +2,12 @@
 """
 PyInstaller-Spec für den LLP Anhangsprüfer (3 Modi, Web-Oberfläche).
 
-Baut eine EINZELNE, eigenständige EXE – kein Python beim Anwender nötig.
-Die EXE öffnet beim Doppelklick die Oberfläche im Browser. Ergebnisse
-landen im Ordner `Ergebnisse\` NEBEN der EXE (siehe app.py: sys.executable).
+Baut einen eigenständigen Programmordner – kein Python beim Anwender nötig.
+Die EXE öffnet beim Doppelklick die Oberfläche im Browser. Ergebnisse landen
+im Ordner "Ergebnisse" NEBEN der EXE (siehe app.py: sys.executable).
 
 Bauen:   pyinstaller Anhangspruefer.spec --noconfirm
-Ergebnis: dist\Anhangspruefer.exe
+Ergebnis: dist/Anhangspruefer/Anhangspruefer.exe (+ _internal/)
 """
 
 from PyInstaller.utils.hooks import collect_submodules, collect_all
@@ -61,23 +61,33 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# ONEDIR-Bauform: schneller Start (kein Entpacken bei jedem Lauf, wichtig auf
+# Netzlaufwerken). Ergebnis: dist\Anhangspruefer\Anhangspruefer.exe + _internal\
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,     # Binärdateien NICHT in die EXE -> kommen via COLLECT
     name="Anhangspruefer",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     upx_exclude=[],
-    runtime_tmpdir=None,
-    console=True,          # Konsolenfenster zeigt Status / "zum Beenden schließen"
+    console=False,             # KEIN schwarzes Konsolenfenster (Beenden via Knopf)
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name="Anhangspruefer",     # -> dist\Anhangspruefer\
 )

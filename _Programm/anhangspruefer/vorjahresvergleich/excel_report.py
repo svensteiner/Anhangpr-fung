@@ -93,11 +93,21 @@ def _write_uebersicht(wb: Workbook, result: CompareResult) -> None:
     ws.column_dimensions["A"].width = 32
     ws.column_dimensions["B"].width = 14
 
-    ws.cell(row=15, column=1,
-            value=("Hinweis: Heuristische Analyse (Regex + Fuzzy-Label-Matching). "
-                   "Ersetzt KEINE prüferische Beurteilung. Manuelle Validierung erforderlich.")
+    # Eigener Bereich: Textvergleich
+    tcount = len(result.new_text_blocks)
+    ws.cell(row=14, column=1, value="Neue Textteile (eigener Bereich)").font = Font(bold=True)
+    tc = ws.cell(row=14, column=2, value=tcount)
+    tc.font = Font(bold=True)
+    tc.fill = NEW_TEXT_FILL
+    ws.cell(row=14, column=3,
+            value="→ Blatt 'Neue Textteile'").font = Font(italic=True, color="7F7F7F")
+
+    ws.cell(row=16, column=1,
+            value=("Hinweis: Heuristische Analyse (Regex + Fuzzy-Label-Matching, "
+                   "Textvergleich ohne Zahlen). Ersetzt KEINE prüferische Beurteilung. "
+                   "Manuelle Validierung erforderlich.")
             ).font = Font(italic=True, color="7F7F7F")
-    ws.merge_cells("A15:D15")
+    ws.merge_cells("A16:D16")
 
 
 def _write_rows(ws, rows, headers, widths):
@@ -151,6 +161,35 @@ def _write_alle(wb: Workbook, result: CompareResult) -> None:
     _write_rows(ws, result.rows, _HEADERS, _WIDTHS)
 
 
+_TEXT_HEADERS = ["Neuer Textteil (im aktuellen Anhang)", "Seite", "Ähnlichkeit Vorjahr"]
+_TEXT_WIDTHS = [110, 8, 18]
+NEW_TEXT_FILL = PatternFill("solid", fgColor="FFEB9C")
+
+
+def _write_neue_textteile(wb: Workbook, result: CompareResult) -> None:
+    """Eigener Bereich: Textteile, die im aktuellen Anhang neu hinzugekommen sind."""
+    ws = wb.create_sheet("Neue Textteile")
+    _set_header(ws, 1, _TEXT_HEADERS, _TEXT_WIDTHS)
+
+    blocks = result.new_text_blocks
+    if not blocks:
+        c = ws.cell(row=2, column=1,
+                    value="Keine neuen Textteile gegenüber dem Vorjahres-Anhang gefunden.")
+        c.font = Font(italic=True, color="7F7F7F")
+        ws.merge_cells("A2:C2")
+        return
+
+    for r_idx, blk in enumerate(blocks, start=2):
+        c1 = ws.cell(row=r_idx, column=1, value=blk.text)
+        c1.alignment = Alignment(wrap_text=True, vertical="top")
+        c1.fill = NEW_TEXT_FILL
+        c2 = ws.cell(row=r_idx, column=2, value=blk.page)
+        c2.alignment = Alignment(horizontal="center", vertical="top")
+        c3 = ws.cell(row=r_idx, column=3, value=blk.best_score)
+        c3.alignment = Alignment(horizontal="center", vertical="top")
+        c3.number_format = "0.00"
+
+
 def _write_abweichungen(wb: Workbook, result: CompareResult) -> None:
     ws = wb.create_sheet("Abweichungen")
     rows = [r for r in result.rows if r.status == "ABWEICHUNG"]
@@ -163,6 +202,7 @@ def generate_excel(result: CompareResult, output_path: Path) -> Path:
     _write_uebersicht(wb, result)
     _write_alle(wb, result)
     _write_abweichungen(wb, result)
+    _write_neue_textteile(wb, result)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(output_path)

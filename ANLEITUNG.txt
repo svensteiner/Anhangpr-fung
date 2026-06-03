@@ -3,15 +3,22 @@
   Pruefungsunterstuetzung fuer Anhaenge zum Jahresabschluss
 ============================================================
 
-EIN TOOL - DREI MODI - DOPPELKLICK GENUEGT:
--------------------------------------------
+SO STARTEN SIE (EINMALIG INSTALLIEREN):
+---------------------------------------
 
-  Anhangspruefer.exe   (im Ordner dist\)
-  ~~~~~~~~~~~~~~~~~~~~
-  EINFACHSTE VARIANTE - KEIN PYTHON NOETIG.
-  Doppelklick auf die EXE. Die Web-Oberflaeche oeffnet sich
-  automatisch im Browser (http://localhost:5555).
-  Zum Beenden: das schwarze Konsolenfenster schliessen.
+  SCHRITT 1 - EINMALIG:  Doppelklick auf  Installieren.bat
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Kopiert das Tool vom Netzlaufwerk auf Ihren PC und legt
+  eine Verknuepfung "Anhangspruefer" auf den DESKTOP.
+  (Wichtig: vom Netzlaufwerk startet es langsam ~60 s,
+   lokal nur ~2 s. Darum einmal installieren.)
+
+  SCHRITT 2 - IMMER:  Doppelklick auf die Desktop-Verknuepfung
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Der Browser oeffnet sich automatisch (http://localhost:5555).
+  KEIN Python noetig, KEIN schwarzes Fenster.
+
+  ZUM BEENDEN: Knopf "Beenden" oben rechts in der Oberflaeche.
 
   (Alternativ fuer Entwickler: Starten.bat - braucht Python.)
 

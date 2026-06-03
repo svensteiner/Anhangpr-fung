@@ -39,6 +39,12 @@ from typing import Optional
 import pdfplumber
 
 
+# Wort-Trennschärfe für pdfplumber. Standard (3) verklebt bei manchen PDFs
+# (z.B. Prüfungsberichten ohne echte Space-Zeichen) die Wörter. 2 rekonstruiert
+# die Wortgrenzen über die Zeichenabstände zuverlässig.
+X_TOLERANCE = 2
+
+
 # ---------------------------------------------------------------------------
 # Zahlenerkennung (deutsches Format, optional Klammern für Negativwerte)
 # ---------------------------------------------------------------------------
@@ -152,6 +158,22 @@ class AnhangItem:
     def label_key(self) -> str:
         return normalize_label(self.label)
 
+    @property
+    def label_key_compact(self) -> str:
+        """Match-Schlüssel OHNE Leerzeichen.
+
+        Manche PDFs (z.B. Prüfungsberichte) extrahieren Text mit verklebten
+        Wörtern ('Rückstellungenfürsonstiges'), andere mit Leerzeichen
+        ('Rückstellungen für sonstiges'). Durch Entfernen aller Leerzeichen
+        matchen beide Schreibweisen zuverlässig.
+        """
+        return compact_key(self.label)
+
+
+def compact_key(label: str) -> str:
+    """Normalisierter Match-Schlüssel ohne jegliche Leerzeichen."""
+    return normalize_label(label).replace(" ", "")
+
 
 def normalize_label(label: str) -> str:
     """Normalisiert ein Label für robustes Matching zwischen zwei PDFs."""
@@ -252,8 +274,16 @@ def extract_items(pdf_path: Path) -> list[AnhangItem]:
 
     with pdfplumber.open(str(pdf_path)) as pdf:
         for page_index, page in enumerate(pdf.pages, start=1):
-            text = page.extract_text() or ""
+            text = page.extract_text(x_tolerance=X_TOLERANCE) or ""
             raw_lines = [ln.rstrip() for ln in text.split("\n")]
+
+            # Nur der ANLAGENSPIEGEL hat echte Doppelzeilen-Posten (Stand 1.1.
+            # über Stand 31.12., je 6 Spalten). Andere Spiegel (Rückstellungen,
+            # Verbindlichkeiten) sind EINZEILIG. Die Doppelzeilen-Logik darf
+            # daher nur auf Anlagenspiegel-Seiten feuern – erkennbar am Kopf
+            # "Anschaffungs-/Herstellungskosten … Buchwert".
+            _tl = text.lower()
+            page_is_anlagenspiegel = ("buchwert" in _tl) and ("anschaff" in _tl)
 
             # Modus: zwei Zahlen pro Item-Zeile = (current, prior)?
             two_column_mode = False
@@ -340,7 +370,7 @@ def extract_items(pdf_path: Path) -> list[AnhangItem]:
                 #   Zahlenzeile eine Summenzeile (keine zweite Datenzeile) ist.
                 #   Anlagespiegel-Zeilen haben typischerweise >= 3 Zahlen.
                 _two_col_table = two_column_mode and len(nums) == 2
-                if not prior_values and not _two_col_table and i + 1 < len(raw_lines):
+                if not prior_values and not _two_col_table and page_is_anlagenspiegel and i + 1 < len(raw_lines):
                     nxt_line = raw_lines[i + 1]
                     nxt_label, nxt_nums = split_label_and_trailing_numbers(nxt_line)
                     only_numeric = bool(nxt_nums) and (

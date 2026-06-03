@@ -19,16 +19,59 @@ Vorgehen (rein lokal, keine externen Aufrufe):
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Optional
 
-from .extractor import AnhangItem, extract_items, normalize_label
+from .extractor import AnhangItem, compact_key, extract_items, normalize_label
+from .text_compare import NewTextBlock, find_new_text_blocks
 
 
-# Schwelle für Fuzzy-Matching der Labels (0..1)
-FUZZY_THRESHOLD = 0.88
+# Schwelle für Fuzzy-Matching der Labels (0..1). Hoch angesetzt, damit nur
+# praktisch identische Bezeichnungen matchen – verhindert Fehlmatches wie
+# "Zuweisung Rückstellung …" ↔ "Rückstellung …".
+FUZZY_THRESHOLD = 0.95
+
+
+# Zeilen, die KEINE vergleichbaren Einzelposten sind und daher übersprungen
+# werden: Summen/Zwischensummen sowie generische "davon …"-Aufgliederungen
+# (nicht eindeutig ohne Oberposten -> würden falsch cross-matchen).
+_SKIP_LABEL_RE = re.compile(
+    r"^\s*(summe|zwischensumme|gesamtsumme|gesamt|davon\b)",
+    re.I,
+)
+
+# Beteiligungslisten (Tochtergesellschaften): Firmennamen mit Rechtsform.
+# Diese sind KEINE Kontinuitätspositionen — Eigenkapital/Ergebnis der Tochter
+# ändern sich von Jahr zu Jahr legitim. Daher aus dem Zahlenvergleich nehmen.
+_LEGAL_FORM_RE = re.compile(
+    r"\b(gmbh|gesmbh|ges\.m\.b\.h|ag|kgaa|kg|og|se|s\.?r\.?l|s\.?r\.?o|"
+    r"s\.?p\.?a|b\.?v|n\.?v|ltd|llc|inc|plc)\b",
+    re.I,
+)
+# echte Positionen, die zwar einen Firmennamen enthalten, aber Bilanzposten
+# sind (z.B. "Darlehen accilium group GmbH") -> NICHT ausschließen
+_POSITION_PREFIX_RE = re.compile(
+    r"^\s*(darlehen|forderung|verbindlichkeit|r[uü]ckstellung|verrechnung|"
+    r"ausleihung|anteile|beteiligung|guthaben|kredit)",
+    re.I,
+)
+
+
+def _is_skippable(item: AnhangItem) -> bool:
+    lab = item.label.strip()
+    if _SKIP_LABEL_RE.match(lab):
+        return True
+    # reine Aufzählungs-Unterpunkte wie "a) übrige" / "b. übrige" sind
+    # Aufgliederungen ohne eindeutige Bezeichnung
+    if re.match(r"^[a-zA-Z][\.\)]\s+\S", lab) and len(item.label_key) <= 8:
+        return True
+    # Beteiligungs-/Firmennamen (aber keine echten Positionen wie "Darlehen …")
+    if _LEGAL_FORM_RE.search(lab) and not _POSITION_PREFIX_RE.match(lab):
+        return True
+    return False
 
 # Toleranz für Wertvergleich (absolut, EUR)
 VALUE_TOLERANCE = 0.005
@@ -65,6 +108,8 @@ class CompareResult:
     current_pdf: Path
     prior_pdf: Path
     rows: list[ComparisonRow] = field(default_factory=list)
+    # Eigener Bereich: im aktuellen Anhang neu hinzugekommene Textteile
+    new_text_blocks: list[NewTextBlock] = field(default_factory=list)
 
     @property
     def stats(self) -> dict:
@@ -98,7 +143,7 @@ def _label_similarity(a: str, b: str) -> float:
 def _index_by_normalized(items: list[AnhangItem]) -> dict[str, list[AnhangItem]]:
     out: dict[str, list[AnhangItem]] = {}
     for it in items:
-        key = it.label_key
+        key = it.label_key_compact  # leerzeichen-unabhängig (verklebte Wörter)
         if not key:
             continue
         out.setdefault(key, []).append(it)
@@ -125,6 +170,41 @@ def _find_match(
 
 
 # ---------------------------------------------------------------------------
+# Eröffnungs-/Schlusswert je Posten
+# ---------------------------------------------------------------------------
+# Fachregel (vom Prüfer vorgegeben):
+#   In allen Spiegel-/Entwicklungstabellen muss der ERÖFFNUNGSwert im NEUEN
+#   Bericht mit dem SCHLUSSwert im VORJAHRES-Bericht übereinstimmen
+#   (Bilanzkontinuität). Je nach Tabellentyp ist das:
+#     - Anlagenspiegel (Doppelzeile): BUCHWERT (letzte Spalte) –
+#         Eröffnung = obere Zeile, Schluss = untere Zeile
+#     - Rückstellungs-/Verbindlichkeitenspiegel (einzeilig, >=3 Spalten):
+#         Eröffnung = "Stand" erste Spalte, Schluss = "Stand" letzte Spalte
+#     - einfache Tabelle (Bezeichnung + Vorjahr): Eröffnung = Vorjahresspalte,
+#         Schluss = Berichtsjahresspalte
+def _is_single_row_spiegel(item: AnhangItem) -> bool:
+    return (not item.double_row) and (not item.prior_values) and len(item.current_values) >= 3
+
+
+def opening_value(item: AnhangItem) -> Optional[float]:
+    """Wert am Periodenbeginn (muss = Vorjahres-Schlusswert sein)."""
+    if item.double_row:                       # Anlagenspiegel: obere Zeile, Buchwert
+        return item.prior_values[-1] if item.prior_values else None
+    if _is_single_row_spiegel(item):          # Stand-Spiegel: erste Spalte
+        return item.current_values[0]
+    return item.prior_values[0] if item.prior_values else None   # einfach: Vorjahresspalte
+
+
+def closing_value(item: AnhangItem) -> Optional[float]:
+    """Wert am Periodenende."""
+    if item.double_row:                       # Anlagenspiegel: untere Zeile, Buchwert
+        return item.current_values[-1] if item.current_values else None
+    if _is_single_row_spiegel(item):          # Stand-Spiegel: letzte Spalte
+        return item.current_values[-1]
+    return item.current_values[0] if item.current_values else None  # einfach: Berichtsjahr
+
+
+# ---------------------------------------------------------------------------
 # Hauptfunktion
 # ---------------------------------------------------------------------------
 def compare_anhaenge(current_pdf: Path, prior_pdf: Path) -> CompareResult:
@@ -143,113 +223,99 @@ def compare_anhaenge(current_pdf: Path, prior_pdf: Path) -> CompareResult:
     current_pdf = Path(current_pdf)
     prior_pdf = Path(prior_pdf)
 
-    cur_items = extract_items(current_pdf)
-    prior_items = extract_items(prior_pdf)
+    cur_items = [it for it in extract_items(current_pdf) if not _is_skippable(it)]
+    prior_items = [it for it in extract_items(prior_pdf) if not _is_skippable(it)]
 
     prior_index = _index_by_normalized(prior_items)
     matched_prior_keys: set[str] = set()
     rows: list[ComparisonRow] = []
 
     for cur in cur_items:
-        # Wir vergleichen nur Items, die im aktuellen Anhang überhaupt
-        # einen Vorjahreswert ausweisen — sonst gibt es nichts zu prüfen.
-        if not cur.prior_values:
-            continue
+        # Eröffnungswert im neuen Anhang = der Wert, der mit dem SCHLUSSwert
+        # des Vorjahresberichts übereinstimmen muss (Bilanzkontinuität).
+        new_open = opening_value(cur)
+        if new_open is None:
+            continue  # nichts Vergleichbares (kein Eröffnungs-/Vorjahreswert)
 
-        match, score = _find_match(cur.label_key, prior_index)
+        match, score = _find_match(cur.label_key_compact, prior_index)
 
         if match is None:
-            for ci, v in enumerate(cur.prior_values, start=1):
-                rows.append(
-                    ComparisonRow(
-                        label=cur.label,
-                        column_index=ci,
-                        value_in_current_anhang=v,
-                        value_in_prior_anhang=None,
-                        page_current=cur.page,
-                        page_prior=None,
-                        match_score=0.0,
-                        status="NUR_AKTUELL",
-                    )
-                )
-            continue
-
-        matched_prior_keys.add(match.label_key)
-
-        n = max(len(cur.prior_values), len(match.current_values))
-
-        # Anlagespiegel-Doppelzeilen: Zeile 1 und Zeile 2 haben unterschiedliche
-        # Spalten-Semantik. Nur die Bilanzspalten (AHK, KumAfa, Buchwert) sind
-        # direkt vergleichbar; Bewegungsspalten (Zugänge, AfA, Abgänge) werden
-        # übersprungen.
-        # Standard-Layout 6 Spalten:  [AHK | Zug | KumAfa | AfA | Abg | BW]
-        #   Bilanzspalten bei n=6: {0, 2, 5}
-        #   Bilanzspalten bei n=5: {0, 2, 4}
-        #   Bilanzspalten bei n=4: {0, 2, 3}
-        #   Bilanzspalten bei n<=3: alle
-        if cur.double_row or match.double_row:
-            if n == 6:
-                compare_cols: set[int] = {0, 2, 5}
-            elif n == 5:
-                compare_cols = {0, 2, 4}
-            elif n == 4:
-                compare_cols = {0, 2, 3}
-            else:
-                compare_cols = set(range(n))
-        else:
-            compare_cols = set(range(n))
-
-        for ci in range(n):
-            if ci not in compare_cols:
-                continue  # Bewegungsspalte überspringen
-
-            v_cur = cur.prior_values[ci] if ci < len(cur.prior_values) else None
-            v_pri = match.current_values[ci] if ci < len(match.current_values) else None
-
-            if v_cur is None or v_pri is None:
-                status = "FEHLENDER_WERT"
-            elif _values_match(v_cur, v_pri):
-                status = "OK"
-            else:
-                status = "ABWEICHUNG"
-
             rows.append(
                 ComparisonRow(
                     label=cur.label,
-                    column_index=ci + 1,
-                    value_in_current_anhang=v_cur,
-                    value_in_prior_anhang=v_pri,
+                    column_index=1,
+                    value_in_current_anhang=new_open,
+                    value_in_prior_anhang=None,
                     page_current=cur.page,
-                    page_prior=match.page,
-                    match_score=score,
-                    status=status,
-                    label_prior_doc=match.label if match.label != cur.label else None,
+                    page_prior=None,
+                    match_score=0.0,
+                    status="NUR_AKTUELL",
                 )
             )
+            continue
+
+        matched_prior_keys.add(match.label_key_compact)
+
+        old_close = closing_value(match)
+        if old_close is None:
+            status = "FEHLENDER_WERT"
+        elif _values_match(new_open, old_close):
+            status = "OK"
+        else:
+            status = "ABWEICHUNG"
+
+        rows.append(
+            ComparisonRow(
+                label=cur.label,
+                column_index=1,
+                value_in_current_anhang=new_open,   # Eröffnung neu (= Vorjahres-Schluss)
+                value_in_prior_anhang=old_close,     # Schluss alt
+                page_current=cur.page,
+                page_prior=match.page,
+                match_score=score,
+                status=status,
+                label_prior_doc=match.label if match.label != cur.label else None,
+            )
+        )
 
     # Zusatz-Zeilen für Posten, die nur im Vorjahres-PDF vorkommen.
     for it in prior_items:
-        if it.label_key in matched_prior_keys:
+        if it.label_key_compact in matched_prior_keys:
             continue
-        if not it.current_values:
+        old_close = closing_value(it)
+        if old_close is None:
             continue
-        for ci, v in enumerate(it.current_values, start=1):
-            rows.append(
-                ComparisonRow(
-                    label=it.label,
-                    column_index=ci,
-                    value_in_current_anhang=None,
-                    value_in_prior_anhang=v,
-                    page_current=0,
-                    page_prior=it.page,
-                    match_score=0.0,
-                    status="NUR_VORJAHR",
-                    label_prior_doc=it.label,
-                )
+        rows.append(
+            ComparisonRow(
+                label=it.label,
+                column_index=1,
+                value_in_current_anhang=None,
+                value_in_prior_anhang=old_close,
+                page_current=0,
+                page_prior=it.page,
+                match_score=0.0,
+                status="NUR_VORJAHR",
+                label_prior_doc=it.label,
             )
+        )
+
+    # Duplikat-Unterdrückung: Ein Posten kann in mehreren Tabellen auftauchen
+    # (z.B. Anlagenspiegel = Buchwert UND Anlagenverzeichnis = Anschaffungs-
+    # kosten). Wenn dieselbe Bezeichnung an einer Stelle bereits OK ist, ist die
+    # Kontinuität belegt -> eine widersprüchliche Abweichung desselben Labels
+    # aus einer anderen Tabelle ist ein Artefakt und wird entfernt.
+    ok_labels = {compact_key(r.label) for r in rows if r.status == "OK"}
+    rows = [
+        r for r in rows
+        if not (r.status == "ABWEICHUNG" and compact_key(r.label) in ok_labels)
+    ]
+
+    # Textbereich: neu hinzugekommene Textteile als eigener Bereich
+    new_text_blocks = find_new_text_blocks(current_pdf, prior_pdf)
 
     return CompareResult(
         current_pdf=current_pdf,
         prior_pdf=prior_pdf,
         rows=rows,
+        new_text_blocks=new_text_blocks,
     )
