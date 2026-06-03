@@ -27,6 +27,9 @@ Fachliche Unterlagen/
 # ===========================================================================
 build/
 dist/
+# Verteilte EXE (lokal gebaut, nicht ins Repo)
+Anhangspruefer.exe
+*.exe
 __pycache__/
 *.py[cod]
 *$py.class

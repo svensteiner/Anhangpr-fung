@@ -80,6 +80,12 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 TMP_DIR = None  # tempfile fällt auf das System-Default zurück
 TOOL_ZIP = HERE / "Anhangspruefer_Tool.zip"
 
+# Modus 3 (UGB-Inhaltsprüfung): erweiterbares Prüfprogramm als Excel.
+# Liegt im Fachordner NEBEN der EXE -> jederzeit vom Prüfer in Excel erweiterbar.
+# Ist die Datei vorhanden, wird sie statt der Code-Standardliste verwendet.
+UGB_FACHORDNER = HERE / "Fachliche Unterlagen" / "UGB-Inhaltsprüfung"
+UGB_PRUEFPROGRAMM = UGB_FACHORDNER / "UGB-Pruefprogramm.xlsx"
+
 
 # ---------------------------------------------------------------------------
 # Prüfungsfortschritt je Mandant (3-Stufen-Übersicht)
@@ -1031,9 +1037,21 @@ def ugb_review_route():
         anhang_p = tmp_path / (anhang_file.filename or "anhang.pdf")
         anhang_file.save(str(anhang_p))
 
+        # Prüfprogramm laden: bevorzugt das erweiterbare Excel im Fachordner,
+        # sonst die Code-Standardliste.
+        from anhangspruefer.compliance.knowledge.checklist_loader import ChecklistLoader
+        loader = ChecklistLoader()
+        try:
+            if UGB_PRUEFPROGRAMM.exists():
+                checklist = loader.load_from_xlsx(UGB_PRUEFPROGRAMM)
+            else:
+                checklist = loader.load_default_checklist()
+        except Exception:
+            checklist = loader.load_default_checklist()
+
         try:
             engine = ReviewEngine()
-            review_result = engine.review(notes_path=anhang_p)
+            review_result = engine.review(notes_path=anhang_p, checklist=checklist)
         except Exception as e:
             return jsonify({"error": f"Fehler bei der UGB-Prüfung: {e}"}), 500
 
@@ -1042,8 +1060,6 @@ def ugb_review_route():
         out_fname = f"ugb_protokoll_{stem}_{ts}.md"
         out_path = OUTPUT_DIR / out_fname
         try:
-            from anhangspruefer.compliance.knowledge.checklist_loader import ChecklistLoader
-            checklist = ChecklistLoader().load_default_checklist()
             generator = MarkdownReportGenerator(checklist=checklist)
             generator.generate(review_result, out_path)
         except Exception as e:
@@ -1138,12 +1154,19 @@ def _open_browser(port: int) -> None:
 
 def _main() -> None:
     port = _free_port(5555)
-    print("=" * 60)
-    print("  LLP Anhangsprüfer  —  3 Modi: Vorjahr · Beleg · UGB")
-    print("=" * 60)
-    print(f"  Oberfläche : http://localhost:{port}")
-    print("  Beenden    : Knopf 'Beenden' in der Oberfläche")
+    print("=" * 64)
+    print("   LLP ANHANGSPRUEFER")
+    print("=" * 64)
     print()
+    print("   Das Tool wird gestartet - BITTE WARTEN.")
+    print("   (Beim ersten Mal vom Netzlaufwerk kann das bis zu 1 Minute")
+    print("    dauern. Der Browser oeffnet sich dann AUTOMATISCH.)")
+    print()
+    print(f"   Falls der Browser nicht aufgeht: {('http://localhost:%d' % port)}")
+    print()
+    print("   Dieses Fenster BITTE OFFEN LASSEN, solange Sie arbeiten.")
+    print("   Zum Beenden: dieses Fenster schliessen.")
+    print("=" * 64)
     threading.Thread(target=_open_browser, args=(port,), daemon=True).start()
     app.run(host="127.0.0.1", port=port, debug=False)
 

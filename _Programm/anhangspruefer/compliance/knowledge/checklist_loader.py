@@ -80,6 +80,126 @@ class ChecklistLoader:
 
         return checklist
 
+    @staticmethod
+    def _split_multi(value) -> list[str]:
+        """Zerlegt 'A; B; C' / Zeilenumbrüche in eine Liste."""
+        if value is None:
+            return []
+        parts = re.split(r"[;\n]+", str(value))
+        return [p.strip() for p in parts if p.strip()]
+
+    @staticmethod
+    def _truthy(value) -> bool:
+        s = str(value).strip().lower()
+        return s in ("ja", "j", "yes", "y", "wahr", "true", "1", "x", "pflicht")
+
+    def load_from_xlsx(self, file_path: Path) -> Checklist:
+        """Lädt das UGB-Prüfprogramm aus einer Excel-Datei.
+
+        Erwartete Spaltenüberschriften (Reihenfolge egal, Groß/Klein egal):
+          ID | Kategorie | Prüffrage | UGB-§ | Stichwörter | Pflicht |
+          Anwendbar auf | Hinweis
+        Mehrere Werte (UGB-§, Stichwörter, Anwendbar) mit ';' trennen.
+        So kann das Prüfprogramm jederzeit in Excel erweitert werden.
+        """
+        from openpyxl import load_workbook
+
+        wb = load_workbook(str(file_path), read_only=True, data_only=True)
+        ws = wb.active
+        rows = [r for r in ws.iter_rows(values_only=True)]
+        if not rows:
+            return Checklist(name="UGB-Prüfprogramm (leer)", version="", source_file=str(file_path))
+
+        header = [str(h).strip().lower() if h is not None else "" for h in rows[0]]
+
+        def col(*names: str):
+            for n in names:
+                if n in header:
+                    return header.index(n)
+            return None
+
+        ix = {
+            "id":      col("id", "nr", "item_id"),
+            "kat":     col("kategorie", "category"),
+            "desc":    col("prüffrage", "prueffrage", "frage", "beschreibung", "description"),
+            "ugb":     col("ugb-§", "ugb", "ugb-referenz", "paragraph", "§", "ugb_references"),
+            "kw":      col("stichwörter", "stichworte", "keywords", "search_keywords"),
+            "pflicht": col("pflicht", "is_mandatory", "mandatory"),
+            "anw":     col("anwendbar auf", "anwendbar", "applicable_to", "größenklasse"),
+            "hinweis": col("hinweis", "judgment_guidance", "guidance", "notes"),
+        }
+
+        checklist = Checklist(
+            name="UGB-Prüfprogramm (Excel)",
+            version="",
+            source_file=str(file_path),
+        )
+
+        def cell(row, key):
+            i = ix[key]
+            if i is None or i >= len(row) or row[i] is None:
+                return ""
+            return str(row[i]).strip()
+
+        n = 0
+        for row in rows[1:]:
+            if not any(c is not None and str(c).strip() for c in row):
+                continue
+            desc = cell(row, "desc")
+            if not desc:
+                continue
+            n += 1
+            anw = self._split_multi(cell(row, "anw")) or ["alle"]
+            checklist.add_item(ChecklistItem(
+                item_id=cell(row, "id") or f"chk_{n:03d}",
+                category=cell(row, "kat") or "Allgemein",
+                description=desc,
+                ugb_references=self._split_multi(cell(row, "ugb")),
+                search_keywords=self._split_multi(cell(row, "kw")),
+                applicable_to=anw,
+                is_mandatory=self._truthy(cell(row, "pflicht")) if cell(row, "pflicht") else True,
+                judgment_guidance=cell(row, "hinweis"),
+            ))
+
+        logger.info(f"UGB-Prüfprogramm aus Excel geladen: {len(checklist.items)} Prüfpunkte")
+        return checklist
+
+    def save_to_xlsx(self, checklist: Checklist, file_path: Path) -> None:
+        """Schreibt eine Checkliste als bearbeitbares Excel-Prüfprogramm."""
+        from openpyxl import Workbook
+        from openpyxl.styles import Alignment, Font, PatternFill
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "UGB-Prüfprogramm"
+        headers = ["ID", "Kategorie", "Prüffrage", "UGB-§", "Stichwörter",
+                   "Pflicht", "Anwendbar auf", "Hinweis"]
+        widths = [10, 26, 60, 18, 40, 9, 18, 45]
+        hfill = PatternFill("solid", fgColor="305496")
+        hfont = Font(bold=True, color="FFFFFF")
+        for c, (h, w) in enumerate(zip(headers, widths), start=1):
+            cell = ws.cell(row=1, column=c, value=h)
+            cell.fill = hfill
+            cell.font = hfont
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            ws.column_dimensions[chr(64 + c)].width = w
+        ws.freeze_panes = "A2"
+        ws.row_dimensions[1].height = 28
+
+        for r, item in enumerate(checklist.items, start=2):
+            ws.cell(row=r, column=1, value=item.item_id)
+            ws.cell(row=r, column=2, value=item.category)
+            ws.cell(row=r, column=3, value=item.description).alignment = Alignment(wrap_text=True, vertical="top")
+            ws.cell(row=r, column=4, value="; ".join(item.ugb_references))
+            ws.cell(row=r, column=5, value="; ".join(item.search_keywords)).alignment = Alignment(wrap_text=True, vertical="top")
+            ws.cell(row=r, column=6, value="Ja" if item.is_mandatory else "Nein")
+            ws.cell(row=r, column=7, value="; ".join(item.applicable_to))
+            ws.cell(row=r, column=8, value=item.judgment_guidance).alignment = Alignment(wrap_text=True, vertical="top")
+
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        wb.save(str(file_path))
+        logger.info(f"UGB-Prüfprogramm als Excel gespeichert: {file_path}")
+
     def load_default_checklist(self) -> Checklist:
         """
         Create a default UGB Anhang checklist.

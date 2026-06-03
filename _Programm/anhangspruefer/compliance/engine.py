@@ -67,7 +67,8 @@ class ReviewEngine:
         self,
         notes_path: str | Path,
         checklist_path: Optional[str | Path] = None,
-        ugb_source_path: Optional[str | Path] = None
+        ugb_source_path: Optional[str | Path] = None,
+        checklist=None,
     ) -> ReviewResult:
         """
         Perform a review of the notes document.
@@ -102,10 +103,11 @@ class ReviewEngine:
 
         # Step 3: Load checklist
         logger.info("Loading checklist...")
-        if checklist_path:
-            checklist = self.checklist_loader.load_from_json(Path(checklist_path))
-        else:
-            checklist = self.checklist_loader.load_default_checklist()
+        if checklist is None:
+            if checklist_path:
+                checklist = self.checklist_loader.load_from_json(Path(checklist_path))
+            else:
+                checklist = self.checklist_loader.load_default_checklist()
         logger.info(f"Checklist loaded: {len(checklist.items)} items")
 
         # Step 4: Load UGB source if provided

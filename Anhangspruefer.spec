@@ -61,33 +61,29 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-# ONEDIR-Bauform: schneller Start (kein Entpacken bei jedem Lauf, wichtig auf
-# Netzlaufwerken). Ergebnis: dist\Anhangspruefer\Anhangspruefer.exe + _internal\
+# ONEFILE-Bauform: EINE einzige .exe. Robust direkt vom Netzlaufwerk aufrufbar
+# (eine Datei wird gelesen, entpackt sich in den LOKALEN Temp-Ordner und läuft
+# von dort). Kein onedir-Ordner mit hunderten Dateien (der über das Netz
+# unzuverlässig lädt -> "Failed to import encodings module").
+# console=True: sichtbares Statusfenster, weil der Erststart vom Netz ~30-60 s
+# dauert – der Anwender sieht "wird gestartet…" statt scheinbarem Stillstand.
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,     # Binärdateien NICHT in die EXE -> kommen via COLLECT
     name="Anhangspruefer",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     upx_exclude=[],
-    console=False,             # KEIN schwarzes Konsolenfenster (Beenden via Knopf)
+    runtime_tmpdir=None,
+    console=True,
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name="Anhangspruefer",     # -> dist\Anhangspruefer\
 )
