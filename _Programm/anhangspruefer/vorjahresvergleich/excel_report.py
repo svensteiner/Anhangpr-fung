@@ -93,14 +93,18 @@ def _write_uebersicht(wb: Workbook, result: CompareResult) -> None:
     ws.column_dimensions["A"].width = 32
     ws.column_dimensions["B"].width = 14
 
-    # Eigener Bereich: Textvergleich
-    tcount = len(result.new_text_blocks)
-    ws.cell(row=14, column=1, value="Neue Textteile (eigener Bereich)").font = Font(bold=True)
-    tc = ws.cell(row=14, column=2, value=tcount)
+    # Eigener Bereich: Textvergleich (Vollständigkeit)
+    fehlt = sum(1 for t in result.text_rows if t.status == "FEHLT")
+    neu = sum(1 for t in result.text_rows if t.status == "NEU")
+    geaendert = sum(1 for t in result.text_rows if t.status == "GEÄNDERT")
+    ws.cell(row=14, column=1, value="Textvergleich (Vollständigkeit)").font = Font(bold=True)
+    tc = ws.cell(row=14, column=2,
+                 value=f"FEHLT: {fehlt} · NEU: {neu} · GEÄNDERT: {geaendert}")
     tc.font = Font(bold=True)
-    tc.fill = NEW_TEXT_FILL
+    if fehlt:
+        tc.fill = STATUS_FILLS["ABWEICHUNG"]
     ws.cell(row=14, column=3,
-            value="→ Blatt 'Neue Textteile'").font = Font(italic=True, color="7F7F7F")
+            value="→ Blatt 'Textvergleich'").font = Font(italic=True, color="7F7F7F")
 
     ws.cell(row=16, column=1,
             value=("Hinweis: Heuristische Analyse (Regex + Fuzzy-Label-Matching, "
@@ -161,33 +165,42 @@ def _write_alle(wb: Workbook, result: CompareResult) -> None:
     _write_rows(ws, result.rows, _HEADERS, _WIDTHS)
 
 
-_TEXT_HEADERS = ["Neuer Textteil (im aktuellen Anhang)", "Seite", "Ähnlichkeit Vorjahr"]
-_TEXT_WIDTHS = [110, 8, 18]
+_TEXT_HEADERS = ["Textteil aktuell", "Textteil Vorjahr", "Status", "S. akt.", "S. VJ"]
+_TEXT_WIDTHS = [70, 70, 12, 8, 8]
 NEW_TEXT_FILL = PatternFill("solid", fgColor="FFEB9C")
 
+_TEXT_STATUS_FILL = {
+    "IDENT":    PatternFill("solid", fgColor="FFFFFF"),
+    "GEÄNDERT": PatternFill("solid", fgColor="FFEB9C"),
+    "NEU":      PatternFill("solid", fgColor="DDEBF7"),
+    "FEHLT":    PatternFill("solid", fgColor="FFC7CE"),  # Vollständigkeitslücke!
+}
 
-def _write_neue_textteile(wb: Workbook, result: CompareResult) -> None:
-    """Eigener Bereich: Textteile, die im aktuellen Anhang neu hinzugekommen sind."""
-    ws = wb.create_sheet("Neue Textteile")
+
+def _write_textvergleich(wb: Workbook, result: CompareResult) -> None:
+    """Gegenüberstellung der Textteile aktuell ↔ Vorjahr (Vollständigkeit)."""
+    ws = wb.create_sheet("Textvergleich")
     _set_header(ws, 1, _TEXT_HEADERS, _TEXT_WIDTHS)
 
-    blocks = result.new_text_blocks
-    if not blocks:
-        c = ws.cell(row=2, column=1,
-                    value="Keine neuen Textteile gegenüber dem Vorjahres-Anhang gefunden.")
+    trows = result.text_rows
+    if not trows:
+        c = ws.cell(row=2, column=1, value="Kein vergleichbarer Text gefunden.")
         c.font = Font(italic=True, color="7F7F7F")
-        ws.merge_cells("A2:C2")
+        ws.merge_cells("A2:E2")
         return
 
-    for r_idx, blk in enumerate(blocks, start=2):
-        c1 = ws.cell(row=r_idx, column=1, value=blk.text)
-        c1.alignment = Alignment(wrap_text=True, vertical="top")
-        c1.fill = NEW_TEXT_FILL
-        c2 = ws.cell(row=r_idx, column=2, value=blk.page)
-        c2.alignment = Alignment(horizontal="center", vertical="top")
-        c3 = ws.cell(row=r_idx, column=3, value=blk.best_score)
-        c3.alignment = Alignment(horizontal="center", vertical="top")
-        c3.number_format = "0.00"
+    top = Alignment(wrap_text=True, vertical="top")
+    ctr = Alignment(horizontal="center", vertical="top")
+    for r_idx, tr in enumerate(trows, start=2):
+        c1 = ws.cell(row=r_idx, column=1, value=tr.current); c1.alignment = top
+        c2 = ws.cell(row=r_idx, column=2, value=tr.prior);   c2.alignment = top
+        c3 = ws.cell(row=r_idx, column=3, value=tr.status);  c3.alignment = ctr
+        ws.cell(row=r_idx, column=4, value=tr.page_current).alignment = ctr
+        ws.cell(row=r_idx, column=5, value=tr.page_prior).alignment = ctr
+        fill = _TEXT_STATUS_FILL.get(tr.status)
+        if fill:
+            for col in range(1, 6):
+                ws.cell(row=r_idx, column=col).fill = fill
 
 
 def _write_abweichungen(wb: Workbook, result: CompareResult) -> None:
@@ -202,7 +215,7 @@ def generate_excel(result: CompareResult, output_path: Path) -> Path:
     _write_uebersicht(wb, result)
     _write_alle(wb, result)
     _write_abweichungen(wb, result)
-    _write_neue_textteile(wb, result)
+    _write_textvergleich(wb, result)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(output_path)

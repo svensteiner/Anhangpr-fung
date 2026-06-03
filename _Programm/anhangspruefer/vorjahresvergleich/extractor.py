@@ -258,6 +258,55 @@ def _is_meaningful_label(label: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Anhang-Abschnitt eingrenzen
+# ---------------------------------------------------------------------------
+# Wir prüfen NUR den Anhang. In Prüfungsberichten steht davor/danach viel
+# anderer Text (Prüfungsvertrag, Bestätigungsvermerk, Lagebericht, eine
+# zweite Bilanz/GuV, Beilagen). Diese Bereiche werden anhand der Überschriften
+# ausgeschlossen, damit Zahlen- und Textvergleich nur den Anhang erfassen.
+def _is_anhang_start(line: str) -> bool:
+    s = line.strip().lower()
+    if s == "anhang":
+        return True
+    if re.match(r"^\d+\.\s*anhang$", s):
+        return True
+    if re.match(r"^anhang\s+(zum|f[üu]r|gem|nach|i\.\s*s)", s):
+        return True
+    return False
+
+
+def _is_anhang_end(line: str) -> bool:
+    s = line.strip().lower()
+    if len(s) > 45:
+        return False
+    return bool(re.match(
+        r"^(lagebericht\b|bilanz\b|gewinn-?\s*und\s*verlust|best[äa]tigungsvermerk\b|"
+        r"beilage\b|anlagenverzeichnis\b|entwicklung des anlageverm|anlage\s+\d)",
+        s,
+    ))
+
+
+def anhang_page_range(page_texts: list[str]) -> tuple[int, int]:
+    """(start, end) Seitenindizes des Anhang-Abschnitts; end exklusiv.
+
+    Wird kein Anhang-Kopf erkannt, wird das ganze Dokument zurückgegeben.
+    """
+    start = None
+    for i, t in enumerate(page_texts):
+        if any(_is_anhang_start(ln) for ln in t.split("\n")):
+            start = i
+            break
+    if start is None:
+        return (0, len(page_texts))
+    end = len(page_texts)
+    for j in range(start + 1, len(page_texts)):
+        if any(_is_anhang_end(ln) for ln in page_texts[j].split("\n")):
+            end = j
+            break
+    return (start, end)
+
+
+# ---------------------------------------------------------------------------
 # Hauptfunktion
 # ---------------------------------------------------------------------------
 def extract_items(pdf_path: Path) -> list[AnhangItem]:
@@ -273,8 +322,10 @@ def extract_items(pdf_path: Path) -> list[AnhangItem]:
     pdf_path = Path(pdf_path)
 
     with pdfplumber.open(str(pdf_path)) as pdf:
-        for page_index, page in enumerate(pdf.pages, start=1):
-            text = page.extract_text(x_tolerance=X_TOLERANCE) or ""
+        page_texts = [p.extract_text(x_tolerance=X_TOLERANCE) or "" for p in pdf.pages]
+        start, end = anhang_page_range(page_texts)
+        for page_index in range(start + 1, end + 1):   # 1-basierte Seitennummer
+            text = page_texts[page_index - 1]
             raw_lines = [ln.rstrip() for ln in text.split("\n")]
 
             # Nur der ANLAGENSPIEGEL hat echte Doppelzeilen-Posten (Stand 1.1.

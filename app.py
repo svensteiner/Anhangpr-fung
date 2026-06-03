@@ -255,6 +255,7 @@ HTML = r"""<!DOCTYPE html>
   .stat-abw   .stat-val { color: var(--error); }
   .stat-total .stat-val { color: var(--maroon); }
   .stat-text  .stat-val { color: var(--orange); }
+  .stat-fehlt .stat-val { color: var(--error); }
   .result-note { font-size: 13px; color: var(--muted); background: var(--bg); border-left: 3px solid var(--orange); padding: 10px 14px; border-radius: 4px; margin-bottom: 16px; }
   .result-saved { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
 
@@ -407,9 +408,10 @@ HTML = r"""<!DOCTYPE html>
         <div class="stat-box stat-ok"><div class="stat-val" id="vj-ok">—</div><div class="stat-lbl">Übereinstimmend</div></div>
         <div class="stat-box stat-abw"><div class="stat-val" id="vj-abw">—</div><div class="stat-lbl">Abweichungen</div></div>
         <div class="stat-box stat-total"><div class="stat-val" id="vj-tot">—</div><div class="stat-lbl">Geprüfte Posten</div></div>
-        <div class="stat-box stat-text"><div class="stat-val" id="vj-newtext">—</div><div class="stat-lbl">Neue Textteile</div></div>
+        <div class="stat-box stat-fehlt"><div class="stat-val" id="vj-textfehlt">—</div><div class="stat-lbl">Fehlende Textteile</div></div>
+        <div class="stat-box stat-text"><div class="stat-val" id="vj-textneu">—</div><div class="stat-lbl">Neue Textteile</div></div>
       </div>
-      <div class="result-note">Zwei Bereiche im Bericht: <strong>Zahlenvergleich</strong> (Vorjahreszahlen ↔ Vorjahresbericht) und <strong>Neue Textteile</strong> (eigenes Tabellenblatt).</div>
+      <div class="result-note">Zwei Bereiche im Bericht: <strong>Zahlenvergleich</strong> (Vorjahreszahlen ↔ Vorjahresbericht) und <strong>Textvergleich</strong> (Absätze aktuell ↔ Vorjahr, Vollständigkeit — Blatt „Textvergleich").</div>
       <div class="result-saved" id="vj-saved"></div>
       <button class="btn-download" id="vj-dl" onclick="openResults()">📂 Ergebnis-Ordner öffnen</button>
     </div>
@@ -659,7 +661,8 @@ function vjShowResult(data) {
   document.getElementById('vj-ok').textContent  = data.ok;
   document.getElementById('vj-abw').textContent = data.abweichungen;
   document.getElementById('vj-tot').textContent = data.gesamt;
-  document.getElementById('vj-newtext').textContent = (data.neue_textteile != null ? data.neue_textteile : '—');
+  document.getElementById('vj-textfehlt').textContent = (data.text_fehlt != null ? data.text_fehlt : '—');
+  document.getElementById('vj-textneu').textContent = (data.text_neu != null ? data.text_neu : '—');
   resultReady('vj', data.filename);
   refreshStatusAfterRun();
 }
@@ -945,12 +948,14 @@ def compare_route():
 
     ok_count  = sum(1 for r in result.rows if r.status == "OK")
     abw_count = sum(1 for r in result.rows if r.status == "ABWEICHUNG")
-    text_count = len(result.new_text_blocks)
+    text_fehlt = sum(1 for t in result.text_rows if t.status == "FEHLT")
+    text_neu = sum(1 for t in result.text_rows if t.status == "NEU")
     summary = {
         "ok": ok_count,
         "abweichungen": abw_count,
         "gesamt": len(result.rows),
-        "neue_textteile": text_count,
+        "text_fehlt": text_fehlt,
+        "text_neu": text_neu,
     }
     _record_stage(request.form.get("mandant", ""), "vorjahr", out_fname, summary)
     return jsonify({**summary, "filename": out_fname})

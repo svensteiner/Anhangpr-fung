@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Optional
 
 from .extractor import AnhangItem, compact_key, extract_items, normalize_label
-from .text_compare import NewTextBlock, find_new_text_blocks
+from .text_compare import TextRow, align_texts
 
 
 # Schwelle für Fuzzy-Matching der Labels (0..1). Hoch angesetzt, damit nur
@@ -108,8 +108,8 @@ class CompareResult:
     current_pdf: Path
     prior_pdf: Path
     rows: list[ComparisonRow] = field(default_factory=list)
-    # Eigener Bereich: im aktuellen Anhang neu hinzugekommene Textteile
-    new_text_blocks: list[NewTextBlock] = field(default_factory=list)
+    # Eigener Bereich: Text-Gegenüberstellung aktuell ↔ Vorjahr (Vollständigkeit)
+    text_rows: list[TextRow] = field(default_factory=list)
 
     @property
     def stats(self) -> dict:
@@ -310,12 +310,12 @@ def compare_anhaenge(current_pdf: Path, prior_pdf: Path) -> CompareResult:
         if not (r.status == "ABWEICHUNG" and compact_key(r.label) in ok_labels)
     ]
 
-    # Textbereich: neu hinzugekommene Textteile als eigener Bereich
-    new_text_blocks = find_new_text_blocks(current_pdf, prior_pdf)
+    # Textbereich: Gegenüberstellung aktuell ↔ Vorjahr (Vollständigkeit)
+    text_rows = align_texts(current_pdf, prior_pdf)
 
     return CompareResult(
         current_pdf=current_pdf,
         prior_pdf=prior_pdf,
         rows=rows,
-        new_text_blocks=new_text_blocks,
+        text_rows=text_rows,
     )
