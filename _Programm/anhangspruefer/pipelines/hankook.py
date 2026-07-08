@@ -28,6 +28,7 @@ import openpyxl
 import pdfplumber
 
 from ..pruefung.extractor import AnhangPosition, ExtractedFact, _trailing_numbers, _parse_de_number
+from ..vorjahresvergleich.extractor import AnhangItem
 from .base import Pipeline
 
 # Belegtypen dieser Pipeline
@@ -50,6 +51,27 @@ _LST_COMPONENTS = [
     (r"Firmen",        "LatSteuer_Firmenwert",  TYPE_LST_FIRMENWERT, "Latente Steuer Geschäfts-(Firmen-)wert"),
     (r"Jubil",         "LatSteuer_Jubilaeum",   TYPE_LST_JUBILAEUM, "Latente Steuer Rückstellung Jubiläumsgelder"),
 ]
+
+# Vorjahresvergleich (Modus 1): Vorwärts-Verpflichtungen sind KEINE Kontinuitätsposten
+_VJV_EXCLUDE_RE = re.compile(r"verpflichtungen\s+aus\s+(leasing|miet)", re.I)
+
+
+def _is_hankook_vjv_item(it: AnhangItem) -> bool:
+    """True, wenn der Posten in den Vorjahresvergleich (Bilanzkontinuität) gehört.
+
+    Beseitigt die Fehlerquellen des Standard-Extraktors bei Hankook:
+      * Nutzungsdauer-Angaben (z.B. Firmenwert "10", BGA "5" = JAHRE) sowie
+        Seitenzahlen/Prosa-Zahlen erscheinen als Einzelwert und kollidieren
+        mit gleichlautenden Anlagenspiegel-Labels -> Fehlmatch.
+      * Verpflichtungen aus Leasing-/Mietverträgen sind Vorwärtsangaben
+        (folgendes Jahr / folgende 5 Jahre), keine Bilanzkontinuität; sie
+        werden in Modus 2 geprüft.
+    """
+    if _VJV_EXCLUDE_RE.search(it.label):
+        return False
+    if it.double_row or it.prior_values:   # Anlagenspiegel / Posten mit Vorjahreswert
+        return True
+    return len(it.current_values) >= 3     # einzeiliger Spiegel ja, Einzel-Rauschzahl nein
 
 
 # ---------------------------------------------------------------------------
@@ -274,6 +296,12 @@ class HankookPipeline(Pipeline):
         "LatSteuer_Jubilaeum": TYPE_LST_JUBILAEUM,
     }
 
+    # ---- Modus 1: Vorjahresvergleich ----
+    def extract_anhang_items(self, pdf_path: Path) -> list[AnhangItem]:
+        items = super().extract_anhang_items(pdf_path)
+        return [it for it in items if _is_hankook_vjv_item(it)]
+
+    # ---- Modus 2: Belegprüfung ----
     def extract_anhang_positions(self, pdf_path: Path) -> list[AnhangPosition]:
         # Standard (Haftungen, Arbeitnehmer) + Verpflichtungen + latente Steuern
         return (

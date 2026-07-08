@@ -11,10 +11,12 @@ from anhangspruefer.pipelines.hankook import (
     _detect_hankook_type,
     _parse_lst_anhang,
     _parse_lst_beleg,
+    _is_hankook_vjv_item,
     TYPE_LEASING,
     TYPE_MIETE,
     TYPE_EVENTUALV,
 )
+from anhangspruefer.vorjahresvergleich.extractor import AnhangItem
 
 
 # ---------------------------------------------------------------------------
@@ -122,3 +124,40 @@ def test_hankook_section_to_type_has_latente_steuern():
     assert hp.section_to_type["LatSteuer_Leasing_KFZ"] == "hankook_lst_leasing_kfz"
     assert hp.section_to_type["LatSteuer_Firmenwert"] == "hankook_lst_firmenwert"
     assert hp.section_to_type["LatSteuer_Jubilaeum"] == "hankook_lst_jubilaeum"
+
+
+# ---------------------------------------------------------------------------
+# Modus 1: Filter für echte Kontinuitätsposten (Vorjahresvergleich)
+# ---------------------------------------------------------------------------
+def _item(label, current, prior, double_row=False):
+    return AnhangItem(label=label, page=1, current_values=current,
+                      prior_values=prior, double_row=double_row)
+
+
+def test_vjv_keeps_anlagenspiegel_and_items_with_vorjahr():
+    # Anlagenspiegel-Doppelzeile
+    assert _is_hankook_vjv_item(_item(
+        "Geschäfts-(Firmen-)wert",
+        [3251298, 0, 2004968, 0, 1246330],
+        [3251298, 0, 1679838, 325130, 1571460],
+        double_row=True,
+    )) is True
+    # Angestellte (Wert mit Vorjahr) – echter Kontinuitätsvergleich
+    assert _is_hankook_vjv_item(_item("Angestellte", [23.0], [21.0])) is True
+    # einzeiliger Spiegel (>=3 Spalten, kein Vorjahr)
+    assert _is_hankook_vjv_item(_item("Rückstellungsspiegel Stand", [100.0, 20.0, 120.0], [])) is True
+
+
+def test_vjv_drops_nutzungsdauer_and_noise():
+    # Nutzungsdauer in JAHREN (kollidiert mit Anlagenspiegel-Label)
+    assert _is_hankook_vjv_item(_item("Geschäfts-(Firmen-)wert", [10.0], [])) is False
+    assert _is_hankook_vjv_item(_item("Betriebs- und Geschäftsausstattung", [5.0], [])) is False
+    # Seitenzahl / Prosa-Zahl
+    assert _is_hankook_vjv_item(_item("Geschäftsführer Suk Namkung Seite", [7.0], [])) is False
+    assert _is_hankook_vjv_item(_item("konzernweiten Safe Harbour Test", [2025.0], [])) is False
+
+
+def test_vjv_drops_forward_commitments():
+    # Verpflichtungen (folgendes Jahr / 5 Jahre) -> Modus 2, nicht Kontinuität
+    assert _is_hankook_vjv_item(_item("Verpflichtungen aus Leasingverträgen", [64440.0], [191859.0])) is False
+    assert _is_hankook_vjv_item(_item("Verpflichtungen aus Mietverträgen", [1086052.0], [4645228.0])) is False
