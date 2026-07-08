@@ -23,6 +23,7 @@ from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 
 from .comparator import CompareResult
+from .text_compare import diff_excerpt
 
 
 STATUS_FILLS = {
@@ -165,8 +166,8 @@ def _write_alle(wb: Workbook, result: CompareResult) -> None:
     _write_rows(ws, result.rows, _HEADERS, _WIDTHS)
 
 
-_TEXT_HEADERS = ["Textteil aktuell", "Textteil Vorjahr", "Status", "S. akt.", "S. VJ"]
-_TEXT_WIDTHS = [70, 70, 12, 8, 8]
+_TEXT_HEADERS = ["Textteil aktuell", "Textteil Vorjahr", "Status", "S. akt.", "S. VJ", "Unterschied (Auszug)"]
+_TEXT_WIDTHS = [70, 70, 12, 8, 8, 60]
 NEW_TEXT_FILL = PatternFill("solid", fgColor="FFEB9C")
 
 _TEXT_STATUS_FILL = {
@@ -186,7 +187,7 @@ def _write_textvergleich(wb: Workbook, result: CompareResult) -> None:
     if not trows:
         c = ws.cell(row=2, column=1, value="Kein vergleichbarer Text gefunden.")
         c.font = Font(italic=True, color="7F7F7F")
-        ws.merge_cells("A2:E2")
+        ws.merge_cells("A2:F2")
         return
 
     top = Alignment(wrap_text=True, vertical="top")
@@ -197,9 +198,11 @@ def _write_textvergleich(wb: Workbook, result: CompareResult) -> None:
         c3 = ws.cell(row=r_idx, column=3, value=tr.status);  c3.alignment = ctr
         ws.cell(row=r_idx, column=4, value=tr.page_current).alignment = ctr
         ws.cell(row=r_idx, column=5, value=tr.page_prior).alignment = ctr
+        c6 = ws.cell(row=r_idx, column=6, value=diff_excerpt(tr.current, tr.prior))
+        c6.alignment = top
         fill = _TEXT_STATUS_FILL.get(tr.status)
         if fill:
-            for col in range(1, 6):
+            for col in range(1, 7):
                 ws.cell(row=r_idx, column=col).fill = fill
 
 

@@ -34,6 +34,15 @@ from .extractor import anhang_page_range
 # Ähnlichkeitsschwelle: bestes Match < Schwelle  =>  Segment gilt als NEU
 NEW_THRESHOLD = 0.80
 
+# Ähnlichkeit, ab der zwei Absätze als "derselbe" Absatz gelten (sonst NEU/FEHLT).
+# Die Paarung erfolgt nach bester Ähnlichkeit statt strikt nach Reihenfolge, damit
+# umgestellte/anders aufgeteilte Absätze korrekt zugeordnet werden.
+PARA_MATCH_THRESHOLD = 0.55
+
+# Deckungsgrad, ab dem ein unpaariger Absatz als "in der Gegenseite enthalten"
+# gilt (nur anders aufgeteilt) und daher NICHT als NEU/FEHLT ausgewiesen wird.
+PARA_CONTAIN_THRESHOLD = 0.75
+
 # Mindestlänge eines erzählenden Segments (Zeichen), um Rauschen zu vermeiden
 MIN_SEGMENT_CHARS = 30
 MIN_SEGMENT_WORDS = 5
@@ -203,13 +212,82 @@ def _detect_tables(pdf_path: Path) -> list[str]:
 # ---------------------------------------------------------------------------
 # Gegenüberstellung aktuell ↔ Vorjahr (Absätze + Tabellen-Anmerkungen)
 # ---------------------------------------------------------------------------
-def align_texts(current_pdf: Path, prior_pdf: Path) -> list[TextRow]:
-    """Stellt Absätze beider Anhänge Zeile für Zeile gegenüber.
+def _coverage(frag: str, pool: list[str]) -> float:
+    """Höchster Deckungsgrad von 'frag' in einem der Absätze aus 'pool' (0..1).
 
-    Gleiche Absätze (Wortlaut identisch, Zahlen ausgeblendet) stehen in
-    derselben Zeile (IDENT). Lücken zeigen sofort NEU (nur aktuell) bzw.
-    FEHLT (nur Vorjahr → Vollständigkeitslücke). Tabellen erscheinen als
-    eine Anmerkungszeile "<Tabelle> vorhanden".
+    Deckungsgrad = übereinstimmende Zeichen / Länge von 'frag'. Erfasst den
+    Fall, dass ein Absatz auf der Gegenseite nur ANDERS AUFGETEILT ist (er
+    steckt vollständig in einem längeren Absatz).
+    """
+    if not frag:
+        return 1.0
+    best = 0.0
+    for other in pool:
+        if not other:
+            continue
+        sm = SequenceMatcher(None, frag, other, autojunk=False)
+        cov = sum(bl.size for bl in sm.get_matching_blocks()) / len(frag)
+        if cov > best:
+            best = cov
+            if best >= PARA_CONTAIN_THRESHOLD:
+                break
+    return best
+
+
+def _pair_paragraphs(cur: list[tuple[str, int]], pri: list[tuple[str, int]]) -> list[TextRow]:
+    """Paart Absätze nach BESTER Ähnlichkeit (reihenfolge-unabhängig).
+
+    Jeder Vorjahres-Absatz wird höchstens einmal verwendet (greedy, stärkste
+    Paare zuerst). Umgestellte oder anders aufgeteilte Absätze werden dadurch
+    korrekt zugeordnet. Ein unpaariger Absatz gilt nur dann als NEU/FEHLT, wenn
+    sein Inhalt nicht ohnehin (anders aufgeteilt) in einem Absatz der Gegenseite
+    enthalten ist. IDENT = Wortlaut gleich (Zahlen ausgeblendet), sonst GEÄNDERT.
+    """
+    a = [_normalize_for_match(t) for t, _ in cur]
+    b = [_normalize_for_match(t) for t, _ in pri]
+
+    pairs: list[tuple[float, int, int]] = []
+    for i in range(len(a)):
+        if not a[i]:
+            continue
+        for j in range(len(b)):
+            if not b[j]:
+                continue
+            r = SequenceMatcher(None, a[i], b[j], autojunk=False).ratio()
+            if r >= PARA_MATCH_THRESHOLD:
+                pairs.append((r, i, j))
+    pairs.sort(key=lambda x: x[0], reverse=True)
+
+    match_of: dict[int, int] = {}
+    used_prior: set[int] = set()
+    for _r, i, j in pairs:
+        if i in match_of or j in used_prior:
+            continue
+        match_of[i] = j
+        used_prior.add(j)
+
+    rows: list[TextRow] = []
+    for i, (ct, cp) in enumerate(cur):           # in Reihenfolge des aktuellen Anhangs
+        j = match_of.get(i)
+        if j is not None:
+            pt, pp = pri[j]
+            status = "IDENT" if a[i] == b[j] else "GEÄNDERT"
+            rows.append(TextRow(ct, pt, status, cp, pp))
+        elif _coverage(a[i], b) < PARA_CONTAIN_THRESHOLD:
+            rows.append(TextRow(ct, "", "NEU", cp, None))   # wirklich neuer Text
+    for j, (pt, pp) in enumerate(pri):           # nicht gepaarte Vorjahres-Absätze
+        if j not in used_prior and _coverage(b[j], a) < PARA_CONTAIN_THRESHOLD:
+            rows.append(TextRow("", pt, "FEHLT", None, pp))  # echte Vollständigkeitslücke
+    return rows
+
+
+def align_texts(current_pdf: Path, prior_pdf: Path) -> list[TextRow]:
+    """Stellt Absätze beider Anhänge gegenüber.
+
+    Gleiche Absätze (Wortlaut identisch, Zahlen ausgeblendet) sind IDENT.
+    Umgestellte Absätze werden über die Ähnlichkeit korrekt gepaart; echte
+    Lücken zeigen NEU (nur aktuell) bzw. FEHLT (nur Vorjahr → Vollständigkeits-
+    lücke). Tabellen erscheinen als Anmerkungszeile "<Tabelle> vorhanden".
     """
     rows: list[TextRow] = []
 
@@ -227,34 +305,52 @@ def align_texts(current_pdf: Path, prior_pdf: Path) -> list[TextRow]:
         else:
             rows.append(TextRow("", label, "FEHLT", None, None))
 
-    # 2) Absatz-Gegenüberstellung (Sequenz-Ausrichtung)
-    cur = _extract_paragraphs(current_pdf)
-    pri = _extract_paragraphs(prior_pdf)
-    a = [_normalize_for_match(t) for t, _ in cur]
-    b = [_normalize_for_match(t) for t, _ in pri]
-    sm = SequenceMatcher(None, a, b, autojunk=False)
-    for tag, i1, i2, j1, j2 in sm.get_opcodes():
-        if tag == "equal":
-            for k in range(i2 - i1):
-                ct, cp = cur[i1 + k]
-                pt, pp = pri[j1 + k]
-                rows.append(TextRow(ct, pt, "IDENT", cp, pp))
-        elif tag == "replace":
-            la, lb = i2 - i1, j2 - j1
-            for k in range(max(la, lb)):
-                ct, cp = cur[i1 + k] if k < la else ("", None)
-                pt, pp = pri[j1 + k] if k < lb else ("", None)
-                status = "GEÄNDERT" if (ct and pt) else ("NEU" if ct else "FEHLT")
-                rows.append(TextRow(ct, pt, status, cp, pp))
-        elif tag == "delete":            # nur im aktuellen Anhang
-            for k in range(i1, i2):
-                ct, cp = cur[k]
-                rows.append(TextRow(ct, "", "NEU", cp, None))
-        elif tag == "insert":            # nur im Vorjahres-Anhang -> fehlt heuer
-            for k in range(j1, j2):
-                pt, pp = pri[k]
-                rows.append(TextRow("", pt, "FEHLT", None, pp))
+    # 2) Absatz-Gegenüberstellung nach bester Ähnlichkeit (reihenfolge-unabhängig)
+    rows += _pair_paragraphs(_extract_paragraphs(current_pdf),
+                             _extract_paragraphs(prior_pdf))
     return rows
+
+
+def diff_excerpt(current: str, prior: str, max_len: int = 400) -> str:
+    """Kompakter Auszug der Wortunterschiede zwischen zwei Textteilen.
+
+    Für die Spalte "Unterschied (Auszug)" im Textvergleich:
+      * leer, wenn identisch,
+      * Kurzhinweis bei nur-aktuell/nur-Vorjahr,
+      * sonst die abweichenden Wortgruppen, getrennt nach Seite.
+    Reine Satzzeichen-Fragmente (z.B. ein verirrter ".") werden ausgeblendet.
+    """
+    current = current or ""
+    prior = prior or ""
+    if current == prior:
+        return ""
+    if not prior:
+        return "nur aktuell (neuer Textteil)"
+    if not current:
+        return "nur im Vorjahr (fehlt aktuell)"
+
+    aw, bw = current.split(), prior.split()
+    sm = SequenceMatcher(None, aw, bw, autojunk=False)
+    only_cur: list[str] = []
+    only_pri: list[str] = []
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag in ("replace", "delete"):
+            frag = " ".join(aw[i1:i2]).strip()
+            if frag and any(ch.isalnum() for ch in frag):
+                only_cur.append(frag)
+        if tag in ("replace", "insert"):
+            frag = " ".join(bw[j1:j2]).strip()
+            if frag and any(ch.isalnum() for ch in frag):
+                only_pri.append(frag)
+
+    parts: list[str] = []
+    if only_cur:
+        parts.append("aktuell: " + " / ".join(only_cur))
+    if only_pri:
+        parts.append("Vorjahr: " + " / ".join(only_pri))
+    if not parts:
+        return "nur geänderte Zahlen/Zeichen"
+    return (" || ".join(parts))[:max_len]
 
 
 def find_new_text_blocks(current_pdf: Path, prior_pdf: Path) -> list[NewTextBlock]:

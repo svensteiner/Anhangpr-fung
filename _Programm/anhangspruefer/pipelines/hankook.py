@@ -77,33 +77,45 @@ def _is_hankook_vjv_item(it: AnhangItem) -> bool:
 # ---------------------------------------------------------------------------
 # Anhang-Seite: die beiden Verpflichtungs-Zeilen aus dem Hankook-Anhang lesen
 # ---------------------------------------------------------------------------
+def _iter_pdf_pages(pdf_path: Path):
+    """Liefert (Seitenzahl, Seitentext). Robust: bei Lesefehlern leere Folge."""
+    try:
+        with pdfplumber.open(str(pdf_path)) as pdf:
+            for page_num, page in enumerate(pdf.pages, 1):
+                try:
+                    yield page_num, (page.extract_text() or "")
+                except Exception:
+                    yield page_num, ""
+    except Exception:
+        return
+
+
 def _extract_hankook_anhang_positions(pdf_path: Path) -> list[AnhangPosition]:
     positions: list[AnhangPosition] = []
-    with pdfplumber.open(str(pdf_path)) as pdf:
-        for page_num, page in enumerate(pdf.pages, 1):
-            for line in (page.extract_text() or "").split("\n"):
-                if re.search(r"Verpflichtungen\s+aus\s+Leasingvertr", line, re.I):
-                    nums = _trailing_numbers(line)
-                    if nums:
-                        positions.append(AnhangPosition(
-                            section="Verpflichtungen_Leasing",
-                            label="Verpflichtungen aus Leasingverträgen (folgendes GJ)",
-                            current_value=nums[0],
-                            prior_value=nums[1] if len(nums) > 1 else None,
-                            page=page_num,
-                            source_line=line.strip(),
-                        ))
-                elif re.search(r"Verpflichtungen\s+aus\s+Mietvertr", line, re.I):
-                    nums = _trailing_numbers(line)
-                    if nums:
-                        positions.append(AnhangPosition(
-                            section="Verpflichtungen_Miete",
-                            label="Verpflichtungen aus Mietverträgen (folgendes GJ)",
-                            current_value=nums[0],
-                            prior_value=nums[1] if len(nums) > 1 else None,
-                            page=page_num,
-                            source_line=line.strip(),
-                        ))
+    for page_num, text in _iter_pdf_pages(pdf_path):
+        for line in text.split("\n"):
+            if re.search(r"Verpflichtungen\s+aus\s+Leasingvertr", line, re.I):
+                nums = _trailing_numbers(line)
+                if nums:
+                    positions.append(AnhangPosition(
+                        section="Verpflichtungen_Leasing",
+                        label="Verpflichtungen aus Leasingverträgen (folgendes GJ)",
+                        current_value=nums[0],
+                        prior_value=nums[1] if len(nums) > 1 else None,
+                        page=page_num,
+                        source_line=line.strip(),
+                    ))
+            elif re.search(r"Verpflichtungen\s+aus\s+Mietvertr", line, re.I):
+                nums = _trailing_numbers(line)
+                if nums:
+                    positions.append(AnhangPosition(
+                        section="Verpflichtungen_Miete",
+                        label="Verpflichtungen aus Mietverträgen (folgendes GJ)",
+                        current_value=nums[0],
+                        prior_value=nums[1] if len(nums) > 1 else None,
+                        page=page_num,
+                        source_line=line.strip(),
+                    ))
     return positions
 
 
@@ -222,19 +234,17 @@ def _parse_lst_beleg(text: str, filename: str = "") -> list[ExtractedFact]:
 
 
 def _pdf_text(pdf_path: Path) -> str:
-    """Gesamten PDF-Text zeilenweise zu einer Zeile je Seite zusammenführen."""
-    with pdfplumber.open(str(pdf_path)) as pdf:
-        return " ".join(
-            " ".join((page.extract_text() or "").split("\n")) for page in pdf.pages
-        )
+    """Gesamten PDF-Text zeilenweise zu einer Zeile je Seite zusammenführen (robust)."""
+    return " ".join(
+        " ".join(text.split("\n")) for _page, text in _iter_pdf_pages(pdf_path)
+    )
 
 
 def _extract_hankook_latente_steuern_anhang(pdf_path: Path) -> list[AnhangPosition]:
-    with pdfplumber.open(str(pdf_path)) as pdf:
-        for page_num, page in enumerate(pdf.pages, 1):
-            text = " ".join((page.extract_text() or "").split("\n"))
-            if "steuerlatenz" in text.lower():
-                return _parse_lst_anhang(text, page_num)
+    for page_num, raw in _iter_pdf_pages(pdf_path):
+        text = " ".join(raw.split("\n"))
+        if "steuerlatenz" in text.lower():
+            return _parse_lst_anhang(text, page_num)
     return []
 
 

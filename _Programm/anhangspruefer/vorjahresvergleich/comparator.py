@@ -314,8 +314,12 @@ def compare_anhaenge(current_pdf: Path, prior_pdf: Path, pipeline=None) -> Compa
         if not (r.status == "ABWEICHUNG" and compact_key(r.label) in ok_labels)
     ]
 
-    # Textbereich: Gegenüberstellung aktuell ↔ Vorjahr (Vollständigkeit)
-    text_rows = align_texts(current_pdf, prior_pdf)
+    # Textbereich: Gegenüberstellung aktuell ↔ Vorjahr (Vollständigkeit).
+    # Optional – ein Fehler hier darf den Zahlenvergleich nicht kippen.
+    try:
+        text_rows = align_texts(current_pdf, prior_pdf)
+    except Exception:
+        text_rows = []
 
     return CompareResult(
         current_pdf=current_pdf,
