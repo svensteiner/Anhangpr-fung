@@ -69,43 +69,41 @@ class PruefResult:
 # ---------------------------------------------------------------------------
 # Hauptfunktion
 # ---------------------------------------------------------------------------
-def pruefen(anhang_path: Path, beleg_paths: list[Path]) -> PruefResult:
+def pruefen(anhang_path: Path, beleg_paths: list[Path], pipeline=None) -> PruefResult:
     """
     Prüft den Anhang gegen alle übergebenen Belegdateien.
 
     Args:
         anhang_path:  Pfad zum Anhang-PDF
         beleg_paths:  Liste der Detailunterlagen (PDF / XLSX)
+        pipeline:     Dokumenten-Pipeline (mandantenspezifisch). None -> Standard.
 
     Returns:
         PruefResult mit allen Prüfzeilen
     """
+    from ..pipelines import Pipeline
+    pipeline = pipeline or Pipeline()
+
     anhang_path = Path(anhang_path)
     beleg_paths = [Path(p) for p in beleg_paths]
 
-    # 1) Anhang-Positionen extrahieren
-    positions = extract_from_anhang(anhang_path)
+    # 1) Anhang-Positionen extrahieren (Pipeline liefert das mandantenspezifische Set)
+    positions = pipeline.extract_anhang_positions(anhang_path)
 
-    # 2) Belegdateien erkennen und extrahieren
+    # 2) Belegdateien erkennen und extrahieren – beides über die Pipeline
     all_facts: list[ExtractedFact] = []
     detected_types: dict[str, str] = {}
 
     for bpath in beleg_paths:
-        dtype = detect_type(bpath)
+        dtype = pipeline.detect_beleg_type(bpath)
         detected_types[bpath.name] = dtype
-
-        if dtype == "bank_guarantees":
-            all_facts.extend(extract_from_bank_guarantees(bpath))
-        elif dtype == "hr_employees":
-            all_facts.extend(extract_from_hr_excel(bpath))
-        # unknown → ignorieren, wird im Report als nicht erkannt angezeigt
+        all_facts.extend(pipeline.extract_beleg_facts(bpath, dtype))
 
     # 3) Positionen mit Belegen abgleichen
     rows: list[PruefRow] = []
-    TOLERANCE = 0.02   # 2 Cent Rundungstoleranz
 
     for pos in positions:
-        fact_type = SECTION_TO_TYPE.get(pos.section)
+        fact_type = pipeline.section_to_type.get(pos.section)
         matching = [f for f in all_facts if f.source_type == fact_type]
 
         if not matching:
@@ -128,7 +126,7 @@ def pruefen(anhang_path: Path, beleg_paths: list[Path]) -> PruefResult:
             diff = None
         else:
             diff = pos.current_value - beleg_total
-            if abs(diff) <= TOLERANCE:
+            if abs(diff) <= pipeline.match_tolerance(pos.current_value):
                 status = STATUS_HINWEIS if pos.note else STATUS_OK
             else:
                 status = STATUS_ABWEICHUNG

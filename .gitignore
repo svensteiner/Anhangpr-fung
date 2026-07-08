@@ -5,6 +5,10 @@
 # ===========================================================================
 
 # Mandantendaten (echte Prüfungsunterlagen)
+# Klienten/: ein Unterordner je Mandant – Inhalte NIE einchecken,
+# nur die _LIESMICH.txt als Platzhalter behalten.
+Klienten/*
+!Klienten/_LIESMICH.txt
 Accilium/
 *.pdf
 *.PDF

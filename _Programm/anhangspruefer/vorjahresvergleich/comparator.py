@@ -207,24 +207,28 @@ def closing_value(item: AnhangItem) -> Optional[float]:
 # ---------------------------------------------------------------------------
 # Hauptfunktion
 # ---------------------------------------------------------------------------
-def compare_anhaenge(current_pdf: Path, prior_pdf: Path) -> CompareResult:
+def compare_anhaenge(current_pdf: Path, prior_pdf: Path, pipeline=None) -> CompareResult:
     """
     Vergleicht die Vorjahreszahlen zwischen zwei Anhang-PDFs.
 
     Args:
         current_pdf: Anhang des aktuellen Berichtsjahrs (z.B. Anhang 2025)
         prior_pdf:   Anhang des Vorjahrs (z.B. Anhang 2024)
+        pipeline:    Dokumenten-Pipeline (mandantenspezifisch). None -> Standard.
 
     Returns:
         CompareResult mit einer Zeile pro (Label, Spalte). Labels die nur
         im Vorjahres-PDF vorkamen werden als zusätzliche Zeilen mit Status
         NUR_VORJAHR angehängt.
     """
+    from ..pipelines import Pipeline
+    pipeline = pipeline or Pipeline()
+
     current_pdf = Path(current_pdf)
     prior_pdf = Path(prior_pdf)
 
-    cur_items = [it for it in extract_items(current_pdf) if not _is_skippable(it)]
-    prior_items = [it for it in extract_items(prior_pdf) if not _is_skippable(it)]
+    cur_items = [it for it in pipeline.extract_anhang_items(current_pdf) if not _is_skippable(it)]
+    prior_items = [it for it in pipeline.extract_anhang_items(prior_pdf) if not _is_skippable(it)]
 
     prior_index = _index_by_normalized(prior_items)
     matched_prior_keys: set[str] = set()

@@ -16,7 +16,7 @@ Diese Datei dokumentiert, was wohin gehört. Bitte halten, nicht zumüllen.
 | `01_PDFs_hier_ablegen/` | **Inbox**: hier legen Anwender ihre Anhang-PDFs ab. Inhalt wird per Git ignoriert. |
 | `Ergebnisse/` | **Outbox**: alle generierten Excel-Berichte und Markdown-Protokolle + Fortschritts-JSON. Inhalt wird per Git ignoriert. |
 | `Fachliche Unterlagen/` | Tool-stützende Fachmaterialien: UGB-Gesetzestext, PwC-Anhangscheckliste, `Wissensbasis/` (Kommentare/Guidance), Domänen-Doku. **Nicht** einchecken (Urheberrecht Dritter). |
-| `Accilium/` | Mandantendaten (Jahresabschluss, Prüfungsbericht). **VERTRAULICH — niemals einchecken oder pushen** (Verschwiegenheitspflicht). |
+| `Klienten/` | Mandantendaten je Klient im eigenen Unterordner (`Klienten/Accilium/`, `Klienten/Hankook/` …). Ordnername = Eintrag „Mandant" in der App → darüber wird die passende Dokumenten-Pipeline gewählt. **VERTRAULICH — niemals einchecken oder pushen** (Verschwiegenheitspflicht). Das „Hirn" (Prüflogik) bleibt **eine** zentrale Kopie; nur die Dokumenten-Pipeline variiert je Klient. |
 | `_Programm/` | Eigentliches Python-Paket + Tests + Entwicklerdoku. |
 | `.gitignore` | Git-Ignore. Schließt **Mandantendaten, Beispiel-PDFs, fachliche Fremdunterlagen, Auswertungen** strikt aus. |
 
@@ -42,6 +42,7 @@ Diese Datei dokumentiert, was wohin gehört. Bitte halten, nicht zumüllen.
 | `compliance/` | Regel-Engine, Evaluator, Evidence, Knowledge, Rules (Modus 3). |
 | `vorjahresvergleich/` | Vergleich Anhang Vorjahr ↔ Berichtsjahr (Modus 1). |
 | `pruefung/` | Detailzahlenvergleich (Belegprüfung): Extractor, Comparator, Excel-Report (Modus 2). |
+| `pipelines/` | **Dokumenten-Pipelines je Mandant** – ein gemeinsames „Hirn" (Vergleichslogik), austauschbare Extraktion. `base.py` = Standard (bisheriges Verhalten), `hankook.py` = Mandantenprofil Hankook, `__init__.py` = Registry `get_pipeline(mandant)`. Auswahl EXPLIZIT über das „Mandant"-Feld. |
 | `gui.py` | Tkinter-GUI (alternativer Anwender-Einstieg). |
 | `cli.py` | CLI-Einstiegspunkt. |
 | `config.py` | Konfiguration / Konstanten. |

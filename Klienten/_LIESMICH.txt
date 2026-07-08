@@ -1,0 +1,30 @@
+============================================================
+  KLIENTEN - Mandantenordner
+============================================================
+
+VERTRAULICH. Der Inhalt dieses Ordners wird NIE eingecheckt
+oder gepusht (Wirtschaftspruefer-Verschwiegenheitspflicht).
+
+KONVENTION
+----------
+Pro Mandant ein Unterordner. Der Ordnername entspricht dem
+Namen, der in der App unter "Mandant" eingetragen wird -
+darueber waehlt das Tool spaeter die passende Dokumenten-
+Pipeline aus ("Explizit ueber Mandant").
+
+  Klienten\
+    Accilium\     <- Jahresabschluss, Pruefungsbericht, Belege ...
+    Hankook\      <- dito
+
+Hier abgelegt werden die Original-Unterlagen des Mandanten
+(PDF, Excel, RTF).
+
+WICHTIG - eine Kopie, nicht drei:
+Das Pruefwerkzeug ("Hirn": Vorjahresvergleich, Belegpruefung,
+UGB-Check) bleibt EINE zentrale Kopie im Hauptordner. Es wird
+NICHT je Mandant dupliziert. Nur die Dokumenten-Pipeline, die
+die Unterlagen eines Mandanten einliest, unterscheidet sich.
+
+Diese Datei (_LIESMICH.txt) ist nur ein Platzhalter, damit der
+Ordner im Repo erhalten bleibt.
+============================================================

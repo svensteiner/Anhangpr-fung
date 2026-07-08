@@ -62,6 +62,9 @@ from anhangspruefer.pruefung.comparator import pruefen
 from anhangspruefer.pruefung.excel_report import generate_excel as write_pruefung_excel
 from anhangspruefer.pruefung.extractor import detect_type
 
+# Dokumenten-Pipelines je Mandant (ein "Hirn", austauschbare Pipeline)
+from anhangspruefer.pipelines import get_pipeline
+
 # Modus 3: UGB-Anhangsprüfung
 from anhangspruefer.compliance.engine import ReviewEngine
 from anhangspruefer.compliance.reporting.markdown_report import MarkdownReportGenerator
@@ -84,7 +87,15 @@ TOOL_ZIP = HERE / "Anhangspruefer_Tool.zip"
 # Liegt im Fachordner NEBEN der EXE -> jederzeit vom Prüfer in Excel erweiterbar.
 # Ist die Datei vorhanden, wird sie statt der Code-Standardliste verwendet.
 UGB_FACHORDNER = HERE / "Fachliche Unterlagen" / "UGB-Inhaltsprüfung"
-UGB_PRUEFPROGRAMM = UGB_FACHORDNER / "UGB-Pruefprogramm.xlsx"
+
+
+def _find_pruefprogramm():
+    """Findet das UGB-Prüfprogramm – bevorzugt die Makro-Version (.xlsm)."""
+    for name in ("UGB-Pruefprogramm.xlsm", "UGB-Pruefprogramm.xlsx"):
+        p = UGB_FACHORDNER / name
+        if p.exists():
+            return p
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -932,6 +943,9 @@ def compare_route():
     if not cur or not pri:
         return jsonify({"error": "Beide PDF-Dateien müssen hochgeladen werden."}), 400
 
+    mandant = request.form.get("mandant", "")
+    pipeline = get_pipeline(mandant)
+
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         cur_p = tmp_path / "current.pdf"
@@ -939,7 +953,7 @@ def compare_route():
         cur.save(str(cur_p))
         pri.save(str(pri_p))
         try:
-            result = compare_anhaenge(cur_p, pri_p)
+            result = compare_anhaenge(cur_p, pri_p, pipeline=pipeline)
         except Exception as e:
             return jsonify({"error": f"Fehler bei der Analyse: {e}"}), 500
 
@@ -962,8 +976,9 @@ def compare_route():
         "gesamt": len(result.rows),
         "text_fehlt": text_fehlt,
         "text_neu": text_neu,
+        "pipeline": pipeline.name,
     }
-    _record_stage(request.form.get("mandant", ""), "vorjahr", out_fname, summary)
+    _record_stage(mandant, "vorjahr", out_fname, summary)
     return jsonify({**summary, "filename": out_fname})
 
 
@@ -988,6 +1003,9 @@ def pruefen_route():
     if not beleg_files:
         return jsonify({"error": "Mindestens eine Detailunterlage erforderlich."}), 400
 
+    mandant = request.form.get("mandant", "")
+    pipeline = get_pipeline(mandant)
+
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         anhang_p = tmp_path / (anhang_file.filename or "anhang.pdf")
@@ -999,11 +1017,17 @@ def pruefen_route():
             bf.save(str(bp))
             beleg_paths.append(bp)
 
-        TYPE_LABEL = {"bank_guarantees": "Bankgarantien", "hr_employees": "Personalstand"}
-        erkannte = sorted({TYPE_LABEL.get(detect_type(bp), "Unbekannt") for bp in beleg_paths})
+        # Belegerkennung über die (mandantenspezifische) Pipeline
+        TYPE_LABEL = {
+            "bank_guarantees": "Bankgarantien",
+            "hr_employees": "Personalstand",
+            "hankook_eventualverbindlichkeiten": "Eventualverbindlichkeiten (Leasing/Miete)",
+            "hankook_latente_steuern": "Latente Steuern",
+        }
+        erkannte = sorted({TYPE_LABEL.get(pipeline.detect_beleg_type(bp), "Unbekannt") for bp in beleg_paths})
 
         try:
-            result = pruefen(anhang_p, beleg_paths)
+            result = pruefen(anhang_p, beleg_paths, pipeline=pipeline)
         except Exception as e:
             return jsonify({"error": f"Fehler bei der Analyse: {e}"}), 500
 
@@ -1020,8 +1044,9 @@ def pruefen_route():
         "ok": result.count_ok,
         "abweichungen": result.count_abweichung,
         "gesamt": len(result.rows),
+        "pipeline": pipeline.name,
     }
-    _record_stage(request.form.get("mandant", ""), "beleg", out_fname, summary)
+    _record_stage(mandant, "beleg", out_fname, summary)
     return jsonify({**summary, "filename": out_fname, "erkannte_belege": erkannte})
 
 
@@ -1042,8 +1067,9 @@ def ugb_review_route():
         from anhangspruefer.compliance.knowledge.checklist_loader import ChecklistLoader
         loader = ChecklistLoader()
         try:
-            if UGB_PRUEFPROGRAMM.exists():
-                checklist = loader.load_from_xlsx(UGB_PRUEFPROGRAMM)
+            pp = _find_pruefprogramm()
+            if pp is not None:
+                checklist = loader.load_from_xlsx(pp)
             else:
                 checklist = loader.load_default_checklist()
         except Exception:
