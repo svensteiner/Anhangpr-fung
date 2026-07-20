@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-import pdfplumber
+from ..parsers.document_text import load_page_texts
 
 
 # Wort-Trennschärfe für pdfplumber. Standard (3) verklebt bei manchen PDFs
@@ -321,140 +321,139 @@ def extract_items(pdf_path: Path) -> list[AnhangItem]:
     items: list[AnhangItem] = []
     pdf_path = Path(pdf_path)
 
-    with pdfplumber.open(str(pdf_path)) as pdf:
-        page_texts = [p.extract_text(x_tolerance=X_TOLERANCE) or "" for p in pdf.pages]
-        start, end = anhang_page_range(page_texts)
-        for page_index in range(start + 1, end + 1):   # 1-basierte Seitennummer
-            text = page_texts[page_index - 1]
-            raw_lines = [ln.rstrip() for ln in text.split("\n")]
+    page_texts = load_page_texts(pdf_path, x_tolerance=X_TOLERANCE)
+    start, end = anhang_page_range(page_texts)
+    for page_index in range(start + 1, end + 1):   # 1-basierte Seitennummer
+        text = page_texts[page_index - 1]
+        raw_lines = [ln.rstrip() for ln in text.split("\n")]
 
-            # Nur der ANLAGENSPIEGEL hat echte Doppelzeilen-Posten (Stand 1.1.
-            # über Stand 31.12., je 6 Spalten). Andere Spiegel (Rückstellungen,
-            # Verbindlichkeiten) sind EINZEILIG. Die Doppelzeilen-Logik darf
-            # daher nur auf Anlagenspiegel-Seiten feuern – erkennbar am Kopf
-            # "Anschaffungs-/Herstellungskosten … Buchwert".
-            _tl = text.lower()
-            page_is_anlagenspiegel = ("buchwert" in _tl) and ("anschaff" in _tl)
+        # Nur der ANLAGENSPIEGEL hat echte Doppelzeilen-Posten (Stand 1.1.
+        # über Stand 31.12., je 6 Spalten). Andere Spiegel (Rückstellungen,
+        # Verbindlichkeiten) sind EINZEILIG. Die Doppelzeilen-Logik darf
+        # daher nur auf Anlagenspiegel-Seiten feuern – erkennbar am Kopf
+        # "Anschaffungs-/Herstellungskosten … Buchwert".
+        _tl = text.lower()
+        page_is_anlagenspiegel = ("buchwert" in _tl) and ("anschaff" in _tl)
 
-            # Modus: zwei Zahlen pro Item-Zeile = (current, prior)?
-            two_column_mode = False
+        # Modus: zwei Zahlen pro Item-Zeile = (current, prior)?
+        two_column_mode = False
 
-            pending_label_parts: list[str] = []
-            i = 0
-            while i < len(raw_lines):
-                line = raw_lines[i]
+        pending_label_parts: list[str] = []
+        i = 0
+        while i < len(raw_lines):
+            line = raw_lines[i]
 
-                if _is_noise(line):
-                    pending_label_parts.clear()
-                    i += 1
-                    continue
-
-                # Spaltenkopf-Erkennung: Jahrespaar in der Zeile
-                if DATE_PAIR_RE.search(line) or (
-                    YEAR_PAIR_RE.search(line) and not NUMBER_RE.search(line.replace(YEAR_PAIR_RE.search(line).group(0), ""))
-                ):
-                    two_column_mode = True
-                    pending_label_parts.clear()
-                    i += 1
-                    continue
-
-                label_part, nums = split_label_and_trailing_numbers(line)
-
-                if not nums:
-                    # reine Textzeile -> als (Teil-)Label vormerken
-                    if label_part:
-                        if _is_section_header(label_part):
-                            # Sektionsüberschrift: pending zurücksetzen, NICHT mitnehmen
-                            pending_label_parts.clear()
-                        else:
-                            pending_label_parts.append(label_part)
-                            # nur die letzten beiden Textzeilen behalten
-                            pending_label_parts = pending_label_parts[-2:]
-                    i += 1
-                    continue
-
-                # Wir haben Zahlen in der Zeile.
-                # Regel: wenn die Item-Zeile selbst einen MEHRTEILIGEN Labeltext enthält
-                # (>= 2 Wörter mit Buchstaben), nimm nur diesen — es ist ein eigenständiges Label.
-                # Einzelne Wörter dagegen sind oft Fortführungen der vorherigen Zeile
-                # (z.B. "...an verbundenen\nUnternehmen 60.000,...") → mit pending zusammenfassen.
-                label_words = [w for w in label_part.split() if re.search(r"[a-zA-ZäöüÄÖÜß]", w)] if label_part else []
-                if len(label_words) >= 2:
-                    full_label = label_part.strip()
-                else:
-                    full_label = " ".join(
-                        pending_label_parts + ([label_part] if label_part else [])
-                    ).strip()
+            if _is_noise(line):
                 pending_label_parts.clear()
-
-                if not _is_meaningful_label(full_label):
-                    i += 1
-                    continue
-
-                # Modus 1: explizite "Vorjahr"-Zeile darunter?
-                prior_values: list[float] = []
-                is_double_row: bool = False
-                if i + 1 < len(raw_lines):
-                    nxt = raw_lines[i + 1].strip()
-                    if re.match(r"^vorjahr\b", nxt, re.I):
-                        rest = re.sub(r"^vorjahr[\s\.:]*", "", nxt, flags=re.I)
-                        _, prior_nums = split_label_and_trailing_numbers(rest)
-                        if prior_nums:
-                            prior_values = prior_nums
-                            i += 1  # Vorjahr-Zeile konsumieren
-
-                current_values = nums
-
-                # Modus 2: Anlagespiegel-Doppelzeile.
-                #   Direkt unter der Item-Zeile steht eine zweite reine
-                #   Zahlenzeile (kein Label, kein "Vorjahr"-Keyword).
-                #   Konvention im Anlagespiegel:
-                #     Zeile 1 = 1.1.<Berichtsjahr>  (= Stand 31.12.Vorjahr)
-                #     Zeile 2 = 31.12.<Berichtsjahr>
-                #   Wir mappen auf prior/current, damit der Vergleich
-                #   2025.prior  ==  2024.current  konsistent funktioniert.
-                #
-                #   WICHTIG: Wenn two_column_mode aktiv ist UND die Item-Zeile
-                #   genau 2 Zahlen hat, handelt es sich um eine einfache
-                #   Datum-Spalten-Tabelle (z.B. Investitionszuschüsse). In diesem
-                #   Fall darf Modus 2 NICHT feuern, weil die nächste reine
-                #   Zahlenzeile eine Summenzeile (keine zweite Datenzeile) ist.
-                #   Anlagespiegel-Zeilen haben typischerweise >= 3 Zahlen.
-                _two_col_table = two_column_mode and len(nums) == 2
-                if not prior_values and not _two_col_table and page_is_anlagenspiegel and i + 1 < len(raw_lines):
-                    nxt_line = raw_lines[i + 1]
-                    nxt_label, nxt_nums = split_label_and_trailing_numbers(nxt_line)
-                    only_numeric = bool(nxt_nums) and (
-                        not nxt_label
-                        or not re.search(r"[a-zA-ZäöüÄÖÜß]", nxt_label)
-                    )
-                    if only_numeric and len(nxt_nums) >= max(1, len(nums) - 2):
-                        prior_values = nums          # 1.1. -> Stand Ende Vorjahr
-                        current_values = nxt_nums    # 31.12. -> Stand Ende Berichtsjahr
-                        is_double_row = True
-                        i += 1  # zweite Zeile konsumieren
-
-                # Modus 3: Spaltenkopf "31.12.YYYY 31.12.YYYY" gesehen,
-                #          keine Vorjahr-Zeile, genau 2 Zahlen -> [current, prior]
-                if (
-                    not prior_values
-                    and two_column_mode
-                    and len(nums) == 2
-                ):
-                    current_values = [nums[0]]
-                    prior_values = [nums[1]]
-
-                items.append(
-                    AnhangItem(
-                        label=full_label[:200],
-                        page=page_index,
-                        current_values=current_values,
-                        prior_values=prior_values,
-                        source_lines=[line],
-                        double_row=is_double_row,
-                    )
-                )
                 i += 1
+                continue
+
+            # Spaltenkopf-Erkennung: Jahrespaar in der Zeile
+            if DATE_PAIR_RE.search(line) or (
+                YEAR_PAIR_RE.search(line) and not NUMBER_RE.search(line.replace(YEAR_PAIR_RE.search(line).group(0), ""))
+            ):
+                two_column_mode = True
+                pending_label_parts.clear()
+                i += 1
+                continue
+
+            label_part, nums = split_label_and_trailing_numbers(line)
+
+            if not nums:
+                # reine Textzeile -> als (Teil-)Label vormerken
+                if label_part:
+                    if _is_section_header(label_part):
+                        # Sektionsüberschrift: pending zurücksetzen, NICHT mitnehmen
+                        pending_label_parts.clear()
+                    else:
+                        pending_label_parts.append(label_part)
+                        # nur die letzten beiden Textzeilen behalten
+                        pending_label_parts = pending_label_parts[-2:]
+                i += 1
+                continue
+
+            # Wir haben Zahlen in der Zeile.
+            # Regel: wenn die Item-Zeile selbst einen MEHRTEILIGEN Labeltext enthält
+            # (>= 2 Wörter mit Buchstaben), nimm nur diesen — es ist ein eigenständiges Label.
+            # Einzelne Wörter dagegen sind oft Fortführungen der vorherigen Zeile
+            # (z.B. "...an verbundenen\nUnternehmen 60.000,...") → mit pending zusammenfassen.
+            label_words = [w for w in label_part.split() if re.search(r"[a-zA-ZäöüÄÖÜß]", w)] if label_part else []
+            if len(label_words) >= 2:
+                full_label = label_part.strip()
+            else:
+                full_label = " ".join(
+                    pending_label_parts + ([label_part] if label_part else [])
+                ).strip()
+            pending_label_parts.clear()
+
+            if not _is_meaningful_label(full_label):
+                i += 1
+                continue
+
+            # Modus 1: explizite "Vorjahr"-Zeile darunter?
+            prior_values: list[float] = []
+            is_double_row: bool = False
+            if i + 1 < len(raw_lines):
+                nxt = raw_lines[i + 1].strip()
+                if re.match(r"^vorjahr\b", nxt, re.I):
+                    rest = re.sub(r"^vorjahr[\s\.:]*", "", nxt, flags=re.I)
+                    _, prior_nums = split_label_and_trailing_numbers(rest)
+                    if prior_nums:
+                        prior_values = prior_nums
+                        i += 1  # Vorjahr-Zeile konsumieren
+
+            current_values = nums
+
+            # Modus 2: Anlagespiegel-Doppelzeile.
+            #   Direkt unter der Item-Zeile steht eine zweite reine
+            #   Zahlenzeile (kein Label, kein "Vorjahr"-Keyword).
+            #   Konvention im Anlagespiegel:
+            #     Zeile 1 = 1.1.<Berichtsjahr>  (= Stand 31.12.Vorjahr)
+            #     Zeile 2 = 31.12.<Berichtsjahr>
+            #   Wir mappen auf prior/current, damit der Vergleich
+            #   2025.prior  ==  2024.current  konsistent funktioniert.
+            #
+            #   WICHTIG: Wenn two_column_mode aktiv ist UND die Item-Zeile
+            #   genau 2 Zahlen hat, handelt es sich um eine einfache
+            #   Datum-Spalten-Tabelle (z.B. Investitionszuschüsse). In diesem
+            #   Fall darf Modus 2 NICHT feuern, weil die nächste reine
+            #   Zahlenzeile eine Summenzeile (keine zweite Datenzeile) ist.
+            #   Anlagespiegel-Zeilen haben typischerweise >= 3 Zahlen.
+            _two_col_table = two_column_mode and len(nums) == 2
+            if not prior_values and not _two_col_table and page_is_anlagenspiegel and i + 1 < len(raw_lines):
+                nxt_line = raw_lines[i + 1]
+                nxt_label, nxt_nums = split_label_and_trailing_numbers(nxt_line)
+                only_numeric = bool(nxt_nums) and (
+                    not nxt_label
+                    or not re.search(r"[a-zA-ZäöüÄÖÜß]", nxt_label)
+                )
+                if only_numeric and len(nxt_nums) >= max(1, len(nums) - 2):
+                    prior_values = nums          # 1.1. -> Stand Ende Vorjahr
+                    current_values = nxt_nums    # 31.12. -> Stand Ende Berichtsjahr
+                    is_double_row = True
+                    i += 1  # zweite Zeile konsumieren
+
+            # Modus 3: Spaltenkopf "31.12.YYYY 31.12.YYYY" gesehen,
+            #          keine Vorjahr-Zeile, genau 2 Zahlen -> [current, prior]
+            if (
+                not prior_values
+                and two_column_mode
+                and len(nums) == 2
+            ):
+                current_values = [nums[0]]
+                prior_values = [nums[1]]
+
+            items.append(
+                AnhangItem(
+                    label=full_label[:200],
+                    page=page_index,
+                    current_values=current_values,
+                    prior_values=prior_values,
+                    source_lines=[line],
+                    double_row=is_double_row,
+                )
+            )
+            i += 1
 
     return _deduplicate(items)
 

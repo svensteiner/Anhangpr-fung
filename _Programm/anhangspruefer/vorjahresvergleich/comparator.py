@@ -153,10 +153,26 @@ def _index_by_normalized(items: list[AnhangItem]) -> dict[str, list[AnhangItem]]
 def _find_match(
     cur_key: str,
     prior_index: dict[str, list[AnhangItem]],
+    target_value: Optional[float] = None,
 ) -> tuple[Optional[AnhangItem], float]:
-    """Sucht im Index nach exaktem oder fuzzy Match."""
+    """Sucht im Index nach exaktem oder fuzzy Match.
+
+    Kommen im Vorjahres-Anhang MEHRERE gleichnamige Posten vor (z.B. steht
+    dieselbe 'Investitionsprämie …' unter mehreren Oberposten des Anlagen-
+    spiegels), wird derjenige bevorzugt, dessen SCHLUSSwert dem gesuchten
+    Eröffnungswert am nächsten liegt – das ist der echte Kontinuitätspartner.
+    Ohne diese Präferenz würde stur der erste Treffer genommen und ein
+    wertgleicher Posten fälschlich als Abweichung ausgewiesen.
+    """
     if cur_key in prior_index:
-        return prior_index[cur_key][0], 1.0
+        candidates = prior_index[cur_key]
+        if len(candidates) > 1 and target_value is not None:
+            def _value_distance(cand: AnhangItem) -> float:
+                cv = closing_value(cand)
+                return abs(cv - target_value) if cv is not None else float("inf")
+
+            return min(candidates, key=_value_distance), 1.0
+        return candidates[0], 1.0
     best: Optional[AnhangItem] = None
     best_score = 0.0
     for k, candidates in prior_index.items():
@@ -241,7 +257,7 @@ def compare_anhaenge(current_pdf: Path, prior_pdf: Path, pipeline=None) -> Compa
         if new_open is None:
             continue  # nichts Vergleichbares (kein Eröffnungs-/Vorjahreswert)
 
-        match, score = _find_match(cur.label_key_compact, prior_index)
+        match, score = _find_match(cur.label_key_compact, prior_index, new_open)
 
         if match is None:
             rows.append(

@@ -26,8 +26,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Optional
 
-import pdfplumber
-
+from ..parsers.document_text import load_page_texts
 from .extractor import anhang_page_range
 
 
@@ -84,6 +83,14 @@ def _is_narrative(segment: str) -> bool:
     s = segment.strip()
     if len(s) < MIN_SEGMENT_CHARS:
         return False
+    # Tabellen-Restzeilen aus dem PDF sicher aussortieren: ein Währungszeichen
+    # '€' oder mehrere formatierte Beträge (x.xxx,xx) sind Tabelleninhalt, kein
+    # Fließtext. Diese Zahlen prüft der Zahlenvergleich – im Textvergleich
+    # würden sie sonst als "neue/fehlende Textteile" erscheinen.
+    if "€" in s:
+        return False
+    if len(re.findall(r"\d{1,3}(?:\.\d{3})*,\d{2}", s)) >= 3:
+        return False
     letters = sum(c.isalpha() for c in s)
     digits = sum(c.isdigit() for c in s)
     if letters == 0:
@@ -127,12 +134,10 @@ def _segments_from_text(text: str) -> list[str]:
 def _extract_segments(pdf_path: Path) -> list[tuple[str, int]]:
     """Liefert (Segmenttext, Seitenzahl) für alle erzählenden Segmente."""
     out: list[tuple[str, int]] = []
-    with pdfplumber.open(str(pdf_path)) as pdf:
-        for page_num, page in enumerate(pdf.pages, start=1):
-            text = page.extract_text(x_tolerance=2) or ""
-            for seg in _segments_from_text(text):
-                if _is_narrative(seg):
-                    out.append((seg, page_num))
+    for page_num, text in enumerate(load_page_texts(pdf_path, include_tables=False), start=1):
+        for seg in _segments_from_text(text):
+            if _is_narrative(seg):
+                out.append((seg, page_num))
     return out
 
 
@@ -159,31 +164,49 @@ def _is_number_row(line: str) -> bool:
     return digits > 0 and digits > letters
 
 
+# Tabellen-Kopf-/Spaltenzeilen (Text ohne Satzcharakter). Sie brechen einen
+# Absatz und werden NICHT in den Fließtext übernommen, damit Tabellenköpfe aus
+# dem PDF nicht an echte Absätze "ankleben" und dadurch Scheinänderungen
+# (GEÄNDERT/FEHLT) gegen den Word-Anhang erzeugen (dessen Tabellen bereits
+# ausgeschlossen sind).
+_TABLE_HEADER_RE = re.compile(
+    r"^\s*(stand\b|aktiv\b|passiv\b|bewegung\b|nutzungsdauer\b|verwendung\b|"
+    r"aufl[öo]sung\b|zuweisung\b|verbrauch\b|abgang\b|zugang\b|restlaufzeit\b|"
+    r"betrag des\b|st[üu]ckzahl\b|nennbetr|aktiengattung\b|buchwert\b|"
+    r"anschaffungs|31\.12\.\d|01\.01\.\d|€|eur\s+eur\b)",
+    re.I,
+)
+
+
+def _is_table_header_line(line: str) -> bool:
+    """True für reine Tabellen-Kopf-/Spaltenzeilen (kein Fließtext)."""
+    return bool(_TABLE_HEADER_RE.match(line.strip()))
+
+
 def _extract_paragraphs(pdf_path: Path) -> list[tuple[str, int]]:
     """Liefert (Absatztext, Seite) für alle erzählenden Absätze."""
     out: list[tuple[str, int]] = []
     pdf_path = Path(pdf_path)
-    with pdfplumber.open(str(pdf_path)) as pdf:
-        page_texts = [p.extract_text(x_tolerance=2) or "" for p in pdf.pages]
-        start, end = anhang_page_range(page_texts)
-        for page_num in range(start + 1, end + 1):    # nur Anhang-Seiten
-            text = page_texts[page_num - 1]
-            buf: list[str] = []
+    page_texts = load_page_texts(pdf_path, include_tables=False)
+    start, end = anhang_page_range(page_texts)
+    for page_num in range(start + 1, end + 1):    # nur Anhang-Seiten
+        text = page_texts[page_num - 1]
+        buf: list[str] = []
 
-            def flush() -> None:
-                if buf:
-                    para = re.sub(r"\s+", " ", " ".join(buf)).strip()
-                    if _is_narrative(para):
-                        out.append((para, page_num))
-                    buf.clear()
+        def flush() -> None:
+            if buf:
+                para = re.sub(r"\s+", " ", " ".join(buf)).strip()
+                if _is_narrative(para):
+                    out.append((para, page_num))
+                buf.clear()
 
-            for raw in text.split("\n"):
-                ln = raw.strip()
-                if not ln or _is_heading(ln) or _is_number_row(ln):
-                    flush()
-                    continue
-                buf.append(ln)
-            flush()
+        for raw in text.split("\n"):
+            ln = raw.strip()
+            if not ln or _is_heading(ln) or _is_number_row(ln) or _is_table_header_line(ln):
+                flush()
+                continue
+            buf.append(ln)
+        flush()
     return out
 
 
@@ -202,8 +225,7 @@ _TABLE_SIGNATURES: list[tuple[str, "re.Pattern[str]"]] = [
 
 def _detect_tables(pdf_path: Path) -> list[str]:
     """Erkennt vorhandene Standard-Tabellen — nur im Anhang-Abschnitt."""
-    with pdfplumber.open(str(Path(pdf_path))) as pdf:
-        page_texts = [p.extract_text(x_tolerance=2) or "" for p in pdf.pages]
+    page_texts = load_page_texts(pdf_path)
     start, end = anhang_page_range(page_texts)
     full = " ".join(page_texts[start:end]).lower()
     return [name for name, pat in _TABLE_SIGNATURES if pat.search(full)]

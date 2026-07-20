@@ -19,8 +19,13 @@ hidden = [m for m in collect_submodules("anhangspruefer") if not m.endswith(".gu
 
 # --- Bibliotheken mit Datendateien -----------------------------------------
 # pdfminer.six bringt CMap-Ressourcen mit, die pdfplumber zur Laufzeit braucht.
+# python-docx (Import "docx") + lxml sind der Word-Konnektor (parsers.document_text).
+# docx/lxml werden erst LAZY importiert (nur wenn ein .docx kommt) -> die
+# statische PyInstaller-Analyse findet sie nicht; hier explizit vollständig
+# einsammeln, sonst schlägt ein Word-Anhang in der EXE mit ImportError fehl.
+# docx bringt zudem Templatedaten (default.docx) mit.
 datas, binaries = [], []
-for pkg in ("pdfminer", "pdfplumber"):
+for pkg in ("pdfminer", "pdfplumber", "docx", "lxml"):
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b

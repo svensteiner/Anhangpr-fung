@@ -14,10 +14,12 @@ from __future__ import annotations
 
 from .base import Pipeline
 from .hankook import HankookPipeline
+from .syngroup import SyngroupPipeline
 
 # Schlüssel = Teilstring (klein) des Mandantennamens -> Pipeline-Klasse.
 _REGISTRY: dict[str, type[Pipeline]] = {
     "hankook": HankookPipeline,
+    "syngroup": SyngroupPipeline,
 }
 
 
@@ -35,4 +37,10 @@ def available_pipelines() -> list[str]:
     return ["standard"] + list(_REGISTRY.keys())
 
 
-__all__ = ["Pipeline", "HankookPipeline", "get_pipeline", "available_pipelines"]
+__all__ = [
+    "Pipeline",
+    "HankookPipeline",
+    "SyngroupPipeline",
+    "get_pipeline",
+    "available_pipelines",
+]
