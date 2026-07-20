@@ -20,6 +20,9 @@ class ChecklistItem:
     applicable_to: list[str] = field(default_factory=list)  # e.g., ["alle", "mittelgroß", "groß"]
     is_mandatory: bool = True
     notes: str = ""
+    # KPMG-Spalte "Größenklasse": Rechtsform-/Größen-Einträge wie
+    # "AG groß; GmbH mittel". Leer = keine Einschränkung.
+    size_classes: list[str] = field(default_factory=list)
 
     # Markers for domain-specific knowledge requirements
     requires_professional_judgment: bool = True

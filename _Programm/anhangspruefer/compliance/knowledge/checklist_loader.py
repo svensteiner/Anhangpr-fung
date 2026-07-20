@@ -105,8 +105,25 @@ class ChecklistLoader:
         from openpyxl import load_workbook
 
         wb = load_workbook(str(file_path), read_only=True, data_only=True)
-        ws = wb.active
-        rows = [r for r in ws.iter_rows(values_only=True)]
+
+        # Das richtige Blatt wählen: die Excel enthält ein "Start"-Übersichts-
+        # blatt, das Master-Blatt mit ALLEN Prüfpunkten und je Kategorie ein
+        # Blatt. Wir nehmen das Blatt mit passender Kopfzeile (ID + Prüffrage)
+        # und den MEISTEN Zeilen (= Master) – nicht stur wb.active.
+        def _is_pp_header(hrow) -> bool:
+            h = [str(x).strip().lower() if x is not None else "" for x in (hrow or ())]
+            has_id = any(x in ("id", "nr", "item_id") for x in h)
+            has_desc = any(x in ("prüffrage", "prueffrage", "frage", "beschreibung", "description") for x in h)
+            return has_id and has_desc
+
+        ws, rows = None, None
+        for cand in wb.worksheets:
+            crows = [r for r in cand.iter_rows(values_only=True)]
+            if crows and _is_pp_header(crows[0]) and (rows is None or len(crows) > len(rows)):
+                ws, rows = cand, crows
+        if rows is None:                       # Fallback: bisheriges Verhalten
+            ws = wb.active
+            rows = [r for r in ws.iter_rows(values_only=True)]
         if not rows:
             return Checklist(name="UGB-Prüfprogramm (leer)", version="", source_file=str(file_path))
 
@@ -125,7 +142,8 @@ class ChecklistLoader:
             "ugb":     col("ugb-§", "ugb", "ugb-referenz", "paragraph", "§", "ugb_references"),
             "kw":      col("stichwörter", "stichworte", "keywords", "search_keywords"),
             "pflicht": col("pflicht", "is_mandatory", "mandatory"),
-            "anw":     col("anwendbar auf", "anwendbar", "applicable_to", "größenklasse"),
+            "anw":     col("anwendbar auf", "anwendbar", "applicable_to"),
+            "gk":      col("größenklasse (kpmg)", "größenklasse", "groessenklasse"),
             "hinweis": col("hinweis", "judgment_guidance", "guidance", "notes"),
         }
 
@@ -159,6 +177,7 @@ class ChecklistLoader:
                 applicable_to=anw,
                 is_mandatory=self._truthy(cell(row, "pflicht")) if cell(row, "pflicht") else True,
                 judgment_guidance=cell(row, "hinweis"),
+                size_classes=self._split_multi(cell(row, "gk")),
             ))
 
         logger.info(f"UGB-Prüfprogramm aus Excel geladen: {len(checklist.items)} Prüfpunkte")

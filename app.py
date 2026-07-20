@@ -382,29 +382,29 @@ HTML = r"""<!DOCTYPE html>
   <!-- =========================================================== -->
   <section id="mode-vorjahr" class="hidden">
     <div class="steps">
-      <div class="step active" id="vj-step1"><div class="step-num">1</div><div class="step-label">PDFs auswählen</div></div>
+      <div class="step active" id="vj-step1"><div class="step-num">1</div><div class="step-label">Dateien auswählen</div></div>
       <div class="step"        id="vj-step2"><div class="step-num">2</div><div class="step-label">Vergleich läuft</div></div>
       <div class="step"        id="vj-step3"><div class="step-num">3</div><div class="step-label">Ergebnis laden</div></div>
     </div>
     <div class="card" id="vj-upload">
-      <h2><span class="num">1</span>PDFs hochladen</h2>
+      <h2><span class="num">1</span>Anhänge hochladen (PDF oder Word)</h2>
       <div class="upload-grid">
         <div class="upload-area" id="vj-area-current"
              ondragover="dragOn(event,'vj-area-current')" ondragleave="dragOff('vj-area-current')"
              ondrop="dropPdf(event,'vj-area-current','vj-file-current','vjCurrent','vj-name-current')">
-          <input type="file" id="vj-file-current" accept=".pdf" onchange="vjSelect('current')">
+          <input type="file" id="vj-file-current" accept=".pdf,.docx" onchange="vjSelect('current')">
           <div class="upload-icon">📄</div>
           <div class="upload-label">Aktueller Anhang</div>
-          <div class="upload-hint">z.B. Anhang 2025</div>
+          <div class="upload-hint">z.B. Anhang 2025 · PDF oder Word</div>
           <div class="upload-filename" id="vj-name-current"></div>
         </div>
         <div class="upload-area" id="vj-area-prior"
              ondragover="dragOn(event,'vj-area-prior')" ondragleave="dragOff('vj-area-prior')"
              ondrop="dropPdf(event,'vj-area-prior','vj-file-prior','vjPrior','vj-name-prior')">
-          <input type="file" id="vj-file-prior" accept=".pdf" onchange="vjSelect('prior')">
+          <input type="file" id="vj-file-prior" accept=".pdf,.docx" onchange="vjSelect('prior')">
           <div class="upload-icon">📂</div>
           <div class="upload-label">Vorjahres-Anhang</div>
-          <div class="upload-hint">z.B. Anhang 2024</div>
+          <div class="upload-hint">z.B. Anhang 2024 · PDF oder Word</div>
           <div class="upload-filename" id="vj-name-prior"></div>
         </div>
       </div>
@@ -948,8 +948,13 @@ def compare_route():
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
-        cur_p = tmp_path / "current.pdf"
-        pri_p = tmp_path / "prior.pdf"
+        # Dateiendung erhalten: Der Anhang darf als PDF ODER Word (.docx) kommen;
+        # der Konnektor (parsers.document_text) wählt den Reader anhand des
+        # Suffix. Ein forciertes ".pdf" würde einen Word-Anhang unlesbar machen.
+        cur_suffix = Path(cur.filename or "").suffix.lower()
+        pri_suffix = Path(pri.filename or "").suffix.lower()
+        cur_p = tmp_path / ("current" + (cur_suffix if cur_suffix in (".pdf", ".docx") else ".pdf"))
+        pri_p = tmp_path / ("prior" + (pri_suffix if pri_suffix in (".pdf", ".docx") else ".pdf"))
         cur.save(str(cur_p))
         pri.save(str(pri_p))
         try:
@@ -1081,21 +1086,53 @@ def ugb_review_route():
         except Exception as e:
             return jsonify({"error": f"Fehler bei der UGB-Prüfung: {e}"}), 500
 
+        # Relevanz-Filter: Angaben zu nicht vorhandenen Bilanz-/GuV-Positionen
+        # -> "NICHT ANWENDBAR" (Angabe nur nötig, wenn die Position vorliegt).
+        try:
+            from anhangspruefer.compliance.knowledge.relevance import apply_relevance
+            import pdfplumber
+            with pdfplumber.open(str(anhang_p)) as _pdf:
+                _doc_text = "\n".join((p.extract_text() or "") for p in _pdf.pages)
+            apply_relevance(review_result, checklist, _doc_text)
+        except Exception:
+            pass  # optional – ohne Filter bleibt das bisherige Verhalten
+
+        # Fundstellen + ehrliches Verdikt (Heuristik, OHNE LLM): je Prüfpunkt die
+        # beste Anhang-Textstelle; Verdikt Fehlt nur bei bewiesener Abwesenheit,
+        # sonst Offen — der Prüfer bestätigt "Ja" per Dropdown in der Excel.
+        # (Der lokale Mistral war als Ja/Nein-Auswähler unzuverlässig — siehe
+        # Council-Analyse; er bleibt als Modul erhalten, aber standardmäßig aus.)
+        ki_info = None
+        try:
+            from anhangspruefer.compliance.knowledge.llm_matcher import (
+                extract_paragraphs, apply_heuristic_fundstellen,
+            )
+            apply_heuristic_fundstellen(review_result, checklist, extract_paragraphs(anhang_p))
+        except Exception:
+            pass  # optional – Prüfung darf nie an der Fundstellensuche scheitern
+
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         stem = Path(anhang_file.filename or "anhang").stem[:35]
-        out_fname = f"ugb_protokoll_{stem}_{ts}.md"
+        # Doku = die KPMG-Checkliste selbst, ausgefüllt (Excel-Arbeitspapier).
+        out_fname = f"UGB-Checkliste_{stem}_{ts}.xlsx"
         out_path = OUTPUT_DIR / out_fname
         try:
-            generator = MarkdownReportGenerator(checklist=checklist)
-            generator.generate(review_result, out_path)
+            from anhangspruefer.compliance.reporting.checklist_excel import generate_checklist_xlsx
+            generate_checklist_xlsx(checklist, review_result, out_path)
         except Exception as e:
             return jsonify({"error": f"Fehler beim Bericht-Export: {e}"}), 500
 
-    # Heuristische Zählung von Findings
+    # Zählung nach ComplianceStatus
     findings = getattr(review_result, "findings", []) or []
-    ok = sum(1 for f in findings if str(getattr(f, "status", "")).lower() in ("ok", "erfuellt", "erfüllt", "pass"))
-    fehl = sum(1 for f in findings if str(getattr(f, "status", "")).lower() in ("fehlend", "missing", "fail", "unklar"))
-    summary = {"ok": ok, "fehlend": fehl, "gesamt": len(findings)}
+    def _n(*vals):
+        return sum(1 for f in findings if getattr(getattr(f, "status", None), "value", "") in vals)
+    summary = {
+        "ok": _n("ENTSPRICHT", "TEILWEISE ENTSPRECHEND"),
+        "fehlend": _n("NICHT ENTSPRECHEND"),
+        "nicht_anwendbar": _n("NICHT ANWENDBAR"),
+        "gesamt": len(findings),
+        "ki": ki_info,
+    }
     _record_stage(request.form.get("mandant", ""), "ugb", out_fname, summary)
     return jsonify({**summary, "filename": out_fname})
 
