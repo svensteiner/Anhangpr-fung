@@ -1051,7 +1051,9 @@ def pruefen_route():
             from anhangspruefer.pruefung.comparator import PruefRow
             from anhangspruefer.pruefung.intern_abgleich import abgleich_intern
 
-            for z in abgleich_intern(anhang_p).zeilen:
+            # Bilanz/GuV können im selben Dokument stehen ODER als eigene
+            # Datei(en) hochgeladen sein – beides wird berücksichtigt.
+            for z in abgleich_intern(anhang_p, detail_dokumente=beleg_paths).zeilen:
                 result.rows.append(PruefRow(
                     section="Intern: Detailzahlen ↔ Anhang",
                     label=z.label,

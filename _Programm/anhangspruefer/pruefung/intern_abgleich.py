@@ -132,19 +132,42 @@ def _sammle(items: list[AnhangItem]) -> dict[str, list[tuple[float, int]]]:
     return out
 
 
-def abgleich_intern(pdf_path: Path, toleranz: float = TOLERANZ) -> AbgleichErgebnis:
-    """Prüft die Detailzahlen des vorderen Teils gegen die Anhangangaben."""
+def abgleich_intern(pdf_path: Path,
+                    detail_dokumente: Optional[list[Path]] = None,
+                    toleranz: float = TOLERANZ) -> AbgleichErgebnis:
+    """Prüft die Zahlen im Anhang gegen die Detailzahlen aus Bilanz und GuV.
+
+    Zwei Aufbauten werden unterstützt:
+      * Bilanz/GuV und Anhang in EINER Datei -> der vordere Teil (vor dem
+        erkannten Anhang) liefert die Detailzahlen.
+      * Bilanz/GuV in SEPARATEN Dateien -> diese als `detail_dokumente`
+        übergeben; sie werden vollständig als Detailquelle gelesen.
+    Beide Quellen können auch kombiniert vorliegen.
+    """
     pdf_path = Path(pdf_path)
     ergebnis = AbgleichErgebnis(dokument=pdf_path.name)
 
     page_texts = load_page_texts(pdf_path, x_tolerance=X_TOLERANCE)
     start, end = anhang_page_range(page_texts)
-    if start <= 0:
-        # Kein vorderer Teil vorhanden (reines Anhang-Dokument) -> nichts zu tun.
-        return ergebnis
-    ergebnis.anhang_ab_seite = start + 1
 
-    vorne = extract_items(pdf_path, page_range=(0, start))
+    # Detailzahlen: vorderer Teil derselben Datei ...
+    vorne: list[AnhangItem] = []
+    if start > 0:
+        ergebnis.anhang_ab_seite = start + 1
+        vorne += extract_items(pdf_path, page_range=(0, start))
+    # ... und/oder separate Bilanz-/GuV-Dokumente
+    for d in (detail_dokumente or []):
+        d = Path(d)
+        if d.resolve() == pdf_path.resolve():
+            continue                      # dieselbe Datei nicht doppelt lesen
+        try:
+            vorne += extract_items(d, page_range=(0, 10_000))
+        except Exception:
+            continue                      # unlesbare Beilage überspringen
+
+    if not vorne:
+        return ergebnis                   # keine Detailzahlen verfügbar
+
     hinten = extract_items(pdf_path, page_range=(start, end))
     ergebnis.posten_vorne = len(vorne)
     ergebnis.posten_anhang = len(hinten)

@@ -3,6 +3,8 @@
 Nur synthetische Daten – keine Mandantenunterlagen.
 """
 
+from pathlib import Path
+
 from anhangspruefer.pruefung.intern_abgleich import (
     BETRAG_GRENZE,
     STUECKZAHL_GRENZE,
@@ -113,3 +115,36 @@ def test_zwei_kleine_stueckzahlen_erzeugen_keine_abweichung(tmp_path, monkeypatc
                         lambda p, page_range=None: vorne if page_range == (0, 16) else hinten)
 
     assert mod.abgleich_intern(tmp_path / "x.pdf").zeilen == []
+
+
+# --- Bilanz/GuV als SEPARATE Datei -------------------------------------------
+def test_bilanz_als_eigene_datei(tmp_path, monkeypatch):
+    """Anhang-Dokument ohne vorderen Teil + Bilanz/GuV als eigene Datei:
+    der Abgleich muss trotzdem funktionieren."""
+    import anhangspruefer.pruefung.intern_abgleich as mod
+    from anhangspruefer.vorjahresvergleich.extractor import AnhangItem
+
+    bilanz = [AnhangItem(label="Sonstige Rueckstellungen", page=2,
+                         current_values=[34634.94], prior_values=[])]
+    anhang = [AnhangItem(label="Sonstige Rueckstellungen", page=3,
+                         current_values=[34634.94], prior_values=[])]
+
+    monkeypatch.setattr(mod, "load_page_texts", lambda p, **k: [""] * 5)
+    monkeypatch.setattr(mod, "anhang_page_range", lambda pages: (0, 5))  # kein vorderer Teil
+
+    def fake_extract(p, page_range=None):
+        return bilanz if Path(p).name == "bilanz.pdf" else anhang
+    monkeypatch.setattr(mod, "extract_items", fake_extract)
+
+    r = mod.abgleich_intern(tmp_path / "anhang.pdf",
+                            detail_dokumente=[tmp_path / "bilanz.pdf"])
+    assert r.anzahl_ok == 1 and r.anzahl_abweichung == 0
+
+
+def test_ohne_detailquelle_kein_ergebnis(tmp_path, monkeypatch):
+    """Reines Anhang-Dokument ohne separate Bilanz -> nichts abzugleichen."""
+    import anhangspruefer.pruefung.intern_abgleich as mod
+    monkeypatch.setattr(mod, "load_page_texts", lambda p, **k: [""] * 5)
+    monkeypatch.setattr(mod, "anhang_page_range", lambda pages: (0, 5))
+    monkeypatch.setattr(mod, "extract_items", lambda p, page_range=None: [])
+    assert mod.abgleich_intern(tmp_path / "anhang.pdf").zeilen == []
