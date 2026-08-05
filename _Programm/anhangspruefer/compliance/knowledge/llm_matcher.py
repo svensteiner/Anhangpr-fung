@@ -153,14 +153,58 @@ def _best_sentence(paragraph: str, item: ChecklistItem, max_len: int = 220) -> s
     if not sentences:
         return paragraph[:max_len]
 
+    # SPEZIFISCHE Begriffe (lange Komposita der Prüffrage) entscheiden zuerst:
+    # Enthält irgendein Satz einen davon, kommen NUR diese Sätze in Frage.
+    # Sonst gewinnen generische Wörter ("Angabe", "Erläuterung") und es wird der
+    # falsche Satz des richtigen Absatzes zitiert.
+    spezifisch = [w for w in kws if len(w) >= 10]
+
+    def trifft_spezifisch(s: str) -> bool:
+        low, compact = s.lower(), _norm_compact(s)
+        return any(_kw_hit(w, low, compact) for w in spezifisch)
+
+    kandidaten = [s for s in sentences if trifft_spezifisch(s)] if spezifisch else []
+    if not kandidaten:
+        kandidaten = sentences
+
     def score(s: str) -> float:
         low, compact = s.lower(), _norm_compact(s)
         return sum((2.0 if len(w) >= 10 else 1.0) for w in kws if _kw_hit(w, low, compact))
 
-    best = max(sentences, key=score)
+    best = max(kandidaten, key=score)
     if score(best) == 0:                 # kein Treffer -> erster sinnvoller Satz
-        best = sentences[0]
-    return best[:max_len]
+        best = kandidaten[0]
+    return _zitat_fenster(best, spezifisch, max_len)
+
+
+def _zitat_fenster(satz: str, spezifisch: list[str], max_len: int) -> str:
+    """Kürzt lange Sätze auf ein FENSTER um den Fachbegriff.
+
+    Stures Abschneiden am Satzanfang verliert den entscheidenden Begriff, wenn
+    er weiter hinten steht – die Fundstelle wirkt dann unpassend, obwohl der
+    Satz korrekt ist.
+    """
+    if len(satz) <= max_len:
+        return satz
+
+    low = satz.lower()
+    pos = -1
+    for w in spezifisch:
+        p = low.find(w)
+        if p < 0 and len(w) >= 8:
+            p = low.find(w[:7])          # Wortstamm (wie _kw_hit)
+        if p >= 0 and (pos < 0 or p < pos):
+            pos = p
+    if pos < 0:
+        return satz[:max_len]
+
+    start = max(0, pos - max_len // 3)
+    # an Wortgrenze beginnen, damit das Zitat lesbar bleibt
+    if start > 0:
+        leer = satz.find(" ", start)
+        start = leer + 1 if 0 <= leer < start + 30 else start
+    ausschnitt = satz[start:start + max_len]
+    return ("…" if start > 0 else "") + ausschnitt.strip() + ("…" if start + max_len < len(satz) else "")
 
 
 def select_candidates(
@@ -338,14 +382,20 @@ def apply_heuristic_fundstellen(
         cands = select_candidates(item, paragraphs, k=1)
         if cands:
             text, page = cands[0]
+            zitat = _best_sentence(text, item)
+            # Trifft KEIN spezifischer Begriff der Prüffrage das Zitat, ist die
+            # Fundstelle geraten -> lieber keine Fundstelle als eine irreführende.
+            spez = [w for w in _keywords(item) if len(w) >= 10]
+            trifft = (not spez) or any(
+                _kw_hit(w, zitat.lower(), _norm_compact(zitat)) for w in spez)
             f.status = ComplianceStatus.NOT_ASSESSABLE          # -> "Offen"
             f.technical_reasoning = ""
             f.missing_elements = []
             f.evidence = [EvidenceItem(
                 section_id="heuristik", section_title="Anhang",
-                quote=_best_sentence(text, item), page_number=page,
+                quote=zitat, page_number=page,
                 relevance_score=1.0, is_supporting=False,
-            )]
+            )] if trifft else []
             offen += 1
             continue
 
@@ -366,6 +416,134 @@ def apply_heuristic_fundstellen(
 
     result._update_statistics()
     return {"offen": offen, "fehlt": fehlt}
+
+
+_BINAER_PROMPT = """Du bist Assistent eines Wirtschaftsprüfers (Österreich, UGB).
+
+FRAGE: Enthält der folgende Textabschnitt aus dem Anhang die unten geforderte Angabe?
+
+REGELN:
+- Eine Angabe gilt auch als ENTHALTEN, wenn der Betrag 0,00 ist oder sie als Negativaussage formuliert ist ("keine ...", "EUR 0,00").
+- Antworte "ja" NUR, wenn der Abschnitt die Angabe SELBST macht – nicht, wenn er nur ähnliche Begriffe erwähnt.
+- Bei "ja" MUSST du einen wörtlichen Satzteil aus dem Abschnitt als Beleg zitieren (exakt abschreiben).
+- Reicht der Abschnitt zur Beurteilung nicht: "unklar".
+
+GEFORDERTE ANGABE ({ugb}):
+{frage}
+
+TEXTABSCHNITT AUS DEM ANHANG:
+{absatz}
+
+Antworte NUR mit JSON:
+{{"enthalten": "ja"|"nein"|"unklar", "beleg": "<wörtliches Zitat aus dem Abschnitt, sonst null>", "fehlt_konkret": "<bei nein: was genau fehlt, max 15 Worte, sonst null>"}}"""
+
+
+def build_binaer_prompt(item: ChecklistItem, absatz: str) -> str:
+    """Prompt für die BINÄRE Ja/Nein-Frage zu GENAU EINEM Absatz.
+
+    Kein Auswählen aus mehreren Kandidaten -> der beim Auswählen belegte
+    Positions-Bias des lokalen Modells kann strukturell nicht auftreten.
+    """
+    return _BINAER_PROMPT.format(
+        frage=item.description.strip(),
+        ugb="; ".join(item.ugb_references) or "UGB",
+        absatz=absatz[:1200],
+    )
+
+
+def _beleg_ist_echt(beleg: str, absatz: str) -> bool:
+    """Halluzinationsschutz: das Zitat muss wirklich im Abschnitt stehen."""
+    b = _norm_compact(beleg or "")
+    return len(b) >= 15 and b in _norm_compact(absatz)
+
+
+def refine_binaer(
+    result: ReviewResult,
+    checklist: Checklist,
+    paragraphs: list[tuple[str, int]],
+    llm: Optional[LocalLLM] = None,
+    max_seconds: Optional[float] = None,
+    progress: Optional[Callable[[int, int], None]] = None,
+    answer_cache: Optional[dict] = None,
+) -> dict:
+    """Entscheidet offene Prüfpunkte mit dem LOKALEN Modell (Ja/Nein je Absatz).
+
+    Voraussetzung: `apply_heuristic_fundstellen()` lief bereits – die Fundstelle
+    stammt IMMER aus der Heuristik (nachweislich ~91-95 % treffsicher), das
+    Modell bewertet sie nur.
+
+    Sicherungen gegen den bekannten Ja-Bias:
+      * "ja" nur mit wörtlichem Beleg, der im Absatz nachweisbar ist,
+      * und der Beleg muss einen spezifischen Fachbegriff der Prüffrage enthalten.
+    Andernfalls bleibt der Punkt "Offen". Fällt das Modell aus, bleibt ebenfalls
+    alles beim Heuristik-Ergebnis – die Prüfung kippt nie.
+    """
+    llm = llm or LocalLLM()
+    if not llm.is_available():
+        logger.info("Lokales Modell nicht verfügbar – Heuristik-Ergebnis bleibt.")
+        return {"ja": 0, "fehlt": 0, "offen": 0, "ki": None, "verbleibend": 0}
+
+    by_id = {it.item_id: it for it in checklist.items}
+    todo = [f for f in result.findings
+            if f.status not in (ComplianceStatus.NOT_APPLICABLE,)]
+    t0 = time.time()
+    zahl = {"ja": 0, "fehlt": 0, "offen": 0}
+    erledigt = 0
+
+    for f in todo:
+        item = by_id.get(f.checklist_item_id)
+        if item is None:
+            continue
+        cands = select_candidates(item, paragraphs, k=1)
+        if not cands:
+            zahl["offen"] += 1
+            continue
+        absatz, page = cands[0]
+
+        raw = answer_cache.get(item.item_id) if answer_cache is not None else None
+        if raw is None:
+            if max_seconds is not None and time.time() - t0 > max_seconds:
+                break
+            raw = llm.generate_json(build_binaer_prompt(item, absatz), num_predict=180)
+            if answer_cache is not None and raw is not None:
+                answer_cache[item.item_id] = raw
+        if not isinstance(raw, dict):
+            zahl["offen"] += 1
+            continue
+
+        antwort = str(raw.get("enthalten", "")).strip().lower()
+        beleg = str(raw.get("beleg") or "")
+        spez = [w for w in _keywords(item) if len(w) >= 10]
+
+        if antwort == "ja":
+            beleg_ok = _beleg_ist_echt(beleg, absatz)
+            begriff_ok = (not spez) or any(
+                _kw_hit(w, beleg.lower(), _norm_compact(beleg)) for w in spez)
+            if beleg_ok and begriff_ok:
+                f.status = ComplianceStatus.COMPLIANT               # -> "Ja"
+                f.technical_reasoning = ""
+                f.evidence = [EvidenceItem(
+                    section_id="ki", section_title="Anhang", quote=beleg[:300],
+                    page_number=page, relevance_score=1.0, is_supporting=True)]
+                zahl["ja"] += 1
+            else:
+                zahl["offen"] += 1                                   # bleibt Offen
+        elif antwort == "nein":
+            f.status = ComplianceStatus.NOT_COMPLIANT               # -> "Fehlt"
+            f.missing_elements = [str(raw.get("fehlt_konkret") or "").strip()
+                                  or item.description.strip()[:200]]
+            f.evidence = []
+            f.technical_reasoning = ""
+            zahl["fehlt"] += 1
+        else:
+            zahl["offen"] += 1
+
+        erledigt += 1
+        if progress:
+            progress(erledigt, len(todo))
+
+    result._update_statistics()
+    return {**zahl, "ki": llm.model, "verbleibend": len(todo) - erledigt}
 
 
 def refine_findings(

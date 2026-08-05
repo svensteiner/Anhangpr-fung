@@ -70,6 +70,16 @@ DATE_PAIR_RE = re.compile(r"31\.12\.(20\d{2}).*31\.12\.(20\d{2})")
 # "TEUR TEUR", "EUR TEUR") = zwei Wertspalten (Berichtsjahr | Vorjahr).
 # Ein einzelnes "EUR" ist KEIN Spaltenkopf und darf nicht so gewertet werden.
 CURRENCY_PAIR_RE = re.compile(r"^\s*(?:(?:T?EUR|€)\s+){1,}(?:T?EUR|€)\s*$", re.I)
+# Wort-Spaltenkopf ohne Jahreszahlen ("Geschäftsjahr Vorjahr", "Berichtsjahr
+# Vorjahr"). Nur gültig, wenn die Zeile KEINE Zahl enthält – sonst wäre es ein
+# Fließtext, der zufällig "Vorjahr" erwähnt.
+HEADER_WORD_PAIR_RE = re.compile(
+    r"^\s*(gesch(ä|ae)ftsjahr|berichtsjahr|laufendes\s+jahr|aktuelles\s+jahr)"
+    r"[\s|]+vorjahr\s*$",
+    re.I,
+)
+# Nachlaufende Einheiten-/Fußnotenmarker am Zeilenende (siehe unten).
+_TRAILING_UNIT_RE = re.compile(r"(?:\s+(?:T?EUR|€|TSD|Mio\.?|Mrd\.?)|\s*\*+)+\s*$", re.I)
 
 # Zeilen die wir komplett ignorieren (Kopf-/Fußzeilen, Spaltenköpfe ohne Daten)
 NOISE_PATTERNS = [
@@ -125,6 +135,13 @@ def split_label_and_trailing_numbers(line: str) -> tuple[str, list[float]]:
         'Erläuterungen zu einzelnen Posten von Bilanz und GuV'
         -> ('Erläuterungen zu einzelnen Posten von Bilanz und GuV', [])
     """
+    # Nachlaufende Währungseinheiten/Fußnotenmarker abschneiden, sonst bricht
+    # die Rückwärtssuche sofort ab und die Zeile liefert GAR KEINE Zahlen
+    # ("Sonstige Rückstellungen 1.234,00 EUR" -> bisher 0 Werte).
+    # BEWUSST NICHT getrimmt: nachgestelltes Minus (Nutzungsdauer-Erkennung der
+    # Syngroup-Pipeline hängt daran) und "%" (Prozentsätze sind keine Beträge).
+    line = _TRAILING_UNIT_RE.sub("", line)
+
     matches = list(NUMBER_RE.finditer(line))
     if not matches:
         return line.strip(), []
@@ -188,10 +205,21 @@ def normalize_label(label: str) -> str:
          .replace("ü", "ue")
          .replace("ß", "ss")
     )
-    # Aufzählungszeichen/Nummerierungen am Anfang weg
-    s = re.sub(r"^[\divxlcm]+[\.\)]\s*", "", s)
-    s = re.sub(r"^[a-z][\.\)]\s*", "", s)
-    s = re.sub(r"^[•·\-–—\*]\s*", "", s)
+    # Aufzählungszeichen/Nummerierungen am Anfang weg – ITERATIV, damit auch
+    # mehrstufige Gliederungen ("A.II.1. Sachanlagen", "1.2.3 Anlagevermögen")
+    # vollständig entfernt werden. Ohne die Schleife bliebe ein Rest stehen und
+    # kostete bei FUZZY_THRESHOLD=0.95 den Match.
+    for _ in range(6):
+        vorher = s
+        # mehrstufige Nummer ohne abschließenden Punkt ("1.2.3 Anlagevermögen").
+        # Verlangt mindestens eine Unterstufe, damit ein Label wie "3 Monate"
+        # NICHT seine führende Zahl verliert.
+        s = re.sub(r"^\d+(?:\.\d+)+[\.\)]?\s+", "", s)
+        s = re.sub(r"^[\divxlcm]+[\.\)]\s*", "", s)
+        s = re.sub(r"^[a-z][\.\)]\s*", "", s)
+        s = re.sub(r"^[•·\-–—\*]\s*", "", s)
+        if s == vorher:
+            break
     s = re.sub(r"[^a-z0-9\s]", " ", s)
     s = re.sub(r"\s+", " ", s).strip()
     return s
@@ -313,9 +341,17 @@ def anhang_page_range(page_texts: list[str]) -> tuple[int, int]:
 # ---------------------------------------------------------------------------
 # Hauptfunktion
 # ---------------------------------------------------------------------------
-def extract_items(pdf_path: Path) -> list[AnhangItem]:
+def extract_items(pdf_path: Path,
+                  page_range: Optional[tuple[int, int]] = None) -> list[AnhangItem]:
     """
     Extrahiert alle Anhang-Posten aus einer PDF.
+
+    Args:
+        pdf_path:   Dokument (PDF oder DOCX – über den Konnektor).
+        page_range: Optionaler Seitenbereich (start, end) als 0-basierte
+                    Indizes, end exklusiv. Ohne Angabe wird der automatisch
+                    erkannte Anhang-Abschnitt verwendet. Damit lässt sich auch
+                    der VORDERE Teil (Bilanz/GuV) getrennt einlesen.
 
     Returns:
         Liste von AnhangItem in Lesereihenfolge. Jeder Eintrag enthält
@@ -326,7 +362,7 @@ def extract_items(pdf_path: Path) -> list[AnhangItem]:
     pdf_path = Path(pdf_path)
 
     page_texts = load_page_texts(pdf_path, x_tolerance=X_TOLERANCE)
-    start, end = anhang_page_range(page_texts)
+    start, end = page_range if page_range is not None else anhang_page_range(page_texts)
     for page_index in range(start + 1, end + 1):   # 1-basierte Seitennummer
         text = page_texts[page_index - 1]
         raw_lines = [ln.rstrip() for ln in text.split("\n")]
@@ -351,7 +387,9 @@ def extract_items(pdf_path: Path) -> list[AnhangItem]:
             # Er steht auch in NOISE_PATTERNS und würde sonst als Rauschen
             # verworfen – dann bliebe die Vorjahresspalte unerkannt und alle
             # Posten der Tabelle hätten keinen Eröffnungswert.
-            if CURRENCY_PAIR_RE.match(line):
+            if CURRENCY_PAIR_RE.match(line) or (
+                HEADER_WORD_PAIR_RE.match(line) and not NUMBER_RE.search(line)
+            ):
                 two_column_mode = True
                 pending_label_parts.clear()
                 i += 1

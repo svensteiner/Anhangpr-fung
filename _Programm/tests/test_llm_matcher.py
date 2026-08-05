@@ -278,3 +278,24 @@ def test_build_prompt_contains_rules_and_candidates():
     item = _item("Angabe X", kws=["Restlaufzeit"])
     p = build_prompt(item, [("Textabsatz eins", 4)])
     assert "Negativaussage" in p and "[1] Textabsatz eins" in p and "Angabe X" in p
+
+
+# --- Zitat-Fenster: Fachbegriff muss im Zitat sichtbar bleiben ---------------
+def test_zitat_fenster_zeigt_fachbegriff_auch_spaet_im_satz():
+    from anhangspruefer.compliance.knowledge.llm_matcher import _best_sentence
+    langer_satz = ("Die Gesellschaft erlaeutert einleitend ausfuehrlich die allgemeinen "
+                   "Grundsaetze der Rechnungslegung sowie zahlreiche weitere Sachverhalte, "
+                   "die hier nur der Laenge halber wiedergegeben werden und keinen Bezug "
+                   "haben, und nennt schliesslich die Verbrauchsfolgebewertung der Vorraete.")
+    item = _item("Angabe zur Verbrauchsfolgebewertung", kws=["Verbrauchsfolgebewertung"])
+    zitat = _best_sentence(langer_satz, item, max_len=120)
+    assert len(zitat) <= 130
+    assert "Verbrauchsfolgebewertung" in zitat      # Begriff darf nicht wegfallen
+
+
+def test_best_sentence_bevorzugt_satz_mit_fachbegriff():
+    from anhangspruefer.compliance.knowledge.llm_matcher import _best_sentence
+    absatz = ("Die Angabe erfolgt gemaess den Vorschriften. "
+              "Die Jubilaeumsgeldrueckstellung wurde finanzmathematisch ermittelt.")
+    item = _item("Angabe zur Jubilaeumsgeldrueckstellung", kws=["Jubilaeumsgeldrueckstellung"])
+    assert "Jubilaeumsgeldrueckstellung" in _best_sentence(absatz, item)
