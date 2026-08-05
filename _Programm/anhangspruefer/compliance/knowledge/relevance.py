@@ -77,7 +77,105 @@ ITEM_TRIGGERS: list[tuple[str, list[str]]] = [
      ["genussschein", "genussrecht", "wandelschuldverschreibung", "optionsschein", "besserungsschein"]),
     (r"festverzinslich|wertpapier", ["wertpapier", "festverzinslich"]),
     (r"\baktien\b|aktiengattung|bezugsrecht", ["aktie", "grundkapital"]),
+
+    # METHODEN/VERFAHREN: Hier entscheidet der EINE Begriff allein. Fragt die
+    # Checkliste nach dem Umsatzkostenverfahren und ist der Abschluss nach dem
+    # Gesamtkostenverfahren aufgestellt, ist der Punkt nicht anwendbar – auch
+    # wenn Begleitbegriffe wie "Personalaufwand" im Abschluss vorkommen.
+    (r"umsatzkostenverfahren", ["umsatzkostenverfahren"]),
+    (r"pauschalwertberichtigung", ["pauschalwertberichtigung", "pauschale wertberichtigung"]),
+    (r"equity-?methode", ["equity"]),
+    (r"vollkonsolidier|quotenkonsolidier", ["vollkonsolidier", "quotenkonsolidier"]),
+    (r"teilwertabschreibung", ["teilwertabschreibung"]),
+    (r"zuschreibung", ["zuschreibung"]),
+
+    # ---------------------------------------------------------------------
+    # BILANZPOSITIONEN: Fragt der Prüfpunkt nach einer konkreten Position und
+    # ist diese im Abschluss nicht bilanziert, ist die Angabe NICHT ANWENDBAR
+    # (nicht "offen"). Beispiel: ohne Firmenwert entfallen alle Firmenwert-
+    # Angaben. Geprüft wird der GESAMTE Abschluss (Bilanz UND Anhang).
+    # ---------------------------------------------------------------------
+    (r"firmenwert|gesch(ä|ae)fts-?\s*\(?firmen", ["firmenwert", "firmen-)wert", "goodwill"]),
+    (r"entwicklungskosten|forschung", ["entwicklungskosten", "forschung"]),
+    (r"vorr(ä|ae)t|unfertige|fertige erzeugnis|roh-,? hilfs",
+     ["vorrat", "vorräte", "vorraet", "unfertige", "fertige erzeugnis", "handelswaren", "hilfsstoffe"]),
+    (r"beteiligung", ["beteiligung"]),
+    (r"ausleihung", ["ausleihung"]),
+    (r"eigene anteile|eigene aktien", ["eigene anteile", "eigene aktien"]),
+    (r"pensionsr(ü|ue)ckstellung|pensionsverpflichtung", ["pension"]),
+    (r"abfertigung", ["abfertigung"]),
+    (r"jubil(ä|ae)um", ["jubiläum", "jubilaeum", "jubiläums", "jubilaeums"]),
+    (r"disagio|damnum", ["disagio", "damnum"]),
+    (r"fremdw(ä|ae)hrung|devisen", ["fremdwährung", "fremdwaehrung", "devisen"]),
+    (r"grundst(ü|ue)ck|geb(ä|ae)ude|bauten", ["grundstück", "grundstueck", "gebäude", "gebaeude", "bauten"]),
+    (r"anzahlung", ["anzahlung"]),
+    (r"r(ü|ue)cklage", ["rücklage", "ruecklage"]),
+    (r"gewinnvortrag|verlustvortrag|bilanzverlust|bilanzgewinn",
+     ["gewinnvortrag", "verlustvortrag", "bilanzverlust", "bilanzgewinn"]),
 ]
+
+
+# Allgemeines Prüf-/Rechnungslegungsvokabular. Diese Begriffe beschreiben die
+# ANGABE selbst, nicht einen Sachverhalt des Mandanten – ihr Fehlen bedeutet
+# "Angabe fehlt", NICHT "nicht anwendbar". Sie dürfen den generischen
+# Positionsfilter daher nie auslösen.
+_GENERISCHE_BEGRIFFE = {
+    "angabe", "angaben", "erlaeuterung", "erläuterung", "erlaeuterungen", "erläuterungen",
+    "aufgliederung", "beschreibung", "begruendung", "begründung", "darstellung",
+    "gesellschaft", "gesellschaften", "unternehmen", "mutterunternehmen",
+    "geschaeftsjahr", "geschäftsjahr", "berichtsjahr", "wirtschaftsjahr", "vorjahr",
+    "bilanzstichtag", "jahresabschluss", "abschlussstichtag", "konzernabschluss",
+    "gesamtbetrag", "betrages", "betraege", "beträge", "hoehe", "höhe",
+    "bilanzierung", "bilanzierungs", "bewertung", "bewertungs", "bewertungsmethoden",
+    "grundsaetze", "grundsätze", "vorschriften", "voraussetzungen", "verhaeltnisse",
+    "auswirkungen", "zusammensetzung", "restlaufzeit", "geschaeftsfelder",
+    "wesentliche", "wesentlichen", "sonstige", "sonstigen", "einzelnen",
+    "buchwertes", "buchwert", "posten", "bilanzposten", "position", "positionen",
+}
+
+#: Ab dieser Länge gilt ein Wort als spezifischer Fachbegriff.
+_POSITIONS_MIN_LEN = 12
+
+
+def _positions_begriffe(item: ChecklistItem) -> list[str]:
+    """Spezifische Sachverhalts-/Positionsbegriffe der Prüffrage.
+
+    Nur lange, nicht-generische Wörter – also solche, die eine konkrete Bilanz-
+    oder GuV-Position bzw. einen Sachverhalt benennen ("Pauschalwertberichtigung",
+    "Firmenwert", "Genussrecht"), nicht das Prüfvokabular ("Angabe").
+    """
+    text = (item.description or "") + " " + " ".join(item.search_keywords)
+    woerter = re.findall(r"[a-zäöüßA-ZÄÖÜ]{%d,}" % _POSITIONS_MIN_LEN, text)
+    out: list[str] = []
+    for w in woerter:
+        wl = w.lower()
+        # Beugungsfest vergleichen: "Restlaufzeiten" ist so generisch wie
+        # "Restlaufzeit" und darf den Filter nicht auslösen.
+        if any(wl.startswith(g) or g.startswith(wl) for g in _GENERISCHE_BEGRIFFE):
+            continue
+        out.append(wl)
+    return out
+
+
+def _begriff_im_abschluss(begriff: str, document_text_low: str) -> bool:
+    """Kommt der Begriff (auch als Wortstamm) im Abschluss vor?"""
+    if begriff in document_text_low:
+        return True
+    # Wortstamm: Komposita/Beugung ("Pauschalwertberichtigungen" -> "...berichtigung")
+    return len(begriff) >= 12 and begriff[:10] in document_text_low
+
+
+def _position_vorhanden(item: ChecklistItem, document_text_low: str) -> bool:
+    """False, wenn KEIN spezifischer Begriff der Prüffrage im Abschluss vorkommt.
+
+    Fachregel des Prüfers: Findet sich z.B. das Wort "Pauschalwertberichtigung"
+    nirgends im Abschluss, ist die zugehörige Anhangangabe nicht anwendbar –
+    nicht "offen".
+    """
+    begriffe = _positions_begriffe(item)
+    if not begriffe:
+        return True                     # keine Positionsbindung -> immer prüfen
+    return any(_begriff_im_abschluss(b, document_text_low) for b in begriffe)
 
 
 def _detect_legal_form(document_text_low: str) -> str | None:
@@ -167,6 +265,8 @@ def apply_relevance(result: ReviewResult, checklist: Checklist, document_text: s
             grund = f"Gilt nicht für {legal_form.upper()} (KPMG-Größenklasse)."
         elif item is not None and not _item_applicable(item, low):
             grund = "Sachverhalt nicht vorhanden."
+        elif item is not None and not _position_vorhanden(item, low):
+            grund = "Position/Sachverhalt kommt im Abschluss nicht vor."
 
         if grund and f.status != ComplianceStatus.NOT_APPLICABLE:
             f.status = ComplianceStatus.NOT_APPLICABLE

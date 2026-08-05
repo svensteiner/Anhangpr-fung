@@ -118,10 +118,13 @@ def test_item_trigger_festverzinsliche_wertpapiere():
                          description="Beschreibung der Methoden bei festverzinslichen Wertpapieren")
     assert _item_applicable(item, "kein einschlägiger text") is False
     assert _item_applicable(item, "die wertpapiere des anlagevermögens ...") is True
-    # 'derivativer Firmenwert' ist KEIN Derivat und darf NICHT gefiltert werden
+    # 'derivativer Firmenwert' ist KEIN Derivat -> der Derivate-Trigger darf
+    # nicht greifen; maßgeblich ist, ob ein FIRMENWERT bilanziert ist.
     fw = ChecklistItem(item_id="K018", category="Allgemein",
                        description="Zuordnung eines derivativen Geschäfts-(Firmen-)werts")
-    assert _item_applicable(fw, "text ohne derivate") is True
+    assert _item_applicable(fw, "der firmenwert wird linear abgeschrieben") is True
+    # Ohne Firmenwert im Abschluss ist die Angabe nicht anwendbar (Prüfervorgabe)
+    assert _item_applicable(fw, "text ohne solche position") is False
 
 
 def test_loader_reads_size_classes(tmp_path):
