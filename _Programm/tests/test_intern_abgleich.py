@@ -71,3 +71,45 @@ def test_abgleich_meldet_nur_echte_abweichung(tmp_path, monkeypatch):
     assert r.anzahl_abweichung == 1
     abw = [z for z in r.zeilen if z.status == "ABWEICHUNG"][0]
     assert abw.differenz == -2500.00
+
+
+# --- Spiegel-Spalten: Buchwert ist abzustimmen, nicht die Anschaffungskosten --
+def test_anlagenspiegel_buchwert_wird_abgestimmt(tmp_path, monkeypatch):
+    """Anlagenspiegel im Anhang: AHK | Zugang | Abgang | Abschreibung | Buchwert.
+    In der Bilanz steht der BUCHWERT – die Abstimmung muss darauf treffen und
+    darf nicht die Anschaffungskosten dagegenhalten."""
+    import anhangspruefer.pruefung.intern_abgleich as mod
+    from anhangspruefer.vorjahresvergleich.extractor import AnhangItem
+
+    vorne = [AnhangItem(label="Technische Anlagen und Maschinen", page=7,
+                        current_values=[18582.28], prior_values=[])]
+    hinten = [AnhangItem(label="Technische Anlagen und Maschinen", page=23,
+                         current_values=[234328.69, 0.0, 0.0, 215746.41, 18582.28],
+                         prior_values=[])]
+    monkeypatch.setattr(mod, "load_page_texts", lambda p, **k: [""] * 30)
+    monkeypatch.setattr(mod, "anhang_page_range", lambda pages: (16, 30))
+    monkeypatch.setattr(mod, "extract_items",
+                        lambda p, page_range=None: vorne if page_range == (0, 16) else hinten)
+
+    r = mod.abgleich_intern(tmp_path / "x.pdf")
+    assert r.anzahl_abweichung == 0        # keine Scheinabweichung AHK vs Buchwert
+    assert r.anzahl_ok == 1
+    assert r.zeilen[0].wert_anhang == 18582.28
+
+
+def test_zwei_kleine_stueckzahlen_erzeugen_keine_abweichung(tmp_path, monkeypatch):
+    """6 vs 23 ohne Betragsbezug: die Zuordnung über die Bezeichnung ist zu
+    schwach für eine Abweichungsmeldung."""
+    import anhangspruefer.pruefung.intern_abgleich as mod
+    from anhangspruefer.vorjahresvergleich.extractor import AnhangItem
+
+    vorne = [AnhangItem(label="Durchschnittliche Anzahl Angestellte", page=2,
+                        current_values=[23.0], prior_values=[])]
+    hinten = [AnhangItem(label="Durchschnittliche Anzahl Angestellte", page=24,
+                         current_values=[6.0], prior_values=[])]
+    monkeypatch.setattr(mod, "load_page_texts", lambda p, **k: [""] * 30)
+    monkeypatch.setattr(mod, "anhang_page_range", lambda pages: (16, 30))
+    monkeypatch.setattr(mod, "extract_items",
+                        lambda p, page_range=None: vorne if page_range == (0, 16) else hinten)
+
+    assert mod.abgleich_intern(tmp_path / "x.pdf").zeilen == []

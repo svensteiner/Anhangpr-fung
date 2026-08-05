@@ -100,10 +100,24 @@ class AbgleichErgebnis:
 
 
 def _berichtswert(item: AnhangItem) -> Optional[float]:
-    """Berichtsjahreswert eines Postens (erste Wertspalte)."""
-    if item.current_values:
-        return item.current_values[0]
-    return None
+    """Der Wert, der gegen die Bilanz abzustimmen ist.
+
+    Fachregel: In Spiegel-Darstellungen (Anlagenspiegel:
+    Anschaffungskosten | Zugänge | Abgänge | Abschreibungen | BUCHWERT) ist
+    NICHT die erste Spalte (Anschaffungskosten) mit der Bilanz vergleichbar,
+    sondern die letzte (Buchwert). Nur der Buchwert steht in der Bilanz.
+    """
+    v = item.current_values
+    if not v:
+        return None
+    if len(v) >= 3:            # Spiegel-Zeile -> Buchwert
+        return v[-1]
+    return v[0]
+
+
+def _alle_werte(item: AnhangItem) -> list[float]:
+    """Alle Wertspalten – für die tolerante Übereinstimmungsprüfung."""
+    return list(item.current_values)
 
 
 def _sammle(items: list[AnhangItem]) -> dict[str, list[tuple[float, int]]]:
@@ -152,16 +166,20 @@ def abgleich_intern(pdf_path: Path, toleranz: float = TOLERANZ) -> AbgleichErgeb
         if not partner:
             continue                      # keine Entsprechung vorne -> kein Fall
 
-        # (a) Einzelwert stimmt überein?
+        # (a) Stimmt IRGENDEINE Wertspalte des Anhang-Postens mit einer
+        #     Wertspalte vorne überein? Der Anhang zeigt bei Spiegeln mehrere
+        #     Spalten (Anschaffungskosten … Buchwert); in der Bilanz steht der
+        #     Buchwert. Ein Treffer in irgendeiner Spalte belegt die Abstimmung.
+        h_werte = _alle_werte(h_item)
         treffer = next(
             ((it, w) for it in partner for w in it.current_values
-             if abs(w - h_wert) <= toleranz),
+             for hw in h_werte if abs(w - hw) <= toleranz),
             None,
         )
         if treffer:
             it, w = treffer
             ergebnis.zeilen.append(AbgleichZeile(
-                h_item.label, w, h_wert, it.page, h_item.page, STATUS_OK))
+                h_item.label, w, w, it.page, h_item.page, STATUS_OK))
             continue
 
         # (b) Summe der Detailposten ergibt die Anhangangabe?
@@ -176,6 +194,11 @@ def abgleich_intern(pdf_path: Path, toleranz: float = TOLERANZ) -> AbgleichErgeb
         if (_ist_jahreszahl(v_wert) or _ist_jahreszahl(h_wert)
                 or _semantisch_unvergleichbar(v_wert, h_wert)):
             continue                      # Fehlpaarung -> nicht melden
+        # Zwei kleine ganze Zahlen sind Stückzahlen (Arbeitnehmer, Anteile) –
+        # ohne Betragsbezug ist die Zuordnung über die Bezeichnung zu schwach,
+        # um daraus eine Abweichung abzuleiten.
+        if (abs(v_wert) < STUECKZAHL_GRENZE and abs(h_wert) < STUECKZAHL_GRENZE):
+            continue
         ergebnis.zeilen.append(AbgleichZeile(
             h_item.label, v_wert, h_wert,
             partner[0].page, h_item.page, STATUS_ABWEICHUNG))

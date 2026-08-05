@@ -742,10 +742,12 @@ function bgRenderList() {
 }
 function bgRemove(idx) { bgBelege.splice(idx, 1); bgRenderList(); bgUpdateBtn(); }
 function bgUpdateBtn() {
-  document.getElementById('bg-btn').disabled = !(bgAnhang && bgBelege.length > 0);
+  // Detailunterlagen sind optional: ohne sie läuft der interne Abgleich
+  // (Detailzahlen im vorderen Teil des Abschlusses ↔ Angaben im Anhang).
+  document.getElementById('bg-btn').disabled = !bgAnhang;
 }
 async function bgRun() {
-  if (!bgAnhang || bgBelege.length === 0) return;
+  if (!bgAnhang) return;
   hide('bg-upload'); hide('bg-error'); hide('bg-result'); show('bg-progress');
   setStep('bg', 2);
   const bar = document.getElementById('bg-bar'), txt = document.getElementById('bg-text');
@@ -772,9 +774,15 @@ function bgShowResult(data) {
   document.getElementById('bg-ok').textContent  = data.ok;
   document.getElementById('bg-abw').textContent = data.abweichungen;
   document.getElementById('bg-tot').textContent = data.gesamt;
+  const hinweise = [];
   if (data.erkannte_belege && data.erkannte_belege.length) {
-    document.getElementById('bg-erkannt').textContent = 'Erkannte Belegtypen: ' + data.erkannte_belege.join(' · ');
+    hinweise.push('Erkannte Belegtypen: ' + data.erkannte_belege.join(' · '));
   }
+  if ((data.intern_ok || 0) + (data.intern_abweichungen || 0) > 0) {
+    hinweise.push('Interner Abgleich (Detailzahlen ↔ Anhang): '
+      + data.intern_ok + ' stimmig, ' + data.intern_abweichungen + ' abweichend');
+  }
+  if (hinweise.length) document.getElementById('bg-erkannt').textContent = hinweise.join('  |  ');
   resultReady('bg', data.filename);
   refreshStatusAfterRun();
 }
@@ -1005,8 +1013,8 @@ def pruefen_route():
     beleg_files = request.files.getlist("belege")
     if not anhang_file:
         return jsonify({"error": "Anhang-PDF fehlt."}), 400
-    if not beleg_files:
-        return jsonify({"error": "Mindestens eine Detailunterlage erforderlich."}), 400
+    # Detailunterlagen sind OPTIONAL: ohne sie wird der interne Abgleich
+    # gefahren (Detailzahlen im vorderen Teil ↔ Angaben im Anhang).
 
     mandant = request.form.get("mandant", "")
     pipeline = get_pipeline(mandant)
@@ -1036,6 +1044,31 @@ def pruefen_route():
         except Exception as e:
             return jsonify({"error": f"Fehler bei der Analyse: {e}"}), 500
 
+        # Interner Abgleich: Detailzahlen im vorderen Teil des Abschlusses
+        # gegen die Angaben im Anhang – braucht keine externen Belege.
+        intern_ok = intern_abw = 0
+        try:
+            from anhangspruefer.pruefung.comparator import PruefRow
+            from anhangspruefer.pruefung.intern_abgleich import abgleich_intern
+
+            for z in abgleich_intern(anhang_p).zeilen:
+                result.rows.append(PruefRow(
+                    section="Intern: Detailzahlen ↔ Anhang",
+                    label=z.label,
+                    anhang_value=z.wert_anhang,
+                    beleg_value=z.wert_vorne,
+                    difference=z.differenz,
+                    status=z.status,
+                    page_anhang=z.seite_anhang,
+                    note=f"Detailzahl auf Seite {z.seite_vorne} des Abschlusses",
+                ))
+                if z.status == "OK":
+                    intern_ok += 1
+                else:
+                    intern_abw += 1
+        except Exception:
+            pass  # optional – die Belegprüfung darf daran nicht scheitern
+
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         stem = Path(anhang_file.filename or "anhang").stem[:35]
         out_fname = f"pruefung_{stem}_{ts}.xlsx"
@@ -1050,6 +1083,8 @@ def pruefen_route():
         "abweichungen": result.count_abweichung,
         "gesamt": len(result.rows),
         "pipeline": pipeline.name,
+        "intern_ok": intern_ok,
+        "intern_abweichungen": intern_abw,
     }
     _record_stage(mandant, "beleg", out_fname, summary)
     return jsonify({**summary, "filename": out_fname, "erkannte_belege": erkannte})
