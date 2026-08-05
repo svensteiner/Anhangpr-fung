@@ -25,7 +25,13 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Optional
 
-from .extractor import AnhangItem, compact_key, extract_items, normalize_label
+from .extractor import (
+    AnhangItem,
+    anhang_page_range,
+    compact_key,
+    extract_items,
+    normalize_label,
+)
 from .text_compare import TextRow, align_texts
 
 
@@ -140,6 +146,35 @@ def _label_similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
+# Mindestlänge eines Schlüssels, ab der die Volltext-Gegenprobe beweiskräftig
+# ist. Kurze Schlüssel ("summe", "davon") kommen zufällig überall vor.
+_GEGENPROBE_MIN_LEN = 10
+
+
+def _anhang_compact_text(pdf_path: Path) -> str:
+    """Anhang-Volltext des Dokuments als leerzeichenfreier Suchschlüssel.
+
+    Dient als von der Posten-Extraktion UNABHÄNGIGE Gegenprobe: kommt eine
+    Bezeichnung hier vor, ist der Posten im Dokument vorhanden – auch wenn der
+    Extraktor ihn (z.B. mangels Wertespalte) nicht als Posten erfasst hat.
+    """
+    try:
+        from ..parsers.document_text import load_page_texts
+
+        pages = load_page_texts(pdf_path)
+        start, end = anhang_page_range(pages)
+        return compact_key(" ".join(pages[start:end]))
+    except Exception:
+        return ""
+
+
+def _vorhanden_laut_volltext(label_key: str, other_text: str) -> bool:
+    """True, wenn die Bezeichnung im Volltext der Gegenseite auftaucht."""
+    if not other_text or len(label_key) < _GEGENPROBE_MIN_LEN:
+        return False
+    return label_key in other_text
+
+
 def _index_by_normalized(items: list[AnhangItem]) -> dict[str, list[AnhangItem]]:
     out: dict[str, list[AnhangItem]] = {}
     for it in items:
@@ -250,16 +285,33 @@ def compare_anhaenge(current_pdf: Path, prior_pdf: Path, pipeline=None) -> Compa
     matched_prior_keys: set[str] = set()
     rows: list[ComparisonRow] = []
 
+    # Volltexte für die Gegenprobe (Präzision vor Vollständigkeit): eine
+    # einseitige Meldung wird nur ausgegeben, wenn die Bezeichnung auf der
+    # Gegenseite NACHWEISLICH fehlt.
+    cur_text = _anhang_compact_text(current_pdf)
+    pri_text = _anhang_compact_text(prior_pdf)
+
     for cur in cur_items:
         # Eröffnungswert im neuen Anhang = der Wert, der mit dem SCHLUSSwert
         # des Vorjahresberichts übereinstimmen muss (Bilanzkontinuität).
         new_open = opening_value(cur)
         if new_open is None:
-            continue  # nichts Vergleichbares (kein Eröffnungs-/Vorjahreswert)
+            # Kein vergleichbarer Eröffnungswert -> keine Vergleichszeile.
+            # ABER: Der Posten IST im aktuellen Anhang vorhanden. Sein
+            # Vorjahres-Gegenstück darf deshalb NICHT als NUR_VORJAHR
+            # ("fehlt heuer") gemeldet werden – das wäre eine Fehlmeldung.
+            vorhanden, _s = _find_match(cur.label_key_compact, prior_index)
+            if vorhanden is not None:
+                matched_prior_keys.add(vorhanden.label_key_compact)
+            continue
 
         match, score = _find_match(cur.label_key_compact, prior_index, new_open)
 
         if match is None:
+            # Gegenprobe: steht die Bezeichnung im Vorjahres-Anhang doch im
+            # Volltext, ist der Posten nicht "neu" – nur nicht gepaart.
+            if _vorhanden_laut_volltext(cur.label_key_compact, pri_text):
+                continue
             rows.append(
                 ComparisonRow(
                     label=cur.label,
@@ -304,6 +356,10 @@ def compare_anhaenge(current_pdf: Path, prior_pdf: Path, pipeline=None) -> Compa
             continue
         old_close = closing_value(it)
         if old_close is None:
+            continue
+        # Gegenprobe: kommt die Bezeichnung im aktuellen Anhang im Volltext vor,
+        # fehlt der Posten NICHT – er wurde nur nicht als Posten erfasst/gepaart.
+        if _vorhanden_laut_volltext(it.label_key_compact, cur_text):
             continue
         rows.append(
             ComparisonRow(

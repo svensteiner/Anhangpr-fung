@@ -66,6 +66,10 @@ NUMBER_RE = re.compile(
 # Header der typischerweise Wertspalten ankündigen
 YEAR_PAIR_RE = re.compile(r"\b(20\d{2}|19\d{2})\b.*\b(20\d{2}|19\d{2})\b")
 DATE_PAIR_RE = re.compile(r"31\.12\.(20\d{2}).*31\.12\.(20\d{2})")
+# Währungs-Spaltenkopf: MINDESTENS zwei Einheiten nebeneinander ("EUR EUR",
+# "TEUR TEUR", "EUR TEUR") = zwei Wertspalten (Berichtsjahr | Vorjahr).
+# Ein einzelnes "EUR" ist KEIN Spaltenkopf und darf nicht so gewertet werden.
+CURRENCY_PAIR_RE = re.compile(r"^\s*(?:(?:T?EUR|€)\s+){1,}(?:T?EUR|€)\s*$", re.I)
 
 # Zeilen die wir komplett ignorieren (Kopf-/Fußzeilen, Spaltenköpfe ohne Daten)
 NOISE_PATTERNS = [
@@ -342,6 +346,16 @@ def extract_items(pdf_path: Path) -> list[AnhangItem]:
         i = 0
         while i < len(raw_lines):
             line = raw_lines[i]
+
+            # Währungs-Spaltenkopf ("EUR EUR" / "TEUR TEUR") ZUERST prüfen:
+            # Er steht auch in NOISE_PATTERNS und würde sonst als Rauschen
+            # verworfen – dann bliebe die Vorjahresspalte unerkannt und alle
+            # Posten der Tabelle hätten keinen Eröffnungswert.
+            if CURRENCY_PAIR_RE.match(line):
+                two_column_mode = True
+                pending_label_parts.clear()
+                i += 1
+                continue
 
             if _is_noise(line):
                 pending_label_parts.clear()
