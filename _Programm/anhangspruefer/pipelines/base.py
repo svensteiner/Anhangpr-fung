@@ -15,6 +15,7 @@ Pipelines erben davon und überschreiben/ergänzen nur einzelne Schritte.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from ..vorjahresvergleich.extractor import AnhangItem, extract_items as _std_extract_items
@@ -35,12 +36,35 @@ class Pipeline:
     #: Mandantenprofil gelaufen ist.
     name = "standard"
 
+    #: Mandantennamen (klein, Teilstring), auf die dieses Profil anspringt.
+    #: Ein Plugin, das das leer lässt, wird unter seinem Ordnernamen registriert.
+    #: HIER GEHÖREN KEINE MANDANTENNAMEN IN DAS REPOSITORY – sie stehen im
+    #: jeweiligen Plugin unter ``Klienten/<Mandant>/pipeline.py``.
+    mandant_keys: tuple[str, ...] = ()
+
+    # ------------------------------------------------------------------
+    # Mandantenspezifische Eigenheiten der Unterlagen
+    # ------------------------------------------------------------------
+    #: Regex-Quelltexte für Dokument-Möblierung, die kein Bilanzposten ist:
+    #: Briefkopf, Kanzleiname, Adresse, Aktenzeichen, Unterschriftszeile.
+    #: Bewusst als Pipeline-Eigenschaft und NICHT im gemeinsamen Extraktor –
+    #: solche Angaben sind mandantenidentifizierend.
+    extra_noise_patterns: tuple[str, ...] = ()
+
+    #: Kennungen der geprüften Gesellschaft in einer HR-Excel (Kurzname,
+    #: Firmen-/Buchungskreis-Code). Leer -> es zählt die Gesamt-/Summenzeile.
+    hr_entity_codes: tuple[str, ...] = ()
+
+    def compiled_noise(self) -> tuple:
+        """``extra_noise_patterns`` als kompilierte, case-insensitive Regexe."""
+        return tuple(re.compile(p, re.I) for p in self.extra_noise_patterns)
+
     # ------------------------------------------------------------------
     # Modus 1 – Vorjahresvergleich
     # ------------------------------------------------------------------
     def extract_anhang_items(self, pdf_path: Path) -> list[AnhangItem]:
         """Liest die vergleichbaren Anhang-Posten (Label + Werte) aus einem PDF."""
-        return _std_extract_items(pdf_path)
+        return _std_extract_items(pdf_path, extra_noise=self.compiled_noise())
 
     # ------------------------------------------------------------------
     # Modus 2 – Belegprüfung (Detailzahlenvergleich)
@@ -49,6 +73,15 @@ class Pipeline:
     section_to_type: dict[str, str] = {
         "Haftungsverhaeltnisse": "bank_guarantees",
         "Arbeitnehmer": "hr_employees",
+    }
+
+    #: Anwendersichtbare Beschriftung je Belegtyp ("Erkannte Belegtypen" in der
+    #: Ergebniskarte). Ein Plugin, das eigene Belegtypen einführt, ergänzt hier
+    #: deren Beschriftung – sonst müsste die App die Typen ihrer Mandanten
+    #: kennen, und die sind vertraulich.
+    beleg_type_labels: dict[str, str] = {
+        "bank_guarantees": "Bankgarantien",
+        "hr_employees": "Personalstand",
     }
 
     def extract_anhang_positions(self, pdf_path: Path) -> list[AnhangPosition]:
@@ -64,7 +97,7 @@ class Pipeline:
         if dtype == "bank_guarantees":
             return _std_extract_bank(path)
         if dtype == "hr_employees":
-            return _std_extract_hr(path)
+            return _std_extract_hr(path, entity_codes=self.hr_entity_codes)
         return []  # unbekannt -> kein Beleg-Fakt
 
     def match_tolerance(self, anhang_value) -> float:

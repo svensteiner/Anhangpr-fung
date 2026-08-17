@@ -145,9 +145,9 @@ def _split_sentences(text: str) -> list[str]:
 def _best_sentence(paragraph: str, item: ChecklistItem, max_len: int = 220) -> str:
     """Passendste Satzstelle des Absatzes zum Prüfpunkt.
 
-    Statt des Absatzanfangs (oft Seitenkopf 'HANKOOK … Anhang') wird der Satz
-    mit der höchsten Stichwort-Überlappung zur Prüffrage gezeigt – so passt die
-    Fundstelle inhaltlich zur geprüften Angabe."""
+    Statt des Absatzanfangs (oft ein Seitenkopf mit Firmenname und 'Anhang')
+    wird der Satz mit der höchsten Stichwort-Überlappung zur Prüffrage gezeigt –
+    so passt die Fundstelle inhaltlich zur geprüften Angabe."""
     kws = _keywords(item)
     sentences = [s.strip() for s in _split_sentences(paragraph) if len(s.strip()) >= 15]
     if not sentences:

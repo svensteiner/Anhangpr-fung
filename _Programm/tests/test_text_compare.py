@@ -67,7 +67,7 @@ def test_diff_excerpt_shows_both_sides():
 
 def test_diff_excerpt_ignores_lone_punctuation():
     # führendes "." (Extraktionsartefakt) ist kein inhaltlicher Unterschied
-    assert diff_excerpt("HANKOOK Anhang Text.", ". HANKOOK Anhang Text.") == "nur geänderte Zahlen/Zeichen"
+    assert diff_excerpt("MUSTERFIRMA Anhang Text.", ". MUSTERFIRMA Anhang Text.") == "nur geänderte Zahlen/Zeichen"
 
 
 def test_diff_excerpt_new_and_missing():

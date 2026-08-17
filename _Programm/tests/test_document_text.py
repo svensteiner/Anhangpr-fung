@@ -129,7 +129,7 @@ def test_narrative_rejects_table_rows():
         "Sonstige Verbindlichkeiten € Entwicklung eines webbasierten Workflows 2.800,00"
     )
     assert not _is_narrative(
-        "Unternehmensberatung Gmbh München -96.364,29 85,00 -17.692,21 Syngroup"
+        "Unternehmensberatung Gmbh München -96.364,29 85,00 -17.692,21 Musterfirma"
     )
     # echter Fließtext bleibt Fließtext (auch mit ein/zwei Beträgen)
     assert _is_narrative(

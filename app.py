@@ -62,8 +62,13 @@ from anhangspruefer.pruefung.comparator import pruefen
 from anhangspruefer.pruefung.excel_report import generate_excel as write_pruefung_excel
 from anhangspruefer.pruefung.extractor import detect_type
 
-# Dokumenten-Pipelines je Mandant (ein "Hirn", austauschbare Pipeline)
-from anhangspruefer.pipelines import get_pipeline
+# Dokumenten-Pipelines je Mandant (ein "Hirn", anstöpselbare Plugins)
+from anhangspruefer.pipelines import (
+    get_pipeline,
+    available_pipelines,
+    plugin_errors,
+    register_plugins,
+)
 
 # Mindesttextprüfung: schützt alle drei Modi davor, aus einem Scan ohne
 # Texterkennung ein leeres, aber vollständig formatiertes Arbeitspapier zu bauen.
@@ -103,6 +108,16 @@ def _find_pruefprogramm():
 
 
 # ---------------------------------------------------------------------------
+# Mandanten-Plugins anstöpseln
+# ---------------------------------------------------------------------------
+# Ein Mandantenprofil verrät, WEN wir prüfen – es liegt daher nicht im
+# Repository, sondern als Plugin neben dem Programm unter
+# Klienten/<Mandant>/pipeline.py. Beim Start werden alle Plugins geladen.
+KLIENTEN_DIR = HERE / "Klienten"
+_PLUGIN_BEFUND = register_plugins(KLIENTEN_DIR)
+
+
+# ---------------------------------------------------------------------------
 # Mindesttextprüfung (alle drei Modi)
 # ---------------------------------------------------------------------------
 class LeereUnterlage(Exception):
@@ -111,6 +126,20 @@ class LeereUnterlage(Exception):
     Ohne diesen Abbruch liefe die Prüfung fehlerfrei durch und erzeugte ein
     vollständig formatiertes Arbeitspapier ohne inhaltliche Grundlage.
     """
+
+
+def _neue_warnungen() -> list:
+    """Warnliste für einen Lauf – bereits gefüllt mit Plugin-Ladefehlern.
+
+    Ein Mandantenprofil, das nicht geladen werden konnte, muss BEI JEDEM Lauf
+    sichtbar sein: der Lauf ist dann mit dem Standardprofil gefahren, was
+    fachlich ein anderes Ergebnis bedeutet.
+    """
+    return [
+        f"Mandantenprofil nicht geladen – dieser Lauf verwendet das "
+        f"Standardprofil: {f}"
+        for f in plugin_errors()
+    ]
 
 
 def _pruefe_lesbarkeit(pfade_mit_namen, warnungen: list) -> None:
@@ -972,7 +1001,13 @@ def index():
 
 @app.route("/healthz")
 def healthz():
-    return jsonify({"status": "ok", "modes": ["vorjahr", "beleg", "ugb"]})
+    return jsonify({
+        "status": "ok",
+        "modes": ["vorjahr", "beleg", "ugb"],
+        # Nur die Profilnamen, keine Mandantenschlüssel.
+        "pipelines": available_pipelines(),
+        "plugin_fehler": plugin_errors(),
+    })
 
 
 @app.route("/status")
@@ -1041,7 +1076,7 @@ def compare_route():
         cur.save(str(cur_p))
         pri.save(str(pri_p))
 
-        warnungen: list[str] = []
+        warnungen: list[str] = _neue_warnungen()
         try:
             _pruefe_lesbarkeit(
                 [(cur_p, f"Aktueller Anhang – {cur.filename or cur_p.name}"),
@@ -1110,7 +1145,7 @@ def pruefen_route():
         anhang_p = tmp_path / (anhang_file.filename or "anhang.pdf")
         anhang_file.save(str(anhang_p))
 
-        warnungen: list[str] = []
+        warnungen: list[str] = _neue_warnungen()
         try:
             _pruefe_lesbarkeit(
                 [(anhang_p, f"Anhang – {anhang_file.filename or anhang_p.name}")],
@@ -1125,14 +1160,12 @@ def pruefen_route():
             bf.save(str(bp))
             beleg_paths.append(bp)
 
-        # Belegerkennung über die (mandantenspezifische) Pipeline
-        TYPE_LABEL = {
-            "bank_guarantees": "Bankgarantien",
-            "hr_employees": "Personalstand",
-            "hankook_eventualverbindlichkeiten": "Eventualverbindlichkeiten (Leasing/Miete)",
-            "hankook_latente_steuern": "Latente Steuern",
-        }
-        erkannte = sorted({TYPE_LABEL.get(pipeline.detect_beleg_type(bp), "Unbekannt") for bp in beleg_paths})
+        # Belegerkennung über die (mandantenspezifische) Pipeline. Auch die
+        # Beschriftungen kommen von dort – die App kennt die Belegtypen ihrer
+        # Mandanten nicht, sie sind Teil des jeweiligen Plugins.
+        labels = pipeline.beleg_type_labels
+        erkannte = sorted({labels.get(pipeline.detect_beleg_type(bp), "Unbekannt")
+                           for bp in beleg_paths})
 
         try:
             result = pruefen(anhang_p, beleg_paths, pipeline=pipeline)
@@ -1212,7 +1245,7 @@ def ugb_review_route():
         # Mindesttextprüfung ZUERST: bei textlosem Anhang würde jede Pflicht-
         # angabe als "nicht anwendbar" oder "Fehlt" gewertet und das Arbeits-
         # papier sähe vollständig geprüft aus.
-        warnungen: list[str] = []
+        warnungen: list[str] = _neue_warnungen()
         try:
             _pruefe_lesbarkeit(
                 [(anhang_p, f"Anhang – {anhang_file.filename or anhang_p.name}")],
@@ -1384,6 +1417,14 @@ def _main() -> None:
     print("   Dieses Fenster BITTE OFFEN LASSEN, solange Sie arbeiten.")
     print("   Zum Beenden: dieses Fenster schliessen.")
     print("=" * 64)
+    # Mandantenprofile: der Anwender muss sehen, was angestöpselt ist – und
+    # vor allem, wenn ein Profil NICHT geladen wurde.
+    print(f"   Mandantenprofile: {', '.join(available_pipelines())}")
+    for _f in plugin_errors():
+        print(f"   !! MANDANTENPROFIL NICHT GELADEN: {_f}")
+        print("      Der Lauf verwendet das Standardprofil.")
+    if plugin_errors():
+        print("=" * 64)
     threading.Thread(target=_open_browser, args=(port,), daemon=True).start()
     app.run(host="127.0.0.1", port=port, debug=False)
 

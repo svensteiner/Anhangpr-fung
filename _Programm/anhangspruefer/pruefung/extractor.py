@@ -336,15 +336,24 @@ def extract_from_bank_guarantees(pdf_path: Path) -> list[ExtractedFact]:
 # ---------------------------------------------------------------------------
 # Extraktion: Personalstand / Mitarbeiter (Excel)
 # ---------------------------------------------------------------------------
-def extract_from_hr_excel(xlsx_path: Path) -> list[ExtractedFact]:
+def extract_from_hr_excel(xlsx_path: Path,
+                          entity_codes: tuple = ()) -> list[ExtractedFact]:
     """
     Extrahiert den Mitarbeiterstand aus einer HR-Excel-Datei.
 
     Strategie:
     1. Pivot/Zusammenfassungs-Sheet bevorzugen (erkennt an Header mit 'Köpfe'/'Anzahl')
-    2. Zeilen mit HAAI-Kennzeichnung (Name oder Firma-Code 100) suchen
-    3. Die Köpfe/Anzahl-Spalte auslesen – KEIN Summing über alle Zeilen,
-       nur die eine passende HAAI-Zeile (oder Gesamtergebnis).
+    2. Zeile der geprüften Gesellschaft suchen – erkennbar an einer der
+       ``entity_codes`` (Kurzname oder Firmen-Code). Diese Kennungen sind
+       mandantenspezifisch und kommen aus dem Mandanten-Plugin
+       (``Pipeline.hr_entity_codes``), nicht aus diesem Modul.
+    3. Die Köpfe/Anzahl-Spalte auslesen – KEIN Summing über alle Zeilen, nur
+       die eine passende Zeile (oder das Gesamtergebnis, wenn keine Kennung
+       hinterlegt ist oder keine Zeile darauf passt).
+
+    Args:
+        entity_codes: Kennungen der geprüften Gesellschaft, z.B. ``("XY", "100")``.
+            Leer (Standard) -> es zählt allein die Gesamt-/Summenzeile.
     """
     facts: list[ExtractedFact] = []
     xlsx_path = Path(xlsx_path)
@@ -390,15 +399,16 @@ def extract_from_hr_excel(xlsx_path: Path) -> list[ExtractedFact]:
                         count_col_idx = ci
                 break
 
-        # Zeilen nach HAAI oder Gesamt durchsuchen
+        # Zeilen nach der geprüften Gesellschaft oder der Summenzeile durchsuchen
+        codes_upper = tuple(str(c).strip().upper() for c in entity_codes if str(c).strip())
         for ri, row in enumerate(rows):
             if ri == header_row_idx:
                 continue
             vals_str = [str(v).strip() if v is not None else "" for v in row]
             full_upper = " ".join(vals_str).upper()
 
-            is_haai = any(
-                v.upper() in ("HAAI", "100")
+            is_entity = bool(codes_upper) and any(
+                v.upper() in codes_upper
                 for v in vals_str if v
             )
             is_total = any(
@@ -406,7 +416,7 @@ def extract_from_hr_excel(xlsx_path: Path) -> list[ExtractedFact]:
                 for kw in ["GESAMTERGEBNIS", "GESAMT", "TOTAL", "SUMME"]
             )
 
-            if not (is_haai or is_total):
+            if not (is_entity or is_total):
                 continue
 
             # Wert aus der Köpfe-Spalte lesen
@@ -424,7 +434,8 @@ def extract_from_hr_excel(xlsx_path: Path) -> list[ExtractedFact]:
                         break
 
             if count_val is not None:
-                label = "Mitarbeiterstand HAAI" if is_haai else "Mitarbeiterstand Gesamt"
+                label = ("Mitarbeiterstand geprüfte Gesellschaft" if is_entity
+                         else "Mitarbeiterstand Gesamt")
                 facts.append(ExtractedFact(
                     source_type="hr_employees",
                     label=label,
@@ -439,6 +450,6 @@ def extract_from_hr_excel(xlsx_path: Path) -> list[ExtractedFact]:
 
     wb.close()
 
-    # Deduplizieren: HAAI-spezifische Zeile bevorzugen
-    haai_facts = [f for f in facts if "HAAI" in f.label]
-    return haai_facts[:1] if haai_facts else facts[:1]
+    # Deduplizieren: die Zeile der geprüften Gesellschaft schlägt die Summenzeile
+    eigene = [f for f in facts if "geprüfte Gesellschaft" in f.label]
+    return eigene[:1] if eigene else facts[:1]

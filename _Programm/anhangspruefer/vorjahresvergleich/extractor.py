@@ -86,17 +86,22 @@ NOISE_PATTERNS = [
     re.compile(r"^\s*$"),
     re.compile(r"^\s*Anhang\s*$", re.I),
     re.compile(r"^\s*Beilage\b", re.I),
-    re.compile(r"^\s*HAAI\b", re.I),
-    re.compile(r"^\s*LANG\s*&\s*OBERMANN", re.I),
-    re.compile(r"^\s*Steuerberatungsgesellschaft", re.I),
     re.compile(r"^\s*(EUR\s*)+$", re.I),
     re.compile(r"^\s*(TEUR\s*)+$", re.I),
     re.compile(r"^[\s\-_=•·\.]+$"),
 ]
 
 
-def _is_noise(line: str) -> bool:
-    return any(p.match(line) for p in NOISE_PATTERNS)
+def _is_noise(line: str, extra_noise=()) -> bool:
+    """Rauschzeile? ``extra_noise`` liefert die Mandanten-Pipeline nach.
+
+    Briefköpfe, Kanzleinamen und Aktenzeichen sind mandantenspezifisch und
+    gehören deshalb NICHT in diese gemeinsame Liste, sondern in das jeweilige
+    Mandanten-Plugin (``Pipeline.extra_noise_patterns``).
+    """
+    if any(p.match(line) for p in NOISE_PATTERNS):
+        return True
+    return any(p.search(line) for p in extra_noise)
 
 
 # ---------------------------------------------------------------------------
@@ -139,7 +144,7 @@ def split_label_and_trailing_numbers(line: str) -> tuple[str, list[float]]:
     # die Rückwärtssuche sofort ab und die Zeile liefert GAR KEINE Zahlen
     # ("Sonstige Rückstellungen 1.234,00 EUR" -> bisher 0 Werte).
     # BEWUSST NICHT getrimmt: nachgestelltes Minus (Nutzungsdauer-Erkennung der
-    # Syngroup-Pipeline hängt daran) und "%" (Prozentsätze sind keine Beträge).
+    # Mandanten-Pipelines hängen daran) und "%" (Prozentsätze sind keine Beträge).
     line = _TRAILING_UNIT_RE.sub("", line)
 
     matches = list(NUMBER_RE.finditer(line))
@@ -342,7 +347,8 @@ def anhang_page_range(page_texts: list[str]) -> tuple[int, int]:
 # Hauptfunktion
 # ---------------------------------------------------------------------------
 def extract_items(pdf_path: Path,
-                  page_range: Optional[tuple[int, Optional[int]]] = None) -> list[AnhangItem]:
+                  page_range: Optional[tuple[int, Optional[int]]] = None,
+                  extra_noise=()) -> list[AnhangItem]:
     """
     Extrahiert alle Anhang-Posten aus einer PDF.
 
@@ -354,6 +360,9 @@ def extract_items(pdf_path: Path,
                     der VORDERE Teil (Bilanz/GuV) getrennt einlesen.
                     ``end=None`` liest bis zum Dokumentende – das ganze
                     Dokument ist also ``(0, None)``.
+        extra_noise: Zusätzliche kompilierte Regexe für mandantenspezifische
+                    Möblierung (Briefkopf, Kanzleiname, Aktenzeichen). Kommt
+                    aus dem Mandanten-Plugin, nicht aus diesem Modul.
 
     Returns:
         Liste von AnhangItem in Lesereihenfolge. Jeder Eintrag enthält
@@ -406,7 +415,7 @@ def extract_items(pdf_path: Path,
                 i += 1
                 continue
 
-            if _is_noise(line):
+            if _is_noise(line, extra_noise):
                 pending_label_parts.clear()
                 i += 1
                 continue

@@ -77,7 +77,7 @@ def test_apply_relevance_marks_absent_positions_not_applicable():
 
 # --- Rechtsform & Größenklasse (KPMG-Spalte) ---------------------------------
 def test_detect_legal_form():
-    assert _detect_legal_form("die hankook tire austria gmbh mit stammkapital") == "gmbh"
+    assert _detect_legal_form("die musterfirma handels gmbh mit stammkapital") == "gmbh"
     assert _detect_legal_form("die muster aktiengesellschaft mit grundkapital") == "ag"
     assert _detect_legal_form("unklarer text ohne rechtsform") is None
 

@@ -1,30 +1,98 @@
 ============================================================
-  KLIENTEN - Mandantenordner
+  KLIENTEN - Mandantenordner und Mandanten-Plugins
 ============================================================
 
 VERTRAULICH. Der Inhalt dieses Ordners wird NIE eingecheckt
 oder gepusht (Wirtschaftspruefer-Verschwiegenheitspflicht).
+Das gilt ausdruecklich AUCH fuer die Plugin-Dateien: ein
+Mandantenprofil verraet, wen wir pruefen und wie dessen
+Unterlagen aufgebaut sind.
+
 
 KONVENTION
 ----------
 Pro Mandant ein Unterordner. Der Ordnername entspricht dem
 Namen, der in der App unter "Mandant" eingetragen wird -
-darueber waehlt das Tool spaeter die passende Dokumenten-
-Pipeline aus ("Explizit ueber Mandant").
+darueber waehlt das Tool die passende Dokumenten-Pipeline
+("Explizit ueber Mandant").
 
   Klienten\
-    Accilium\     <- Jahresabschluss, Pruefungsbericht, Belege ...
-    Hankook\      <- dito
+    <Mandant>\
+        pipeline.py        <- Plugin: wie dessen Unterlagen
+                              gelesen werden  (optional)
+        test_pipeline.py   <- Tests dazu       (optional)
+        ... Original-Unterlagen (PDF, Excel, Word)
 
-Hier abgelegt werden die Original-Unterlagen des Mandanten
-(PDF, Excel, RTF).
+    _Standard\
+        pipeline.py        <- gilt fuer ALLE Mandanten OHNE
+                              eigenes Plugin
+    _LIESMICH.txt          <- Unterstrich = kein Mandant
 
-WICHTIG - eine Kopie, nicht drei:
+Ordner, die mit "_" beginnen, gelten nicht als Mandant.
+Reserviert ist allein "_Standard".
+
+
+EIN GEHIRN, ANGESTOEPSELTE PLUGINS
+----------------------------------
 Das Pruefwerkzeug ("Hirn": Vorjahresvergleich, Belegpruefung,
-UGB-Check) bleibt EINE zentrale Kopie im Hauptordner. Es wird
-NICHT je Mandant dupliziert. Nur die Dokumenten-Pipeline, die
-die Unterlagen eines Mandanten einliest, unterscheidet sich.
+UGB-Check) bleibt EINE zentrale, versionierte Kopie im
+Hauptordner und ist mandantenneutral. Es wird NICHT je Mandant
+dupliziert.
 
-Diese Datei (_LIESMICH.txt) ist nur ein Platzhalter, damit der
-Ordner im Repo erhalten bleibt.
+Was je Mandant abweicht - Briefkopf, Blattnamen, Spaltenfolgen,
+Sonderfaelle - steckt ausschliesslich im Plugin dieses Mandanten.
+Das Hirn laedt die Plugins beim Start.
+
+
+NEUEN MANDANTEN ANSTOEPSELN
+---------------------------
+1. Ordner "Klienten\<Mandant>\" anlegen.
+2. Darin "pipeline.py" mit genau EINER Pipeline-Unterklasse:
+
+     from anhangspruefer.pipelines.base import Pipeline
+
+     class MeinMandantPipeline(Pipeline):
+         name = "mandant-xy"                  # steht im Ergebnis
+         mandant_keys = ("xy gmbh", "xy")     # Teilstrings des
+                                              # Mandantenfelds
+         extra_noise_patterns = (r"^\s*XY\s*&\s*PARTNER",)
+         hr_entity_codes = ("XY", "100")
+
+3. Werkzeug neu starten.
+
+Fehlt "mandant_keys", gilt der Ordnername als Schluessel.
+
+WICHTIG - nur ABSOLUTE Importe:
+  richtig: from anhangspruefer.pipelines.base import Pipeline
+  falsch : from ..pipelines.base import Pipeline
+Das Plugin wird per Dateipfad geladen; es gibt keinen
+Paketkontext fuer relative Importe.
+
+Ueberschreibbare Schritte (siehe pipelines/base.py):
+  extract_anhang_items      Modus 1 - vergleichbare Posten
+  extract_anhang_positions  Modus 2 - pruefbare Positionen
+  detect_beleg_type         Modus 2 - Belegtyp erkennen
+  extract_beleg_facts       Modus 2 - Werte aus dem Beleg
+  match_tolerance           Modus 2 - erlaubte Differenz
+  section_to_type           Zuordnung Abschnitt -> Belegtyp
+  extra_noise_patterns      Briefkopf/Kanzleizeilen ignorieren
+  hr_entity_codes           eigene Zeile in einer HR-Excel
+
+
+WENN EIN PLUGIN NICHT LAEDT
+---------------------------
+Das Werkzeug startet trotzdem - aber es verschweigt es nicht:
+  * beim Start eine WARNUNG im Statusfenster,
+  * bei JEDEM Prueflauf ein Hinweis in der Ergebniskarte,
+  * abrufbar unter http://localhost:5555/healthz
+
+Ein Lauf ohne das Mandantenprofil liefert ein anderes Ergebnis.
+Darum bitte nicht ignorieren.
+
+
+DATENSICHERUNG - BITTE BEACHTEN
+-------------------------------
+Die Plugins sind NICHT versioniert (kein git). Sie sind
+fachliche Arbeit und nur hier vorhanden. Dieser Ordner muss
+in die regulaere Sicherung des Netzlaufwerks einbezogen sein.
 ============================================================

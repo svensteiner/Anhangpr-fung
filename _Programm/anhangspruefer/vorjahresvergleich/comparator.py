@@ -58,7 +58,7 @@ _LEGAL_FORM_RE = re.compile(
     re.I,
 )
 # echte Positionen, die zwar einen Firmennamen enthalten, aber Bilanzposten
-# sind (z.B. "Darlehen accilium group GmbH") -> NICHT ausschließen
+# sind (z.B. "Darlehen Muster Group GmbH") -> NICHT ausschließen
 _POSITION_PREFIX_RE = re.compile(
     r"^\s*(darlehen|forderung|verbindlichkeit|r[uü]ckstellung|verrechnung|"
     r"ausleihung|anteile|beteiligung|guthaben|kredit)",

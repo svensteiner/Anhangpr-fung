@@ -84,13 +84,13 @@ def test_norm_compact_matches_hyphenated_compounds():
 
 def test_best_sentence_skips_page_header_and_picks_relevant():
     from anhangspruefer.compliance.knowledge.llm_matcher import _best_sentence
-    para = ("HANKOOK Tire Austria GmbH Anhang. Folgende Nutzungsdauern wurden den "
+    para = ("MUSTERFIRMA Handels GmbH Anhang. Folgende Nutzungsdauern wurden den "
             "planmäßigen Abschreibungen zugrunde gelegt: Geschäfts-(Firmen-)wert zehn Jahre. "
             "Der Firmenwert wird linear abgeschrieben.")
     item = _item("Erläuterung der Abschreibungsdauer und Abschreibungsmethode für den Firmenwert",
                  kws=["Abschreibungsdauer", "Abschreibungsmethode", "Firmenwert", "Nutzungsdauer"])
     s = _best_sentence(para, item)
-    assert "HANKOOK Tire Austria GmbH Anhang" not in s     # Seitenkopf vermieden
+    assert "MUSTERFIRMA Handels GmbH Anhang" not in s     # Seitenkopf vermieden
     assert ("Nutzungsdauer" in s) or ("Abschreibung" in s)  # relevante Stelle
 
 

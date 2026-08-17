@@ -4,12 +4,15 @@
 #  (Wirtschaftsprüfer-Verschwiegenheitspflicht / Urheberrecht Dritter)
 # ===========================================================================
 
-# Mandantendaten (echte Prüfungsunterlagen)
-# Klienten/: ein Unterordner je Mandant – Inhalte NIE einchecken,
-# nur die _LIESMICH.txt als Platzhalter behalten.
+# Mandantendaten UND Mandanten-Plugins (echte Prüfungsunterlagen + Profile).
+# Klienten/: ein Unterordner je Mandant – Inhalte NIE einchecken, auch nicht
+# die pipeline.py: ein Mandantenprofil identifiziert den Mandanten.
+# Nur die _LIESMICH.txt bleibt als Platzhalter im Repo.
 Klienten/*
 !Klienten/_LIESMICH.txt
-Accilium/
+# Mandantenordner gehören ausschließlich unter Klienten/. Läge einer im
+# Wurzelverzeichnis, griffe die Regel oben nicht – deshalb bitte nie dort
+# ablegen. (Frühere namentliche Ausnahme entfernt: sie nannte einen Mandanten.)
 *.pdf
 *.PDF
 *.xlsx
