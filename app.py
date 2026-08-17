@@ -65,6 +65,10 @@ from anhangspruefer.pruefung.extractor import detect_type
 # Dokumenten-Pipelines je Mandant (ein "Hirn", austauschbare Pipeline)
 from anhangspruefer.pipelines import get_pipeline
 
+# Mindesttextprüfung: schützt alle drei Modi davor, aus einem Scan ohne
+# Texterkennung ein leeres, aber vollständig formatiertes Arbeitspapier zu bauen.
+from anhangspruefer.parsers.document_text import pruefe_textausbeute
+
 # Modus 3: UGB-Anhangsprüfung
 from anhangspruefer.compliance.engine import ReviewEngine
 from anhangspruefer.compliance.reporting.markdown_report import MarkdownReportGenerator
@@ -96,6 +100,38 @@ def _find_pruefprogramm():
         if p.exists():
             return p
     return None
+
+
+# ---------------------------------------------------------------------------
+# Mindesttextprüfung (alle drei Modi)
+# ---------------------------------------------------------------------------
+class LeereUnterlage(Exception):
+    """Eine Unterlage trägt keinen lesbaren Text – der Lauf wird abgebrochen.
+
+    Ohne diesen Abbruch liefe die Prüfung fehlerfrei durch und erzeugte ein
+    vollständig formatiertes Arbeitspapier ohne inhaltliche Grundlage.
+    """
+
+
+def _pruefe_lesbarkeit(pfade_mit_namen, warnungen: list) -> None:
+    """Prüft je Unterlage, ob überhaupt Text darin steckt.
+
+    Args:
+        pfade_mit_namen: Paare (Pfad, Anzeigename für die Meldung).
+        warnungen: Liste, in die Warnungen für textarme Unterlagen angehängt
+            werden (der Lauf geht dann weiter).
+
+    Raises:
+        LeereUnterlage: sobald eine Unterlage praktisch keinen Text enthält.
+    """
+    for pfad, name in pfade_mit_namen:
+        befund = pruefe_textausbeute(pfad, anzeigename=name)
+        if befund is None:
+            continue          # Format hier nicht lesbar -> Modus entscheidet wie bisher
+        if befund.ist_leer:
+            raise LeereUnterlage(befund.meldung)
+        if befund.ist_textarm:
+            warnungen.append(befund.meldung)
 
 
 # ---------------------------------------------------------------------------
@@ -275,6 +311,13 @@ HTML = r"""<!DOCTYPE html>
   .stat-fehlt .stat-val { color: var(--error); }
   .result-note { font-size: 13px; color: var(--muted); background: var(--bg); border-left: 3px solid var(--orange); padding: 10px 14px; border-radius: 4px; margin-bottom: 16px; }
   .result-saved { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  /* Warnbox: das Ergebnis liegt vor, ist aber nur eingeschränkt verlässlich
+     (z.B. textarmes PDF, nicht eingelesene Detailunterlage). */
+  .result-warn { font-size: 13px; color: #7A4200; background: #FFF8E6; border: 1px solid #F0D08A;
+                 border-left: 3px solid var(--orange); border-radius: 4px; padding: 10px 14px; margin-bottom: 16px; }
+  .result-warn strong { display: block; margin-bottom: 6px; }
+  .result-warn ul { margin: 0; padding-left: 18px; }
+  .result-warn li { margin: 4px 0; line-height: 1.45; }
 
   .error-box { background: #FFF5F5; border: 1px solid #FFCDD2; border-radius: 8px; padding: 20px; color: var(--error); font-size: 14px; line-height: 1.5; }
 
@@ -429,6 +472,7 @@ HTML = r"""<!DOCTYPE html>
         <div class="stat-box stat-text"><div class="stat-val" id="vj-textneu">—</div><div class="stat-lbl">Neue Textteile</div></div>
       </div>
       <div class="result-note">Zwei Bereiche im Bericht: <strong>Zahlenvergleich</strong> (Vorjahreszahlen ↔ Vorjahresbericht) und <strong>Textvergleich</strong> (Absätze aktuell ↔ Vorjahr, Vollständigkeit — Blatt „Textvergleich").</div>
+      <div class="result-warn hidden" id="vj-warn"></div>
       <div class="result-saved" id="vj-saved"></div>
       <button class="btn-download" id="vj-dl" onclick="openResults()">📂 Ergebnis-Ordner öffnen</button>
     </div>
@@ -484,6 +528,7 @@ HTML = r"""<!DOCTYPE html>
         <div class="stat-box stat-total"><div class="stat-val" id="bg-tot">—</div><div class="stat-lbl">Geprüfte Positionen</div></div>
       </div>
       <div id="bg-erkannt" style="font-size:13px;color:var(--muted);margin-bottom:12px"></div>
+      <div class="result-warn hidden" id="bg-warn"></div>
       <div class="result-saved" id="bg-saved"></div>
       <button class="btn-download" id="bg-dl" onclick="openResults()">📂 Ergebnis-Ordner öffnen</button>
     </div>
@@ -527,6 +572,7 @@ HTML = r"""<!DOCTYPE html>
         <div class="stat-box stat-abw"><div class="stat-val" id="ug-fehl">—</div><div class="stat-lbl">Fehlend / unklar</div></div>
         <div class="stat-box stat-total"><div class="stat-val" id="ug-tot">—</div><div class="stat-lbl">Geprüfte Items</div></div>
       </div>
+      <div class="result-warn hidden" id="ug-warn"></div>
       <div class="result-saved" id="ug-saved"></div>
       <button class="btn-download" id="ug-dl" onclick="openResults()">📂 Ergebnis-Ordner öffnen</button>
     </div>
@@ -680,6 +726,7 @@ function vjShowResult(data) {
   document.getElementById('vj-tot').textContent = data.gesamt;
   document.getElementById('vj-textfehlt').textContent = (data.text_fehlt != null ? data.text_fehlt : '—');
   document.getElementById('vj-textneu').textContent = (data.text_neu != null ? data.text_neu : '—');
+  showWarnungen('vj', data.warnungen);
   resultReady('vj', data.filename);
   refreshStatusAfterRun();
 }
@@ -783,6 +830,7 @@ function bgShowResult(data) {
       + data.intern_ok + ' stimmig, ' + data.intern_abweichungen + ' abweichend');
   }
   if (hinweise.length) document.getElementById('bg-erkannt').textContent = hinweise.join('  |  ');
+  showWarnungen('bg', data.warnungen);
   resultReady('bg', data.filename);
   refreshStatusAfterRun();
 }
@@ -830,6 +878,7 @@ function ugShowResult(data) {
   document.getElementById('ug-ok').textContent   = data.ok;
   document.getElementById('ug-fehl').textContent = data.fehlend;
   document.getElementById('ug-tot').textContent  = data.gesamt;
+  showWarnungen('ug', data.warnungen);
   resultReady('ug', data.filename);
   refreshStatusAfterRun();
 }
@@ -837,6 +886,32 @@ function ugError(msg) {
   hide('ug-progress'); show('ug-error'); show('ug-upload');
   document.getElementById('ug-err-text').textContent = msg;
   setStep('ug', 1);
+}
+
+/* ===================================================================
+   WARNUNGEN ZUR VERLÄSSLICHKEIT DES ERGEBNISSES
+   =================================================================== */
+/* Das Ergebnis liegt vor, ist aber eingeschränkt: textarmes PDF, nicht
+   eingelesene Detailunterlage, übersprungener Prüfschritt. Bewusst per DOM
+   aufgebaut und nicht per innerHTML – die Texte enthalten Dateinamen. */
+function showWarnungen(prefix, list) {
+  const box = document.getElementById(prefix + '-warn');
+  if (!box) return;
+  box.textContent = '';
+  if (!list || !list.length) { box.classList.add('hidden'); return; }
+  const head = document.createElement('strong');
+  head.textContent = list.length === 1
+    ? '⚠ Hinweis zur Verlässlichkeit dieses Ergebnisses:'
+    : '⚠ Hinweise zur Verlässlichkeit dieses Ergebnisses:';
+  box.appendChild(head);
+  const ul = document.createElement('ul');
+  list.forEach(function (t) {
+    const li = document.createElement('li');
+    li.textContent = t;
+    ul.appendChild(li);
+  });
+  box.appendChild(ul);
+  box.classList.remove('hidden');
 }
 
 /* ===================================================================
@@ -965,6 +1040,17 @@ def compare_route():
         pri_p = tmp_path / ("prior" + (pri_suffix if pri_suffix in (".pdf", ".docx") else ".pdf"))
         cur.save(str(cur_p))
         pri.save(str(pri_p))
+
+        warnungen: list[str] = []
+        try:
+            _pruefe_lesbarkeit(
+                [(cur_p, f"Aktueller Anhang – {cur.filename or cur_p.name}"),
+                 (pri_p, f"Vorjahres-Anhang – {pri.filename or pri_p.name}")],
+                warnungen,
+            )
+        except LeereUnterlage as e:
+            return jsonify({"error": str(e)}), 400
+
         try:
             result = compare_anhaenge(cur_p, pri_p, pipeline=pipeline)
         except Exception as e:
@@ -992,7 +1078,7 @@ def compare_route():
         "pipeline": pipeline.name,
     }
     _record_stage(mandant, "vorjahr", out_fname, summary)
-    return jsonify({**summary, "filename": out_fname})
+    return jsonify({**summary, "filename": out_fname, "warnungen": warnungen})
 
 
 # ---------- Modus 2: Belegprüfung / Detailzahlenvergleich ----------
@@ -1024,6 +1110,15 @@ def pruefen_route():
         anhang_p = tmp_path / (anhang_file.filename or "anhang.pdf")
         anhang_file.save(str(anhang_p))
 
+        warnungen: list[str] = []
+        try:
+            _pruefe_lesbarkeit(
+                [(anhang_p, f"Anhang – {anhang_file.filename or anhang_p.name}")],
+                warnungen,
+            )
+        except LeereUnterlage as e:
+            return jsonify({"error": str(e)}), 400
+
         beleg_paths: list[Path] = []
         for bf in beleg_files:
             bp = tmp_path / (bf.filename or "beleg.bin")
@@ -1053,7 +1148,12 @@ def pruefen_route():
 
             # Bilanz/GuV können im selben Dokument stehen ODER als eigene
             # Datei(en) hochgeladen sein – beides wird berücksichtigt.
-            for z in abgleich_intern(anhang_p, detail_dokumente=beleg_paths).zeilen:
+            abgleich = abgleich_intern(anhang_p, detail_dokumente=beleg_paths)
+            for hinweis in abgleich.uebersprungene_dateien:
+                warnungen.append(
+                    f"Detailunterlage nicht eingelesen – ihre Zahlen sind NICHT "
+                    f"abgeglichen: {hinweis}")
+            for z in abgleich.zeilen:
                 result.rows.append(PruefRow(
                     section="Intern: Detailzahlen ↔ Anhang",
                     label=z.label,
@@ -1068,8 +1168,12 @@ def pruefen_route():
                     intern_ok += 1
                 else:
                     intern_abw += 1
-        except Exception:
-            pass  # optional – die Belegprüfung darf daran nicht scheitern
+        except Exception as e:
+            # Die Belegprüfung darf daran nicht scheitern – aber verschweigen
+            # darf sie es auch nicht: der interne Abgleich hat dann NICHT
+            # stattgefunden, und der Bericht sähe trotzdem vollständig aus.
+            warnungen.append(
+                f"Interner Abgleich (Detailzahlen ↔ Anhang) nicht durchgeführt: {e}")
 
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         stem = Path(anhang_file.filename or "anhang").stem[:35]
@@ -1089,7 +1193,8 @@ def pruefen_route():
         "intern_abweichungen": intern_abw,
     }
     _record_stage(mandant, "beleg", out_fname, summary)
-    return jsonify({**summary, "filename": out_fname, "erkannte_belege": erkannte})
+    return jsonify({**summary, "filename": out_fname, "erkannte_belege": erkannte,
+                    "warnungen": warnungen})
 
 
 # ---------- Modus 3: UGB-Inhaltsprüfung ----------
@@ -1103,6 +1208,18 @@ def ugb_review_route():
         tmp_path = Path(tmp)
         anhang_p = tmp_path / (anhang_file.filename or "anhang.pdf")
         anhang_file.save(str(anhang_p))
+
+        # Mindesttextprüfung ZUERST: bei textlosem Anhang würde jede Pflicht-
+        # angabe als "nicht anwendbar" oder "Fehlt" gewertet und das Arbeits-
+        # papier sähe vollständig geprüft aus.
+        warnungen: list[str] = []
+        try:
+            _pruefe_lesbarkeit(
+                [(anhang_p, f"Anhang – {anhang_file.filename or anhang_p.name}")],
+                warnungen,
+            )
+        except LeereUnterlage as e:
+            return jsonify({"error": str(e)}), 400
 
         # Prüfprogramm laden: bevorzugt das erweiterbare Excel im Fachordner,
         # sonst die Code-Standardliste.
@@ -1171,7 +1288,7 @@ def ugb_review_route():
         "ki": ki_info,
     }
     _record_stage(request.form.get("mandant", ""), "ugb", out_fname, summary)
-    return jsonify({**summary, "filename": out_fname})
+    return jsonify({**summary, "filename": out_fname, "warnungen": warnungen})
 
 
 # ---------- Downloads ----------

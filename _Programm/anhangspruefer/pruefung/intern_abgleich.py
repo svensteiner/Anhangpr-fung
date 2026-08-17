@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from ..parsers.document_text import load_page_texts
+from ..parsers.document_text import kann_lesen, load_page_texts
 from ..vorjahresvergleich.extractor import (
     X_TOLERANCE,
     AnhangItem,
@@ -89,6 +89,10 @@ class AbgleichErgebnis:
     posten_vorne: int = 0
     posten_anhang: int = 0
     anhang_ab_seite: Optional[int] = None
+    #: Detaildokumente, die nicht gelesen werden konnten – je Eintrag
+    #: "Dateiname: Grund". Wird bewusst mitgeführt und nicht verschwiegen: eine
+    #: übersprungene Beilage heißt, dass ihre Detailzahlen UNGEPRÜFT bleiben.
+    uebersprungene_dateien: list[str] = field(default_factory=list)
 
     @property
     def anzahl_ok(self) -> int:
@@ -155,15 +159,24 @@ def abgleich_intern(pdf_path: Path,
     if start > 0:
         ergebnis.anhang_ab_seite = start + 1
         vorne += extract_items(pdf_path, page_range=(0, start))
-    # ... und/oder separate Bilanz-/GuV-Dokumente
+    # ... und/oder separate Bilanz-/GuV-Dokumente (jeweils ganzes Dokument)
     for d in (detail_dokumente or []):
         d = Path(d)
         if d.resolve() == pdf_path.resolve():
             continue                      # dieselbe Datei nicht doppelt lesen
+        if not kann_lesen(d):
+            # Excel-Belege (Personalstand, Kontosalden) sind Belege für die
+            # BELEGprüfung, aber keine Bilanz-/GuV-Textquelle. Hier also kein
+            # Fall – und bewusst keine Warnung, sonst warnt jeder normale Lauf.
+            continue
         try:
-            vorne += extract_items(d, page_range=(0, 10_000))
-        except Exception:
-            continue                      # unlesbare Beilage überspringen
+            vorne += extract_items(d, page_range=(0, None))
+        except Exception as e:
+            # Lesbares Format, das sich trotzdem nicht öffnen lässt (beschädigt,
+            # passwortgeschützt): überspringen, aber vermerken – sonst sieht der
+            # Bericht aus, als wäre diese Unterlage einbezogen worden.
+            ergebnis.uebersprungene_dateien.append(f"{d.name}: {e}")
+            continue
 
     if not vorne:
         return ergebnis                   # keine Detailzahlen verfügbar

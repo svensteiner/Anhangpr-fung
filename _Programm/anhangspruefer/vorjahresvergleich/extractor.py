@@ -342,7 +342,7 @@ def anhang_page_range(page_texts: list[str]) -> tuple[int, int]:
 # Hauptfunktion
 # ---------------------------------------------------------------------------
 def extract_items(pdf_path: Path,
-                  page_range: Optional[tuple[int, int]] = None) -> list[AnhangItem]:
+                  page_range: Optional[tuple[int, Optional[int]]] = None) -> list[AnhangItem]:
     """
     Extrahiert alle Anhang-Posten aus einer PDF.
 
@@ -352,6 +352,8 @@ def extract_items(pdf_path: Path,
                     Indizes, end exklusiv. Ohne Angabe wird der automatisch
                     erkannte Anhang-Abschnitt verwendet. Damit lässt sich auch
                     der VORDERE Teil (Bilanz/GuV) getrennt einlesen.
+                    ``end=None`` liest bis zum Dokumentende – das ganze
+                    Dokument ist also ``(0, None)``.
 
     Returns:
         Liste von AnhangItem in Lesereihenfolge. Jeder Eintrag enthält
@@ -362,7 +364,16 @@ def extract_items(pdf_path: Path,
     pdf_path = Path(pdf_path)
 
     page_texts = load_page_texts(pdf_path, x_tolerance=X_TOLERANCE)
-    start, end = page_range if page_range is not None else anhang_page_range(page_texts)
+    if page_range is not None:
+        start, end = page_range
+        # Der Bereich kommt vom Aufrufer und darf das Dokument überragen
+        # (``end=None`` = bis zum Ende). Ohne diese Begrenzung greift die
+        # Seitenschleife unten an ``page_texts`` vorbei -> IndexError, und der
+        # Aufrufer verliert das Dokument stillschweigend.
+        start = max(0, start)
+        end = len(page_texts) if end is None else min(end, len(page_texts))
+    else:
+        start, end = anhang_page_range(page_texts)
     for page_index in range(start + 1, end + 1):   # 1-basierte Seitennummer
         text = page_texts[page_index - 1]
         raw_lines = [ln.rstrip() for ln in text.split("\n")]

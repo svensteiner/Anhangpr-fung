@@ -31,12 +31,30 @@ Vollständig lokal. Kein Netzwerk, kein externer Aufruf.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 
 # Trennschärfe für pdfplumber (siehe extractor.X_TOLERANCE / text_compare).
 # 2 rekonstruiert Wortgrenzen über Zeichenabstände zuverlässig.
 DEFAULT_X_TOLERANCE = 2
+
+#: Formate, die dieser Konnektor lesen kann. Single Source of Truth – Aufrufer,
+#: die eine Datei nur bei Lesbarkeit heranziehen wollen, fragen ``kann_lesen``
+#: statt eine eigene Liste zu pflegen.
+LESBARE_SUFFIXE = (".pdf", ".docx")
+
+#: Bis zu dieser Zeichenzahl je Seite trägt eine Unterlage praktisch keinen
+#: lesbaren Text – typischer Fall: ein Scan ohne Texterkennung (OCR), der 0
+#: Zeichen liefert. Bewusst niedrig, damit ein Dokument aus Deckblatt und
+#: Trennseiten nicht schon deshalb als leer gilt.
+LEER_GRENZE_JE_SEITE = 25
+
+#: Darunter ist die Unterlage auffällig textarm: Teil-Scan, oder ein PDF mit
+#: fehlerhaft eingebetteten Schriften. Ein normal gesetzter Jahresabschluss
+#: liegt bei 1.500–3.000 Zeichen je Seite.
+TEXTARM_GRENZE_JE_SEITE = 250
 
 # Zell-Trenner beim Linearisieren einer Word-Tabellenzeile. Bewusst breit, damit
 # der Extraktor Label und Werte sicher voneinander trennen kann.
@@ -76,6 +94,95 @@ def load_page_texts(
         f"Nicht unterstütztes Dateiformat für die Textextraktion: '{suffix}'. "
         "Unterstützt werden .pdf und .docx."
     )
+
+
+def kann_lesen(path) -> bool:
+    """Kann dieser Konnektor die Datei lesen? (Entscheidung nur am Suffix.)
+
+    Für Aufrufer, die eine Unterlage nur dann als Textquelle heranziehen, wenn
+    sie überhaupt lesbar ist – z.B. der interne Abgleich, dem ein Excel-Beleg
+    als Bilanz-/GuV-Quelle nichts nützt.
+    """
+    return Path(path).suffix.lower() in LESBARE_SUFFIXE
+
+
+@dataclass(frozen=True)
+class Textausbeute:
+    """Wieviel lesbarer Text steckt in einer Unterlage?
+
+    Hintergrund: Ein gescannter Abschluss ohne Texterkennung liefert leere
+    Seitentexte. Die gesamte Prüflogik läuft dann fehlerfrei durch und erzeugt
+    ein vollständig formatiertes Arbeitspapier OHNE inhaltliche Grundlage –
+    fachlich die gefährlichste Fehlnutzung, weil sie wie ein Ergebnis aussieht.
+    """
+
+    datei: str
+    seiten: int
+    zeichen: int
+
+    @property
+    def zeichen_je_seite(self) -> float:
+        return self.zeichen / self.seiten if self.seiten else 0.0
+
+    @property
+    def ist_leer(self) -> bool:
+        """Kein verwertbarer Text – die Prüfung darf nicht durchlaufen."""
+        return self.seiten == 0 or self.zeichen_je_seite <= LEER_GRENZE_JE_SEITE
+
+    @property
+    def ist_textarm(self) -> bool:
+        """Verwertbar, aber verdächtig wenig – Warnung, kein Abbruch."""
+        return not self.ist_leer and self.zeichen_je_seite < TEXTARM_GRENZE_JE_SEITE
+
+    @property
+    def meldung(self) -> str:
+        """Ein Satz für den Anwender; leer, wenn die Unterlage unauffällig ist."""
+        if self.seiten == 0:
+            return (f"„{self.datei}“ enthält keine lesbaren Seiten. Bitte prüfen, "
+                    f"ob die Datei vollständig und unbeschädigt ist.")
+        if self.ist_leer:
+            return (f"„{self.datei}“ enthält keinen lesbaren Text "
+                    f"({self.seiten} Seiten, {self.zeichen} Zeichen). Das ist "
+                    f"vermutlich ein Scan ohne Texterkennung. Bitte das PDF aus "
+                    f"dem Erstellungsprogramm mit Textebene anfordern oder eine "
+                    f"Texterkennung (OCR) darüber laufen lassen.")
+        if self.ist_textarm:
+            return (f"„{self.datei}“ enthält auffällig wenig Text (rund "
+                    f"{self.zeichen_je_seite:.0f} Zeichen je Seite auf "
+                    f"{self.seiten} Seiten). Möglicherweise ist ein Teil des "
+                    f"Dokuments nur gescannt. Das Ergebnis kann unvollständig "
+                    f"sein – bitte stichprobenweise gegen das Dokument prüfen.")
+        return ""
+
+
+def textausbeute(page_texts: list[str], datei: str) -> Textausbeute:
+    """Misst die Textausbeute bereits gelesener Seitentexte."""
+    return Textausbeute(
+        datei=datei,
+        seiten=len(page_texts),
+        zeichen=sum(len(t or "") for t in page_texts),
+    )
+
+
+def pruefe_textausbeute(path, anzeigename: Optional[str] = None) -> Optional[Textausbeute]:
+    """Liest eine Unterlage und misst, wieviel Text sie trägt.
+
+    Args:
+        path: Pfad zur Datei.
+        anzeigename: Name für die Anwendermeldung (die hochgeladene Datei liegt
+            unter einem technischen Temp-Namen). Ohne Angabe der Dateiname.
+
+    Returns:
+        ``Textausbeute`` – oder ``None``, wenn die Datei mit diesem Konnektor
+        gar nicht gelesen werden kann (fremdes Format, beschädigt). Dann
+        entscheidet der aufrufende Modus wie bisher weiter: die Prüfung soll
+        keinen Weg blockieren, der heute funktioniert.
+    """
+    try:
+        pages = load_page_texts(path)
+    except Exception:
+        return None
+    return textausbeute(pages, anzeigename or Path(path).name)
 
 
 def _pdf_page_texts(path, x_tolerance: int = DEFAULT_X_TOLERANCE) -> list[str]:
