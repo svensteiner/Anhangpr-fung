@@ -191,27 +191,56 @@ def _detect_legal_form(document_text_low: str) -> str | None:
     return None   # unklar/beides -> konservativ nicht filtern
 
 
-def _size_class_applicable(item: ChecklistItem, legal_form: str | None) -> bool:
-    """False nur, wenn die KPMG-Größenklasse die Rechtsform KLAR ausschließt
-    (z.B. reine 'AG …'-Einträge bei einer GmbH)."""
-    if not item.size_classes or legal_form is None:
+#: Größenklasse-Bezeichnungen der KPMG-Spalte -> normierter Schlüssel.
+_SIZE_LABEL = {"groß": "gross", "gross": "gross", "mittel": "mittel", "klein": "klein"}
+_SIZE_ENTRY_RE = re.compile(r"\b(gmbh|ag)\b\s+(groß|gross|mittel|klein)", re.IGNORECASE)
+
+#: Anzeigetexte für Meldungen (nicht für den internen Vergleich).
+_SIZE_DISPLAY = {"gross": "groß", "mittel": "mittel", "klein": "klein"}
+_FORM_DISPLAY = {"gmbh": "GmbH", "ag": "AG"}
+
+
+def _parse_size_classes(entries: list[str]) -> set[tuple[str, str]]:
+    """Zerlegt Einträge wie 'AG groß; GmbH mittel' in {(rechtsform, größe)}."""
+    out: set[tuple[str, str]] = set()
+    for entry in entries:
+        for m in _SIZE_ENTRY_RE.finditer(entry.lower()):
+            out.add((m.group(1), _SIZE_LABEL.get(m.group(2), m.group(2))))
+    return out
+
+
+def _size_class_applicable(
+    item: ChecklistItem, legal_form: str | None, size_class: str | None
+) -> bool:
+    """True = Punkt ist anwendbar (nicht filtern).
+
+    legal_form ('gmbh'/'ag') UND size_class ('klein'/'mittel'/'gross') müssen
+    beide bekannt sein, sonst wird konservativ NICHT gefiltert (unbekannt =>
+    immer anwendbar). Ebenso, wenn die Spalte keine auswertbaren Einträge hat.
+    """
+    if not item.size_classes or legal_form is None or size_class is None:
         return True
-    for entry in item.size_classes:
-        el = entry.lower()
-        if legal_form == "gmbh" and "gmbh" in el:
-            return True
-        if legal_form == "ag" and re.search(r"\bag\b", el):
-            return True
-    return False
+    parsed = _parse_size_classes(item.size_classes)
+    if not parsed:
+        return True
+    return (legal_form, size_class) in parsed
+
+
+def _item_applicable_ex(
+    item: ChecklistItem, document_text_low: str
+) -> tuple[bool, list[str] | None]:
+    """Wie _item_applicable, gibt zusätzlich die geprüften Auslöse-Begriffe
+    zurück (für eine sprechende n.-a.-Begründung)."""
+    dl = (item.description or "").lower()
+    for pattern, triggers in ITEM_TRIGGERS:
+        if re.search(pattern, dl):
+            return any(kw in document_text_low for kw in triggers), triggers
+    return True, None
 
 
 def _item_applicable(item: ChecklistItem, document_text_low: str) -> bool:
     """Prüffragen-Ebene: Sachverhalt der Frage im Abschluss vorhanden?"""
-    dl = (item.description or "").lower()
-    for pattern, triggers in ITEM_TRIGGERS:
-        if re.search(pattern, dl):
-            return any(kw in document_text_low for kw in triggers)
-    return True
+    return _item_applicable_ex(item, document_text_low)[0]
 
 
 def _triggers_for(category: str) -> list[str] | None:
@@ -238,44 +267,98 @@ def relevant_categories(categories, document_text: str) -> dict[str, bool]:
     return {cat: category_applicable(cat, low) for cat in categories}
 
 
-def apply_relevance(result: ReviewResult, checklist: Checklist, document_text: str) -> dict:
-    """Setzt Findings nicht anwendbarer Kategorien auf NOT_APPLICABLE.
+#: Präfix für n.a.-Gründe, die NUR aus Stichwort-/Positions-Heuristik stammen
+#: (Klasse "maschinell") – im Gegensatz zu Gründen mit klarem Rechtsgrund
+#: (Größenklasse, Prüfer-Vorgabe Blatt "Start").
+MASCHINELL_PRAEFIX = "Maschinell n. a. – bitte stichprobenweise prüfen: "
+
+
+def apply_relevance(
+    result: ReviewResult,
+    checklist: Checklist,
+    document_text: str,
+    legal_form: str | None = None,
+    size_class: str | None = None,
+) -> dict:
+    """Setzt Findings nicht anwendbarer Kategorien/Punkte auf NOT_APPLICABLE.
+
+    legal_form ('gmbh'/'ag'/None) und size_class ('klein'/'mittel'/'gross'/None)
+    kommen bevorzugt aus der UI-Auswahl des Prüfers; ist legal_form nicht
+    gesetzt, wird die Rechtsform-Autoerkennung aus dem Abschlusstext als
+    Fallback verwendet (size_class kann nicht automatisch erkannt werden).
+
+    n.-a.-Gründe werden in zwei Klassen unterschieden:
+      - RECHTSGRUND: Größenklasse (§ 221 UGB) oder Prüfer-Vorgabe (Blatt
+        "Start") – eindeutig, keine Stichwortsuche beteiligt.
+      - MASCHINELL: Kategorie-/Positions-Trigger bzw. Stichwortabwesenheit –
+        nur ein Hinweis, der Grund trägt den Präfix MASCHINELL_PRAEFIX und
+        bekommt keinen eigenen Status (bleibt NICHT ANWENDBAR).
 
     Gibt eine Übersicht zurück:
       { "anwendbar": [Kategorien], "nicht_anwendbar": [Kategorien],
-        "umgestellt": Anzahl der auf NICHT ANWENDBAR gesetzten Findings }
+        "umgestellt": Anzahl der auf NICHT ANWENDBAR gesetzten Findings,
+        "rechtsform": effektive Rechtsform, "groessenklasse": size_class,
+        "rechtsgrund": Anzahl n.a. mit Rechtsgrund,
+        "maschinell": Anzahl n.a. maschinell }
     """
     low = (document_text or "").lower()
-    legal_form = _detect_legal_form(low)
+    detected_form = _detect_legal_form(low)
+    effective_form = legal_form or detected_form
     item_of = {it.item_id: it for it in checklist.items}
     applicable_cache: dict[str, bool] = {}
 
     umgestellt = 0
+    rechtsgrund_n = 0
+    maschinell_n = 0
     for f in result.findings:
         item = item_of.get(f.checklist_item_id)
         cat = item.category if item else ""
         if cat not in applicable_cache:
             applicable_cache[cat] = category_applicable(cat, low)
 
-        # kurzer, klarer n.-a.-Grund (ersetzt das Stichwort-Geschwafel)
-        grund = None
-        if not applicable_cache[cat]:
-            grund = "Position nicht vorhanden."
-        elif item is not None and not _size_class_applicable(item, legal_form):
-            grund = f"Gilt nicht für {legal_form.upper()} (KPMG-Größenklasse)."
+        grund: str | None = None
+        klasse: str | None = None
+
+        if item is not None and not item.pruefer_relevant:
+            grund = "Im Prüfprogramm (Blatt Start) als nicht relevant markiert."
+            klasse = "rechtsgrund"
+        elif item is not None and not _size_class_applicable(item, effective_form, size_class):
+            form_txt = _FORM_DISPLAY.get(effective_form, effective_form)
+            size_txt = _SIZE_DISPLAY.get(size_class, size_class)
+            grund = (f"Nicht erforderlich für {form_txt} {size_txt} "
+                     "(Größenklasse laut Prüfprogramm).")
+            klasse = "rechtsgrund"
+        elif not applicable_cache[cat]:
+            begriffe = _triggers_for(cat) or []
+            hinweis = ", ".join(begriffe[:3]) or "kein Positions-/Themenbegriff im Abschluss"
+            grund = f"{MASCHINELL_PRAEFIX}Position nicht vorhanden ({hinweis})."
+            klasse = "maschinell"
         elif item is not None and not _item_applicable(item, low):
-            grund = "Sachverhalt nicht vorhanden."
+            _ok, triggers = _item_applicable_ex(item, low)
+            hinweis = ", ".join((triggers or [])[:3]) or "Sachverhalt"
+            grund = f"{MASCHINELL_PRAEFIX}Sachverhalt nicht vorhanden ({hinweis})."
+            klasse = "maschinell"
         elif item is not None and not _position_vorhanden(item, low):
-            grund = "Position/Sachverhalt kommt im Abschluss nicht vor."
+            begriffe = _positions_begriffe(item)
+            hinweis = ", ".join(begriffe[:3]) or "Fachbegriff"
+            grund = f"{MASCHINELL_PRAEFIX}Position/Sachverhalt kommt im Abschluss nicht vor ({hinweis})."
+            klasse = "maschinell"
 
         if grund and f.status != ComplianceStatus.NOT_APPLICABLE:
             f.status = ComplianceStatus.NOT_APPLICABLE
             f.technical_reasoning = grund
             f.evidence = []
             umgestellt += 1
+            if klasse == "rechtsgrund":
+                rechtsgrund_n += 1
+            elif klasse == "maschinell":
+                maschinell_n += 1
 
     anwendbar = sorted({c for c, ok in applicable_cache.items() if ok})
     nicht = sorted({c for c, ok in applicable_cache.items() if not ok})
     result._update_statistics()
-    return {"anwendbar": anwendbar, "nicht_anwendbar": nicht, "umgestellt": umgestellt,
-            "rechtsform": legal_form}
+    return {
+        "anwendbar": anwendbar, "nicht_anwendbar": nicht, "umgestellt": umgestellt,
+        "rechtsform": effective_form, "groessenklasse": size_class,
+        "rechtsgrund": rechtsgrund_n, "maschinell": maschinell_n,
+    }

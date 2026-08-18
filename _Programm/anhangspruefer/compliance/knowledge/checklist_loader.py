@@ -93,6 +93,74 @@ class ChecklistLoader:
         s = str(value).strip().lower()
         return s in ("ja", "j", "yes", "y", "wahr", "true", "1", "x", "pflicht")
 
+    @staticmethod
+    def _sheet_category(title: str) -> str:
+        """Kategoriename aus dem Blattnamen: führende Nummer + Leerzeichen weg
+        ('3 Anlagevermögen' -> 'Anlagevermögen')."""
+        return re.sub(r"^\d+\s*", "", (title or "").strip()).strip()
+
+    def _load_category_map(self, wb, id_col_names: tuple, desc_col_names: tuple,
+                            master_ws) -> dict[str, str]:
+        """ID -> Kategorie, abgeleitet vom jeweiligen Kategorieblatt (Blattname
+        ohne führende Nummer). Jedes Blatt außer 'Start' und dem Master-Blatt,
+        das wie ein Prüfprogramm-Blatt aussieht (ID + Prüffrage-Spalte), zählt
+        als Kategorieblatt."""
+        out: dict[str, str] = {}
+        for cand in wb.worksheets:
+            if cand is master_ws or (cand.title or "").strip().lower() == "start":
+                continue
+            crows = [r for r in cand.iter_rows(values_only=True)]
+            if not crows:
+                continue
+            chdr = [str(x).strip().lower() if x is not None else "" for x in crows[0]]
+            has_id = any(x in id_col_names for x in chdr)
+            has_desc = any(x in desc_col_names for x in chdr)
+            if not (has_id and has_desc):
+                continue
+            id_ix = next((chdr.index(x) for x in id_col_names if x in chdr), None)
+            if id_ix is None:
+                continue
+            kat = self._sheet_category(cand.title)
+            for row in crows[1:]:
+                if id_ix < len(row) and row[id_ix] is not None:
+                    rid = str(row[id_ix]).strip()
+                    if rid:
+                        out[rid] = kat
+        return out
+
+    def _load_start_relevance(self, wb) -> dict[str, bool]:
+        """Blatt 'Start': Kategorie (Blattname) -> Prüfer-Urteil 'relevant?'.
+
+        Es wird nicht auf feste Spaltenpositionen vertraut, sondern nach Zeilen
+        gesucht, deren Kategorie-Zelle einem echten Blattnamen entspricht und
+        deren letzte belegte Zelle Ja/Nein enthält.
+        """
+        out: dict[str, bool] = {}
+        start = None
+        for name in wb.sheetnames:
+            if name.strip().lower() == "start":
+                start = wb[name]
+                break
+        if start is None:
+            return out
+        sheet_titles = {t.strip().lower() for t in wb.sheetnames}
+        for row in start.iter_rows(values_only=True):
+            vals = [v for v in row if v is not None]
+            if len(vals) < 2:
+                continue
+            kategorie = None
+            relevant_raw = None
+            for v in row:
+                if v is None:
+                    continue
+                if isinstance(v, str) and v.strip().lower() in sheet_titles:
+                    kategorie = v.strip()
+                if isinstance(v, str) and v.strip().lower() in ("ja", "nein"):
+                    relevant_raw = v.strip()
+            if kategorie and relevant_raw is not None:
+                out[self._sheet_category(kategorie)] = self._truthy(relevant_raw)
+        return out
+
     def load_from_xlsx(self, file_path: Path) -> Checklist:
         """Lädt das UGB-Prüfprogramm aus einer Excel-Datei.
 
@@ -101,6 +169,12 @@ class ChecklistLoader:
           Anwendbar auf | Hinweis
         Mehrere Werte (UGB-§, Stichwörter, Anwendbar) mit ';' trennen.
         So kann das Prüfprogramm jederzeit in Excel erweitert werden.
+
+        Die tatsächliche Kategorie eines Punktes wird primär vom jeweiligen
+        Kategorieblatt abgeleitet (Blattname ohne führende Nummer) – die
+        Master-Spalte 'Kategorie' ist oft nur die Sammelkategorie 'Allgemein'
+        und dient nur als Fallback. Das Blatt 'Start' markiert je Kategorie,
+        ob sie laut Prüfer überhaupt relevant ist (Spalte 'relevant?').
         """
         from openpyxl import load_workbook
 
@@ -126,6 +200,13 @@ class ChecklistLoader:
             rows = [r for r in ws.iter_rows(values_only=True)]
         if not rows:
             return Checklist(name="UGB-Prüfprogramm (leer)", version="", source_file=str(file_path))
+
+        # Kategorie je ID vom jeweiligen Kategorieblatt ableiten, und je
+        # Kategorie das Prüfer-Urteil (Blatt "Start", Spalte "relevant?").
+        _id_names = ("id", "nr", "item_id")
+        _desc_names = ("prüffrage", "prueffrage", "frage", "beschreibung", "description")
+        id_to_sheet_cat = self._load_category_map(wb, _id_names, _desc_names, ws)
+        sheet_relevant = self._load_start_relevance(wb)
 
         header = [str(h).strip().lower() if h is not None else "" for h in rows[0]]
 
@@ -168,9 +249,11 @@ class ChecklistLoader:
                 continue
             n += 1
             anw = self._split_multi(cell(row, "anw")) or ["alle"]
+            item_id = cell(row, "id") or f"chk_{n:03d}"
+            kategorie = id_to_sheet_cat.get(item_id) or cell(row, "kat") or "Allgemein"
             checklist.add_item(ChecklistItem(
-                item_id=cell(row, "id") or f"chk_{n:03d}",
-                category=cell(row, "kat") or "Allgemein",
+                item_id=item_id,
+                category=kategorie,
                 description=desc,
                 ugb_references=self._split_multi(cell(row, "ugb")),
                 search_keywords=self._split_multi(cell(row, "kw")),
@@ -178,6 +261,7 @@ class ChecklistLoader:
                 is_mandatory=self._truthy(cell(row, "pflicht")) if cell(row, "pflicht") else True,
                 judgment_guidance=cell(row, "hinweis"),
                 size_classes=self._split_multi(cell(row, "gk")),
+                pruefer_relevant=sheet_relevant.get(kategorie, True),
             ))
 
         logger.info(f"UGB-Prüfprogramm aus Excel geladen: {len(checklist.items)} Prüfpunkte")

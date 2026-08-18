@@ -59,6 +59,21 @@ def _evidence_text(finding) -> str:
     return (ref + quote) if quote else ""
 
 
+def _tool_hint_text(status: str, finding) -> str:
+    """Anzeigetext für 'Maschineller Hinweis (kein Prüfungsurteil)'.
+
+    Bei NICHT ANWENDBAR wird zwischen Rechtsgrund (Größenklasse, Blatt
+    "Start") und rein maschinellem Befund (Stichwort-/Positions-Heuristik)
+    unterschieden – Letzteres ist nur ein Hinweis, kein belastbarer Ausschluss.
+    """
+    if status == "NICHT ANWENDBAR":
+        reasoning = (finding.technical_reasoning if finding else "") or ""
+        if reasoning.startswith("Maschinell n. a."):
+            return "n. a. (maschinell – stichprobenweise prüfen)"
+        return "n. a. (Rechtsgrund)"
+    return _STATUS_LABEL.get(status, status)
+
+
 def _note_text(finding, status: str, item) -> str:
     """Kurze, klare Anmerkung – eine Aussage, kein Fließtext."""
     reasoning = (finding.technical_reasoning if finding else "").strip()
@@ -80,7 +95,14 @@ def _note_text(finding, status: str, item) -> str:
     return ""                                # Ja/Offen: keine Textwüste
 
 
-def generate_checklist_xlsx(checklist: Checklist, result: ReviewResult, out_path: Path) -> None:
+_FORM_LABEL = {"gmbh": "GmbH", "ag": "AG"}
+_SIZE_LABEL_XLSX = {"klein": "klein", "mittel": "mittel", "gross": "groß"}
+
+
+def generate_checklist_xlsx(
+    checklist: Checklist, result: ReviewResult, out_path: Path,
+    legal_form: str | None = None, size_class: str | None = None,
+) -> None:
     by_id = {f.checklist_item_id: f for f in result.findings}
     wb = openpyxl.Workbook()
 
@@ -90,21 +112,45 @@ def generate_checklist_xlsx(checklist: Checklist, result: ReviewResult, out_path
     ov.cell(row=1, column=1, value="UGB-Anhang – ausgefüllte KPMG-Checkliste").font = Font(bold=True, size=14)
     ov.cell(row=2, column=1, value=f"Dokument: {result.document_name}")
     ov.cell(row=3, column=1, value=f"Prüfprogramm: {result.checklist_name}")
+    form_txt = _FORM_LABEL.get(legal_form, "unbekannt")
+    size_txt = _SIZE_LABEL_XLSX.get(size_class, "unbekannt")
+    ov.cell(row=4, column=1,
+            value=(f"Rechtsform: {form_txt} · Größenklasse § 221 UGB: {size_txt} "
+                   "— Grundlage aller n.a.-Beurteilungen")).font = Font(italic=True)
 
     counts: dict[str, int] = {}
+    na_rechtsgrund = na_maschinell = 0
     for f in result.findings:
         counts[f.status.value] = counts.get(f.status.value, 0) + 1
-    ov.cell(row=5, column=1, value="Ergebnis").font = Font(bold=True)
-    ov.cell(row=5, column=2, value="Anzahl").font = Font(bold=True)
+        if f.status.value == "NICHT ANWENDBAR":
+            if (f.technical_reasoning or "").startswith("Maschinell n. a."):
+                na_maschinell += 1
+            else:
+                na_rechtsgrund += 1
+    ov.cell(row=6, column=1, value="Ergebnis").font = Font(bold=True)
+    ov.cell(row=6, column=2, value="Anzahl").font = Font(bold=True)
     order = ["ENTSPRICHT", "TEILWEISE ENTSPRECHEND", "NICHT ENTSPRECHEND",
              "NICHT BEURTEILBAR", "NICHT ANWENDBAR", "PRÜFUNG AUSSTEHEND"]
-    r = 6
+    r = 7
     for key in order:
-        if counts.get(key):
-            ov.cell(row=r, column=1, value=_STATUS_LABEL.get(key, key))
-            ov.cell(row=r, column=2, value=counts[key])
-            ov.cell(row=r, column=1).fill = PatternFill("solid", fgColor=_STATUS_FILL.get(key, "FFFFFF"))
-            r += 1
+        if not counts.get(key):
+            continue
+        if key == "NICHT ANWENDBAR":
+            if na_rechtsgrund:
+                ov.cell(row=r, column=1, value="n. a. (Rechtsgrund)")
+                ov.cell(row=r, column=2, value=na_rechtsgrund)
+                ov.cell(row=r, column=1).fill = PatternFill("solid", fgColor=_STATUS_FILL[key])
+                r += 1
+            if na_maschinell:
+                ov.cell(row=r, column=1, value="n. a. (maschinell – stichprobenweise prüfen)")
+                ov.cell(row=r, column=2, value=na_maschinell)
+                ov.cell(row=r, column=1).fill = PatternFill("solid", fgColor=_STATUS_FILL[key])
+                r += 1
+            continue
+        ov.cell(row=r, column=1, value=_STATUS_LABEL.get(key, key))
+        ov.cell(row=r, column=2, value=counts[key])
+        ov.cell(row=r, column=1).fill = PatternFill("solid", fgColor=_STATUS_FILL.get(key, "FFFFFF"))
+        r += 1
     ov.cell(row=r + 1, column=1, value="Geprüfte Punkte gesamt").font = Font(bold=True)
     ov.cell(row=r + 1, column=2, value=len(result.findings)).font = Font(bold=True)
 
@@ -130,9 +176,10 @@ def generate_checklist_xlsx(checklist: Checklist, result: ReviewResult, out_path
     # das Tool-Ergebnis; Spalte "Final" zeigt das maßgebliche Urteil.
     ws = wb.create_sheet("KPMG-Checkliste (ausgefüllt)")
     headers = ["Nr.", "ID", "Kategorie", "Prüffrage (KPMG)", "UGB-§ / Fachgutachten",
-               "Ergebnis (Tool)", "Nachweis / Fundstelle im Anhang", "Anmerkung",
-               "Pflicht", "Prüfer-Urteil", "Final", "Prüfer-Kommentar"]
-    widths = [5, 7, 24, 58, 26, 14, 50, 40, 8, 13, 10, 36]
+               "Maschineller Hinweis (kein Prüfungsurteil)", "Nachweis / Fundstelle im Anhang",
+               "Anmerkung", "Pflicht", "Prüfer-Urteil", "Final", "Prüfer-Kommentar",
+               "Status (intern)"]
+    widths = [5, 7, 24, 58, 26, 30, 50, 40, 8, 13, 10, 36, 0]
     for c, (h, w) in enumerate(zip(headers, widths), start=1):
         cell = ws.cell(row=1, column=c, value=h)
         cell.font = _HEADER_FONT
@@ -140,6 +187,7 @@ def generate_checklist_xlsx(checklist: Checklist, result: ReviewResult, out_path
         cell.alignment = _CTR
         cell.border = _BORDER
         ws.column_dimensions[get_column_letter(c)].width = w
+    ws.column_dimensions[get_column_letter(len(headers))].hidden = True  # "Status (intern)"
 
     for i, item in enumerate(checklist.items, start=1):
         f = by_id.get(item.item_id)
@@ -151,13 +199,14 @@ def generate_checklist_xlsx(checklist: Checklist, result: ReviewResult, out_path
             item.category,
             item.description,
             "; ".join(item.ugb_references),
-            _STATUS_LABEL.get(status, status),
+            _tool_hint_text(status, f),
             "" if status == "NICHT ANWENDBAR" else _evidence_text(f),
             _note_text(f, status, item),
             "Ja" if item.is_mandatory else "Nein",
             "",                                            # Prüfer-Urteil (Dropdown)
-            f'=IF(J{r_idx}<>"",J{r_idx},F{r_idx})',        # Final = Prüfer schlägt Tool
+            f'=IF(J{r_idx}<>"",J{r_idx},M{r_idx})',        # Final = Prüfer schlägt Tool
             "",                                            # Prüfer-Kommentar
+            _STATUS_LABEL.get(status, status),              # Status (intern, für Final-Formel)
         ]
         for c, v in enumerate(values, start=1):
             cell = ws.cell(row=r_idx, column=c, value=v)

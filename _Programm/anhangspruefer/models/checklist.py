@@ -23,6 +23,9 @@ class ChecklistItem:
     # KPMG-Spalte "Größenklasse": Rechtsform-/Größen-Einträge wie
     # "AG groß; GmbH mittel". Leer = keine Einschränkung.
     size_classes: list[str] = field(default_factory=list)
+    # Prüfer-Vorgabe aus Blatt "Start" (Spalte "relevant?"): False = die
+    # gesamte Kategorie wurde vom Prüfer als nicht relevant markiert.
+    pruefer_relevant: bool = True
 
     # Markers for domain-specific knowledge requirements
     requires_professional_judgment: bool = True

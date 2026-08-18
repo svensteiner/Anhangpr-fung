@@ -583,6 +583,22 @@ HTML = r"""<!DOCTYPE html>
         <div class="upload-hint">wird gegen §§ 236-243 UGB geprüft</div>
         <div class="upload-filename" id="ug-name"></div>
       </div>
+      <div class="mandant-row">
+        <label for="ug-rechtsform">Rechtsform:</label>
+        <select id="ug-rechtsform" class="mandant-input" style="flex:0 0 200px;">
+          <option value="unbekannt">unbekannt</option>
+          <option value="gmbh">GmbH</option>
+          <option value="ag">AG</option>
+        </select>
+        <label for="ug-groessenklasse">Größenklasse § 221 UGB:</label>
+        <select id="ug-groessenklasse" class="mandant-input" style="flex:0 0 200px;">
+          <option value="unbekannt">unbekannt</option>
+          <option value="klein">klein</option>
+          <option value="mittel">mittel</option>
+          <option value="gross">groß</option>
+        </select>
+      </div>
+      <div class="result-note">„unbekannt" bedeutet: größenabhängige Erleichterungen werden NICHT gefiltert (jeder Punkt gilt als möglicherweise relevant).</div>
       <button class="btn-run" id="ug-btn" disabled onclick="ugRun()">▶ Inhaltsprüfung starten</button>
     </div>
     <div class="card hidden" id="ug-progress">
@@ -597,9 +613,10 @@ HTML = r"""<!DOCTYPE html>
     <div class="card hidden" id="ug-result">
       <h2><span class="num">3</span>Prüfungsprotokoll</h2>
       <div class="result-stats">
-        <div class="stat-box stat-ok"><div class="stat-val" id="ug-ok">—</div><div class="stat-lbl">Erfüllt</div></div>
-        <div class="stat-box stat-abw"><div class="stat-val" id="ug-fehl">—</div><div class="stat-lbl">Fehlend / unklar</div></div>
-        <div class="stat-box stat-total"><div class="stat-val" id="ug-tot">—</div><div class="stat-lbl">Geprüfte Items</div></div>
+        <div class="stat-box stat-text"><div class="stat-val" id="ug-bestaetigen">—</div><div class="stat-lbl">Zu bestätigen (Angabe gefunden)</div></div>
+        <div class="stat-box stat-abw"><div class="stat-val" id="ug-keinhinweis">—</div><div class="stat-lbl">Kein Hinweis gefunden</div></div>
+        <div class="stat-box stat-fehlt"><div class="stat-val" id="ug-fehl">—</div><div class="stat-lbl">Fehlt</div></div>
+        <div class="stat-box stat-total"><div class="stat-val" id="ug-na">—</div><div class="stat-lbl">n. a.</div></div>
       </div>
       <div class="result-warn hidden" id="ug-warn"></div>
       <div class="result-saved" id="ug-saved"></div>
@@ -894,6 +911,8 @@ async function ugRun() {
   }, 120);
   const fd = new FormData(); fd.append('anhang', ugFile);
   fd.append('mandant', currentMandant);
+  fd.append('rechtsform', document.getElementById('ug-rechtsform').value);
+  fd.append('groessenklasse', document.getElementById('ug-groessenklasse').value);
   try {
     const resp = await fetch('/ugb_review', { method:'POST', body:fd });
     clearInterval(iv); bar.style.width = '100%';
@@ -904,9 +923,10 @@ async function ugRun() {
 }
 function ugShowResult(data) {
   hide('ug-progress'); show('ug-result'); setStep('ug', 3);
-  document.getElementById('ug-ok').textContent   = data.ok;
+  document.getElementById('ug-bestaetigen').textContent = data.zu_bestaetigen;
+  document.getElementById('ug-keinhinweis').textContent = data.kein_hinweis;
   document.getElementById('ug-fehl').textContent = data.fehlend;
-  document.getElementById('ug-tot').textContent  = data.gesamt;
+  document.getElementById('ug-na').textContent   = data.nicht_anwendbar;
   showWarnungen('ug', data.warnungen);
   resultReady('ug', data.filename);
   refreshStatusAfterRun();
@@ -1273,6 +1293,17 @@ def ugb_review_route():
         except Exception as e:
             return jsonify({"error": f"Fehler bei der UGB-Prüfung: {e}"}), 500
 
+        # Rechtsform/Größenklasse aus der UI (Pflicht-Auswahl vor dem Start).
+        # "unbekannt" => keine größenabhängige Filterung (konservativ).
+        _rechtsform_raw = (request.form.get("rechtsform", "unbekannt") or "unbekannt").strip().lower()
+        _groessenklasse_raw = (request.form.get("groessenklasse", "unbekannt") or "unbekannt").strip().lower()
+        _legal_form = _rechtsform_raw if _rechtsform_raw in ("gmbh", "ag") else None
+        _size_class = _groessenklasse_raw if _groessenklasse_raw in ("klein", "mittel", "gross") else None
+        if _legal_form is None or _size_class is None:
+            warnungen.append(
+                "Ohne Rechtsform/Größenklasse bleiben größenabhängige Erleichterungen ungefiltert."
+            )
+
         # Relevanz-Filter: Angaben zu nicht vorhandenen Bilanz-/GuV-Positionen
         # -> "NICHT ANWENDBAR" (Angabe nur nötig, wenn die Position vorliegt).
         try:
@@ -1280,7 +1311,8 @@ def ugb_review_route():
             import pdfplumber
             with pdfplumber.open(str(anhang_p)) as _pdf:
                 _doc_text = "\n".join((p.extract_text() or "") for p in _pdf.pages)
-            apply_relevance(review_result, checklist, _doc_text)
+            apply_relevance(review_result, checklist, _doc_text,
+                            legal_form=_legal_form, size_class=_size_class)
         except Exception:
             pass  # optional – ohne Filter bleibt das bisherige Verhalten
 
@@ -1305,19 +1337,29 @@ def ugb_review_route():
         out_path = OUTPUT_DIR / out_fname
         try:
             from anhangspruefer.compliance.reporting.checklist_excel import generate_checklist_xlsx
-            generate_checklist_xlsx(checklist, review_result, out_path)
+            generate_checklist_xlsx(checklist, review_result, out_path,
+                                    legal_form=_legal_form, size_class=_size_class)
         except Exception as e:
             return jsonify({"error": f"Fehler beim Bericht-Export: {e}"}), 500
 
-    # Zählung nach ComplianceStatus
+    # Zählung nach ComplianceStatus; "Offen" (NICHT BEURTEILBAR) wird anhand
+    # von technical_reasoning weiter aufgesplittet (Angabe gefunden -> zu
+    # bestätigen; sonst -> kein Hinweis gefunden).
     findings = getattr(review_result, "findings", []) or []
     def _n(*vals):
         return sum(1 for f in findings if getattr(getattr(f, "status", None), "value", "") in vals)
+    def _offen_mit(praefix):
+        return sum(1 for f in findings
+                   if getattr(getattr(f, "status", None), "value", "") == "NICHT BEURTEILBAR"
+                   and (getattr(f, "technical_reasoning", "") or "").startswith(praefix))
     summary = {
-        "ok": _n("ENTSPRICHT", "TEILWEISE ENTSPRECHEND"),
+        "zu_bestaetigen": _offen_mit("Angabe gefunden"),
+        "kein_hinweis": _offen_mit("Kein Hinweis"),
         "fehlend": _n("NICHT ENTSPRECHEND"),
         "nicht_anwendbar": _n("NICHT ANWENDBAR"),
         "gesamt": len(findings),
+        "rechtsform": _legal_form or "unbekannt",
+        "groessenklasse": _size_class or "unbekannt",
         "ki": ki_info,
     }
     _record_stage(request.form.get("mandant", ""), "ugb", out_fname, summary)

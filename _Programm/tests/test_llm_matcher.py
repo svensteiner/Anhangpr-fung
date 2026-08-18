@@ -274,6 +274,29 @@ def test_apply_heuristic_fundstellen_offen_and_fehlt():
     assert st["K3"].status == ComplianceStatus.NOT_APPLICABLE
 
 
+def test_apply_heuristic_fundstellen_splits_offen_via_technical_reasoning():
+    """Status bleibt NICHT BEURTEILBAR ('Offen'), aber technical_reasoning
+    unterscheidet 'Angabe gefunden' (Kandidat mit Begriffstreffer) von
+    'Kein Hinweis gefunden' (kein Kandidat, nicht beweisbar abwesend)."""
+    from anhangspruefer.compliance.knowledge.llm_matcher import apply_heuristic_fundstellen
+    cl = Checklist(name="t", version="")
+    cl.add_item(ChecklistItem(item_id="K1", category="Vorräte",
+                description="Angabe der Vorratsbewertung", search_keywords=["Vorratsbewertung"]))
+    cl.add_item(ChecklistItem(item_id="K2", category="Allgemein",
+                description="Angabe zu einer Frist"))   # keine langen, spezifischen Begriffe
+    res = ReviewResult(document_name="d", checklist_name="t", review_timestamp=datetime(2026, 1, 1))
+    for iid in ("K1", "K2"):
+        res.add_finding(Finding(checklist_item_id=iid, status=ComplianceStatus.PARTIALLY_COMPLIANT, ugb_references=[]))
+
+    paras = [("Die Vorratsbewertung erfolgt zu Anschaffungskosten.", 2)]
+    apply_heuristic_fundstellen(res, cl, paras)
+    st = {f.checklist_item_id: f for f in res.findings}
+    assert st["K1"].status == ComplianceStatus.NOT_ASSESSABLE
+    assert st["K1"].technical_reasoning == "Angabe gefunden – bitte bestätigen"
+    assert st["K2"].status == ComplianceStatus.NOT_ASSESSABLE
+    assert st["K2"].technical_reasoning == "Kein Hinweis gefunden"
+
+
 def test_build_prompt_contains_rules_and_candidates():
     item = _item("Angabe X", kws=["Restlaufzeit"])
     p = build_prompt(item, [("Textabsatz eins", 4)])

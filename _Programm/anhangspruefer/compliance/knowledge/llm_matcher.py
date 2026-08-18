@@ -389,7 +389,8 @@ def apply_heuristic_fundstellen(
             trifft = (not spez) or any(
                 _kw_hit(w, zitat.lower(), _norm_compact(zitat)) for w in spez)
             f.status = ComplianceStatus.NOT_ASSESSABLE          # -> "Offen"
-            f.technical_reasoning = ""
+            f.technical_reasoning = ("Angabe gefunden – bitte bestätigen" if trifft
+                                     else "Kein Hinweis gefunden")
             f.missing_elements = []
             f.evidence = [EvidenceItem(
                 section_id="heuristik", section_title="Anhang",
@@ -412,6 +413,7 @@ def apply_heuristic_fundstellen(
             f.status = ComplianceStatus.NOT_ASSESSABLE          # -> "Offen"
             f.evidence = []
             f.missing_elements = []
+            f.technical_reasoning = "Kein Hinweis gefunden"
             offen += 1
 
     result._update_statistics()
