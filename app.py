@@ -480,6 +480,7 @@ HTML = r"""<!DOCTYPE html>
           <div class="upload-filename" id="vj-name-prior"></div>
         </div>
       </div>
+      <p class="upload-hint" id="vj-folder-hint" style="margin-top:10px;"></p>
       <button class="btn-run" id="vj-btn" disabled onclick="vjRun()">▶ Vergleich starten</button>
     </div>
     <div class="card hidden" id="vj-progress">
@@ -700,6 +701,7 @@ function onMandantChange() {
   currentMandant = document.getElementById('mandant-input').value.trim();
   try { localStorage.setItem('llp_mandant', currentMandant); } catch (e) {}
   renderFortschritt();
+  checkFolderFiles();
 }
 
 function renderFortschritt() {
@@ -731,7 +733,34 @@ async function refreshStatusAfterRun() { await loadStatus(); }
 /* ===================================================================
    MODUS 1 — VORJAHRESVERGLEICH
    =================================================================== */
-let vjCurrent = null, vjPrior = null;
+let vjCurrent = null, vjPrior = null, vjFolder = null;
+function vjUpdateBtn() {
+  document.getElementById('vj-btn').disabled = !((vjCurrent && vjPrior) || (vjFolder && vjFolder.ok));
+}
+async function checkFolderFiles() {
+  const hint = document.getElementById('vj-folder-hint');
+  vjFolder = null;
+  if (hint) hint.textContent = '';
+  const m = (document.getElementById('mandant-input').value || '').trim();
+  if (!m) { vjUpdateBtn(); return; }
+  try {
+    const r = await fetch('/mandant_unterlagen?mandant=' + encodeURIComponent(m));
+    const j = await r.json();
+    if (j.ok) {
+      vjFolder = j;
+      if (!vjCurrent) {
+        document.getElementById('vj-area-current').classList.add('has-file');
+        document.getElementById('vj-name-current').textContent = j.current + ' (Mandantenordner)';
+      }
+      if (!vjPrior) {
+        document.getElementById('vj-area-prior').classList.add('has-file');
+        document.getElementById('vj-name-prior').textContent = j.prior + ' (Mandantenordner)';
+      }
+      if (hint) hint.textContent = 'Unterlagen im Mandantenordner gefunden. Vergleich starten genügt – kein erneutes Hochladen nötig.';
+    }
+  } catch (e) {}
+  vjUpdateBtn();
+}
 function vjSelect(which) {
   const id = which === 'current' ? 'vj-file-current' : 'vj-file-prior';
   const f  = document.getElementById(id).files[0];
@@ -741,10 +770,10 @@ function vjSelect(which) {
   const nameId = which === 'current' ? 'vj-name-current' : 'vj-name-prior';
   document.getElementById(areaId).classList.add('has-file');
   document.getElementById(nameId).textContent = f.name;
-  document.getElementById('vj-btn').disabled = !(vjCurrent && vjPrior);
+  vjUpdateBtn();
 }
 async function vjRun() {
-  if (!vjCurrent || !vjPrior) return;
+  if (!(vjCurrent && vjPrior) && !(vjFolder && vjFolder.ok)) return;
   hide('vj-upload'); hide('vj-error'); hide('vj-result'); show('vj-progress');
   setStep('vj', 2);
   const bar = document.getElementById('vj-bar'), txt = document.getElementById('vj-text');
@@ -755,10 +784,14 @@ async function vjRun() {
     if (pct < 90) { pct += 1; bar.style.width = pct + '%'; }
   }, 120);
   const fd = new FormData();
-  fd.append('current', vjCurrent); fd.append('prior', vjPrior);
   fd.append('mandant', currentMandant);
+  let url = '/compare_folder';
+  if (vjCurrent && vjPrior) {
+    fd.append('current', vjCurrent); fd.append('prior', vjPrior);
+    url = '/compare';
+  }
   try {
-    const resp = await fetch('/compare', { method:'POST', body:fd });
+    const resp = await fetch(url, { method:'POST', body:fd });
     clearInterval(iv); bar.style.width = '100%';
     if (!resp.ok) { const e = await resp.json(); vjError(e.error || 'Unbekannter Fehler'); return; }
     const data = await resp.json();
@@ -1004,7 +1037,7 @@ async function quitApp() {
       document.getElementById('mandant-input').value = saved;
     }
   } catch (e) {}
-  loadStatus();
+  loadStatus().then(checkFolderFiles);
 })();
 </script>
 </body>
@@ -1074,6 +1107,100 @@ def shutdown_route():
 
 
 # ---------- Modus 1: Vorjahresvergleich ----------
+def _mandant_ordner(mandant: str) -> Path | None:
+    """Klienten/<Mandant>/ — Ordnername = Eintrag im Mandantenfeld."""
+    name = (mandant or "").strip()
+    if not name or not KLIENTEN_DIR.is_dir():
+        return None
+    direct = KLIENTEN_DIR / name
+    if direct.is_dir():
+        return direct
+    low = name.lower()
+    for d in KLIENTEN_DIR.iterdir():
+        if d.is_dir() and not d.name.startswith("_") and d.name.lower() == low:
+            return d
+        if d.is_dir() and not d.name.startswith("_") and low in d.name.lower():
+            return d
+    return None
+
+
+def _anhaenge_im_ordner(ordner: Path):
+    """(aktuell, vorjahr) aus dem Mandantenordner, sonst None."""
+    pdfs = [p for p in ordner.iterdir() if p.is_file() and p.suffix.lower() in (".pdf", ".docx")]
+    cur = next((p for p in pdfs if "2025" in p.name or "2026" in p.name), None)
+    pri = next((p for p in pdfs if "2024" in p.name), None)
+    if cur and pri and cur != pri:
+        return cur, pri
+    return None
+
+
+def _vorjahr_auswerten(cur_p: Path, pri_p: Path, mandant: str, anzeigenamen=None):
+    """Gemeinsamer Kern für Upload- und Ordner-Vergleich."""
+    pipeline = get_pipeline(mandant)
+    warnungen: list[str] = _neue_warnungen()
+    cur_name = (anzeigenamen or {}).get("current", cur_p.name)
+    pri_name = (anzeigenamen or {}).get("prior", pri_p.name)
+    _pruefe_lesbarkeit(
+        [(cur_p, f"Aktueller Anhang – {cur_name}"),
+         (pri_p, f"Vorjahres-Anhang – {pri_name}")],
+        warnungen,
+    )
+    result = compare_anhaenge(cur_p, pri_p, pipeline=pipeline)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    stem = Path(cur_name).stem[:40]
+    out_fname = f"vergleich_{stem}_{ts}.xlsx"
+    out_path = OUTPUT_DIR / out_fname
+    write_vorjahr_excel(result, out_path)
+    ok_count  = sum(1 for r in result.rows if r.status == "OK")
+    abw_count = sum(1 for r in result.rows if r.status == "ABWEICHUNG")
+    text_fehlt = sum(1 for t in result.text_rows if t.status == "FEHLT")
+    text_neu = sum(1 for t in result.text_rows if t.status == "NEU")
+    summary = {
+        "ok": ok_count,
+        "abweichungen": abw_count,
+        "gesamt": len(result.rows),
+        "text_fehlt": text_fehlt,
+        "text_neu": text_neu,
+        "pipeline": pipeline.name,
+        "filename": out_fname,
+        "warnungen": warnungen,
+    }
+    _record_stage(mandant, "vorjahr", out_fname, summary)
+    return summary
+
+
+@app.route("/mandant_unterlagen")
+def mandant_unterlagen_route():
+    """Ob im Klientenordner beide Anhänge liegen (für den Demo-Knopf)."""
+    ordner = _mandant_ordner(request.args.get("mandant", ""))
+    if ordner is None:
+        return jsonify({"ok": False})
+    paar = _anhaenge_im_ordner(ordner)
+    if not paar:
+        return jsonify({"ok": False})
+    return jsonify({"ok": True, "current": paar[0].name, "prior": paar[1].name})
+
+
+@app.route("/compare_folder", methods=["POST"])
+def compare_folder_route():
+    """Vorjahresvergleich aus den Dateien im Mandantenordner — ein Klick."""
+    mandant = request.form.get("mandant", "")
+    ordner = _mandant_ordner(mandant)
+    if ordner is None:
+        return jsonify({"error": "Kein Mandantenordner zu diesem Namen. Bitte genau so eintragen wie der Ordner unter Klienten/."}), 400
+    paar = _anhaenge_im_ordner(ordner)
+    if not paar:
+        return jsonify({"error": "Im Mandantenordner fehlen aktueller und Vorjahres-Anhang (PDF/Word)."}), 400
+    cur_p, pri_p = paar
+    try:
+        summary = _vorjahr_auswerten(cur_p, pri_p, mandant)
+    except LeereUnterlage as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Fehler bei der Analyse: {e}"}), 500
+    return jsonify(summary)
+
+
 @app.route("/compare", methods=["POST"])
 def compare_route():
     cur = request.files.get("current")

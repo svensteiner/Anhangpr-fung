@@ -73,6 +73,8 @@ def _normalize_for_match(text: str) -> str:
     """
     t = text.lower()
     t = re.sub(r"[0-9]+(?:[.,][0-9]+)*", " ", t)      # Zahlen/Beträge entfernen
+    t = re.sub(r"([a-zäöüß])\s*-\s+([a-zäöüß])", r"\1\2", t)
+    t = t.replace(";", " ")
     t = re.sub(r"[^a-zäöüß ]+", " ", t)                # Satzzeichen etc. raus
     t = re.sub(r"\s+", " ", t).strip()
     return t
@@ -330,7 +332,7 @@ def align_texts(current_pdf: Path, prior_pdf: Path) -> list[TextRow]:
     # 2) Absatz-Gegenüberstellung nach bester Ähnlichkeit (reihenfolge-unabhängig)
     rows += _pair_paragraphs(_extract_paragraphs(current_pdf),
                              _extract_paragraphs(prior_pdf))
-    return rows
+    return sort_text_rows(rows)
 
 
 def diff_excerpt(current: str, prior: str, max_len: int = 400) -> str:
@@ -373,6 +375,14 @@ def diff_excerpt(current: str, prior: str, max_len: int = 400) -> str:
     if not parts:
         return "nur geänderte Zahlen/Zeichen"
     return (" || ".join(parts))[:max_len]
+
+
+_TEXT_STATUS_ORDER = {"FEHLT": 0, "GEÄNDERT": 1, "NEU": 2, "IDENT": 3}
+
+
+def sort_text_rows(rows: list[TextRow]) -> list[TextRow]:
+    """Änderungen und Lücken zuerst, identische Absätze zuletzt."""
+    return sorted(rows, key=lambda r: (_TEXT_STATUS_ORDER.get(r.status, 9), r.page_current or 99))
 
 
 def find_new_text_blocks(current_pdf: Path, prior_pdf: Path) -> list[NewTextBlock]:

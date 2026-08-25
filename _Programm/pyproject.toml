@@ -39,6 +39,10 @@ dev = [
 rtf = [
     "striprtf>=0.0.26",
 ]
+ocr = [
+    "easyocr>=1.7.0",
+    "pymupdf>=1.24.0",
+]
 all = [
     "pypdf>=4.0.0",
     "pdfplumber>=0.10.0",

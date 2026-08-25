@@ -213,7 +213,7 @@ Bereiche, die fachspezifische Anpassung erfordern.
 
 ## Einschränkungen
 
-- **Keine OCR**: Gescannte PDFs (Bilder) werden nicht unterstützt
+- **OCR lokal**: Bild-Scans ohne Textebene werden mit EasyOCR erkannt (optional, vollständig lokal, Cache als `*.ocr.json` neben der Datei)
 - **Heuristische Erkennung**: Abschnittserkennung kann bei ungewöhnlichen
   Layouts versagen
 - **Keine semantische Analyse**: Inhaltliche Korrektheit wird nicht geprüft

@@ -88,6 +88,7 @@ NOISE_PATTERNS = [
     re.compile(r"^\s*Beilage\b", re.I),
     re.compile(r"^\s*(EUR\s*)+$", re.I),
     re.compile(r"^\s*(TEUR\s*)+$", re.I),
+    re.compile(r"^\s*[A-Za-zÄÖÜäöüß]\s*$"),
     re.compile(r"^[\s\-_=•·\.]+$"),
 ]
 
@@ -314,6 +315,12 @@ def _is_anhang_start(line: str) -> bool:
 
 def _is_anhang_end(line: str) -> bool:
     s = line.strip().lower()
+    if re.search(
+        r"allgemeine\s+auftragsbedingungen|"
+        r"auftragsbedingungen\s+f[uü]r\s+wirtschaftstreuhand",
+        s,
+    ):
+        return True
     if len(s) > 45:
         return False
     return bool(re.match(
@@ -346,6 +353,36 @@ def anhang_page_range(page_texts: list[str]) -> tuple[int, int]:
 # ---------------------------------------------------------------------------
 # Hauptfunktion
 # ---------------------------------------------------------------------------
+_INLINE_VORJAHR_RE = re.compile(
+    r"(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?)"
+    r"(?:\s+[A-Za-zÄÖÜäöüß%]+){0,4}\s*"
+    r"\(\s*Vorjahr\s*:?\s*"
+    r"(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?)",
+    re.I,
+)
+
+
+def _extract_inline_vorjahr(page_text: str, page: int) -> list:
+    """Fliesstext-Paare 'X (Vorjahr: Y)' als Kontinuitaetsposten."""
+    items = []
+    flat = page_text.replace("\n", " ")
+    for m in _INLINE_VORJAHR_RE.finditer(flat):
+        cur = parse_german_number(m.group(1))
+        pri = parse_german_number(m.group(2))
+        if cur is None or pri is None:
+            continue
+        words = re.findall(r"[A-Za-zÄÖÜäöüß\-]{2,}", flat[:m.start()])
+        label = " ".join(words[-6:]) or "Angabe (Vorjahr)"
+        items.append(AnhangItem(
+            label=label[:200],
+            page=page,
+            current_values=[cur],
+            prior_values=[pri],
+            source_lines=[m.group(0)],
+        ))
+    return items
+
+
 def extract_items(pdf_path: Path,
                   page_range: Optional[tuple[int, Optional[int]]] = None,
                   extra_noise=()) -> list[AnhangItem]:
@@ -458,6 +495,8 @@ def extract_items(pdf_path: Path,
                 ).strip()
             pending_label_parts.clear()
 
+            if page_is_anlagenspiegel:
+                full_label = re.sub(r"^\d{1,4}[\.\)]?\s+", "", full_label).strip()
             if not _is_meaningful_label(full_label):
                 i += 1
                 continue
@@ -492,7 +531,9 @@ def extract_items(pdf_path: Path,
             #   Zahlenzeile eine Summenzeile (keine zweite Datenzeile) ist.
             #   Anlagespiegel-Zeilen haben typischerweise >= 3 Zahlen.
             _two_col_table = two_column_mode and len(nums) == 2
-            if not prior_values and not _two_col_table and page_is_anlagenspiegel and i + 1 < len(raw_lines):
+            _wide_anlagenspiegel = page_is_anlagenspiegel and len(nums) >= 11
+            if (not prior_values and not _two_col_table and page_is_anlagenspiegel
+                    and not _wide_anlagenspiegel and i + 1 < len(raw_lines)):
                 nxt_line = raw_lines[i + 1]
                 nxt_label, nxt_nums = split_label_and_trailing_numbers(nxt_line)
                 only_numeric = bool(nxt_nums) and (
@@ -515,6 +556,10 @@ def extract_items(pdf_path: Path,
                 current_values = [nums[0]]
                 prior_values = [nums[1]]
 
+            if not prior_values and _wide_anlagenspiegel:
+                current_values = [nums[-2]]
+                prior_values = [nums[-1]]
+
             items.append(
                 AnhangItem(
                     label=full_label[:200],
@@ -526,6 +571,8 @@ def extract_items(pdf_path: Path,
                 )
             )
             i += 1
+
+        items.extend(_extract_inline_vorjahr(text, page_index))
 
     return _deduplicate(items)
 

@@ -150,11 +150,11 @@ def _write_rows(ws, rows, headers, widths):
 _HEADERS = [
     "Bezeichnung",
     "Spalte",
-    "Wert lt. 2025er Anhang (Vorjahresspalte = 2024)",
-    "Wert lt. 2024er Anhang (Berichtsjahr = 2024)",
+    "Wert lt. aktuellem Anhang (Vorjahresspalte)",
+    "Wert lt. Vorjahres-Anhang (Berichtsjahr)",
     "Differenz",
-    "Seite 2025",
-    "Seite 2024",
+    "Seite aktuell",
+    "Seite Vorjahr",
     "Status",
     "Match-Score",
 ]
@@ -212,6 +212,52 @@ def _write_abweichungen(wb: Workbook, result: CompareResult) -> None:
     _write_rows(ws, rows, _HEADERS, _WIDTHS)
 
 
+
+_CHG_HEADERS = ["Status", "S. akt.", "S. VJ", "Entfernt / nur Vorjahr", "Hinzugefügt / nur aktuell", "Text aktuell", "Text Vorjahr"]
+_CHG_WIDTHS = [12, 8, 8, 45, 45, 50, 50]
+
+
+def _write_textaenderungen(wb: Workbook, result: CompareResult) -> None:
+    """Nur geaenderte/neue/fehlende Textteile — Wortunterschiede aufgeschluesselt."""
+    ws = wb.create_sheet("Textänderungen")
+    _set_header(ws, 1, _CHG_HEADERS, _CHG_WIDTHS)
+    rows = [t for t in result.text_rows if t.status != "IDENT"]
+    if not rows:
+        c = ws.cell(row=2, column=1, value="Keine Textänderungen gegenüber dem Vorjahr.")
+        c.font = Font(italic=True, color="7F7F7F")
+        ws.merge_cells("A2:G2")
+        return
+    top = Alignment(wrap_text=True, vertical="top")
+    ctr = Alignment(horizontal="center", vertical="top")
+    for r_idx, tr in enumerate(rows, start=2):
+        excerpt = diff_excerpt(tr.current, tr.prior, max_len=800)
+        removed = added = ""
+        if "Vorjahr:" in excerpt or "aktuell:" in excerpt:
+            for p in excerpt.split(" || "):
+                if p.startswith("Vorjahr:"):
+                    removed = p[len("Vorjahr:"):].strip()
+                elif p.startswith("aktuell:"):
+                    added = p[len("aktuell:"):].strip()
+        elif excerpt.startswith("nur"):
+            if "Vorjahr" in excerpt:
+                removed = excerpt
+            else:
+                added = excerpt
+        else:
+            added = excerpt
+        ws.cell(row=r_idx, column=1, value=tr.status).alignment = ctr
+        ws.cell(row=r_idx, column=2, value=tr.page_current).alignment = ctr
+        ws.cell(row=r_idx, column=3, value=tr.page_prior).alignment = ctr
+        ws.cell(row=r_idx, column=4, value=removed).alignment = top
+        ws.cell(row=r_idx, column=5, value=added).alignment = top
+        ws.cell(row=r_idx, column=6, value=tr.current).alignment = top
+        ws.cell(row=r_idx, column=7, value=tr.prior).alignment = top
+        fill = _TEXT_STATUS_FILL.get(tr.status)
+        if fill:
+            for col in range(1, 8):
+                ws.cell(row=r_idx, column=col).fill = fill
+
+
 def generate_excel(result: CompareResult, output_path: Path) -> Path:
     """Schreibt einen Excel-Bericht für das Vergleichsergebnis."""
     wb = Workbook()
@@ -219,6 +265,7 @@ def generate_excel(result: CompareResult, output_path: Path) -> Path:
     _write_alle(wb, result)
     _write_abweichungen(wb, result)
     _write_textvergleich(wb, result)
+    _write_textaenderungen(wb, result)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(output_path)

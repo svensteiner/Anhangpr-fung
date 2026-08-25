@@ -50,6 +50,7 @@ _Programm/*.egg-info/
 _tmp_web/
 output/
 *.log
+*.ocr.json
 
 # Backups
 *.bak

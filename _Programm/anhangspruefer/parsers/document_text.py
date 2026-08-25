@@ -186,11 +186,18 @@ def pruefe_textausbeute(path, anzeigename: Optional[str] = None) -> Optional[Tex
 
 
 def _pdf_page_texts(path, x_tolerance: int = DEFAULT_X_TOLERANCE) -> list[str]:
-    """Seitentexte aus einem PDF (pdfplumber) — unverändertes bisheriges Verhalten."""
+    """Seitentexte aus einem PDF (pdfplumber), bei Bild-Scans lokale OCR."""
     import pdfplumber
 
     with pdfplumber.open(str(path)) as pdf:
-        return [p.extract_text(x_tolerance=x_tolerance) or "" for p in pdf.pages]
+        texts = [p.extract_text(x_tolerance=x_tolerance) or "" for p in pdf.pages]
+    if texts and (sum(len(t) for t in texts) / len(texts)) <= LEER_GRENZE_JE_SEITE:
+        from .ocr import ocr_pdf
+
+        ocr_texts = ocr_pdf(path)
+        if ocr_texts and sum(len(t) for t in ocr_texts) > sum(len(t) for t in texts):
+            return ocr_texts
+    return texts
 
 
 def _linearize_row(cells: list[str]) -> str:
