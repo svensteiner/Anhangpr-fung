@@ -83,3 +83,27 @@ def test_gegenprobe_kurze_schluessel_beweisen_nichts():
 
 def test_gegenprobe_ohne_volltext_unterdrueckt_nichts():
     assert _vorhanden_laut_volltext("sonstigerueckstellungen", "") is False
+
+
+def test_eindeutiger_wert_matcht_trotz_anderem_label():
+    """OCR verstellt den Namen, der Betrag ist eindeutig → trotzdem OK."""
+    current = [_item("20500 Abgrenzungen Forderungen", [100.0], [27473.55])]
+    prior = [_item("Abgrenzungen Ford.", [27473.55], [25000.0])]
+    rows = _compare(current, prior).rows
+    ok = [r for r in rows if r.status == "OK"]
+    assert len(ok) == 1
+    assert abs(ok[0].value_in_current_anhang - 27473.55) < 0.01
+
+
+def test_mehrdeutiger_wert_wird_nicht_geraten():
+    current = [_item("Posten A", [100.0], [50.0])]
+    prior = [_item("X", [50.0]), _item("Y", [50.0])]
+    rows = _compare(current, prior).rows
+    assert not [r for r in rows if r.status == "OK"]
+
+
+def test_null_betrag_kein_wertmatch():
+    current = [_item("Neu mit Null", [1.0], [0.0])]
+    prior = [_item("Ganz anderer Posten", [0.0])]
+    rows = _compare(current, prior).rows
+    assert not [r for r in rows if r.status == "OK"]

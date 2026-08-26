@@ -21,6 +21,7 @@ Vorgehen (rein lokal, keine externen Aufrufe):
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -36,7 +37,13 @@ NEW_THRESHOLD = 0.80
 # Ähnlichkeit, ab der zwei Absätze als "derselbe" Absatz gelten (sonst NEU/FEHLT).
 # Die Paarung erfolgt nach bester Ähnlichkeit statt strikt nach Reihenfolge, damit
 # umgestellte/anders aufgeteilte Absätze korrekt zugeordnet werden.
-PARA_MATCH_THRESHOLD = 0.55
+PARA_MATCH_THRESHOLD = 0.60
+
+# Ähnlichkeit, ab der ein gepaarter Absatz trotz OCR-Rauschen (verwürfelte
+# Wortreihenfolge, Satzzeichen-Fehllesungen, vereinzelte Zeichenfehler) noch
+# als IDENT gilt statt als GEÄNDERT. Ein reiner Wortlaut-Vergleich (exakte
+# Gleichheit) würde bei einem Scan-Vorjahr praktisch nie zutreffen.
+IDENT_THRESHOLD = 0.90
 
 # Deckungsgrad, ab dem ein unpaariger Absatz als "in der Gegenseite enthalten"
 # gilt (nur anders aufgeteilt) und daher NICHT als NEU/FEHLT ausgewiesen wird.
@@ -119,6 +126,31 @@ def _is_narrative(segment: str) -> bool:
     return True
 
 
+def _similarity(x: str, y: str) -> float:
+    """Ähnlichkeit zweier normalisierter Absatztexte (0..1).
+
+    Kombiniert zwei Maße und verwendet jeweils das bessere:
+      * Zeichen-Ähnlichkeit (SequenceMatcher) – erkennt Tippfehler und
+        einzelne OCR-Zeichenfehler bei sonst gleicher Wortreihenfolge.
+      * Wortmengen-Ähnlichkeit (Sørensen-Dice über Wort-Vielfachmengen) –
+        bleibt hoch, wenn OCR die Wortreihenfolge durch Spaltenfehler
+        verwürfelt hat (dieselben Wörter, andere Reihenfolge), obwohl die
+        Zeichenkette dadurch stark von der Vorlage abweicht.
+    Ein wirklich neuer/fehlender Absatz hat in beiden Maßen einen niedrigen
+    Wert, da weder die Zeichenfolge noch die Wörter übereinstimmen.
+    """
+    if not x or not y:
+        return 0.0
+    char_ratio = SequenceMatcher(None, x, y, autojunk=False).ratio()
+    wx, wy = Counter(x.split()), Counter(y.split())
+    total = sum(wx.values()) + sum(wy.values())
+    if total == 0:
+        return char_ratio
+    overlap = sum((wx & wy).values())
+    word_ratio = 2 * overlap / total
+    return max(char_ratio, word_ratio)
+
+
 _SENT_SPLIT = re.compile(r"(?<=[.!?:;])\s+(?=[A-ZÄÖÜ0-9])")
 
 
@@ -146,15 +178,88 @@ def _extract_segments(pdf_path: Path) -> list[tuple[str, int]]:
 # ---------------------------------------------------------------------------
 # Absatz-Extraktion (Textteile = Absätze)
 # ---------------------------------------------------------------------------
-_HEADING_RE = re.compile(r"^\s*\d+(?:\.\d+)*\.?\s")
+_HEADING_RE = re.compile(r"^\s*\d+(?:\.\d+)*\.?\s+(?P<rest>\S.*)$")
+
+# Häufige finite Verbformen (Hilfs-/Modalverben in Passiv-/Aktivsätzen).
+# Eine kurze Zeile MIT einem dieser Wörter ist Teil eines Satzes (Fließtext),
+# keine Absatz-Überschrift. Bewusst allgemein gehalten (Grammatik, nicht
+# mandantenspezifischer Wortschatz), damit die Erkennung für jeden Anhang
+# funktioniert.
+_FINITE_VERB_WORDS = frozenset({
+    "wurde", "wurden", "wird", "werden", "ist", "sind", "war", "waren",
+    "hat", "haben", "hatte", "hatten", "kann", "können", "konnte", "konnten",
+    "muss", "müssen", "musste", "mussten", "soll", "sollen", "sollte",
+    "sollten", "darf", "dürfen", "durfte", "durften", "gilt", "gelten",
+    "galt", "enthält", "enthalten", "erfolgt", "erfolgen", "betrifft",
+    "besteht", "bestehen", "bestand", "unterliegt", "unterliegen",
+})
+
+
+def _looks_like_title_line(s: str) -> bool:
+    """Strukturelle Erkennung einer Absatz-Überschrift ohne Wortlaut-Liste.
+
+    Eine Überschrift wie "Sachanlagen", "Sonstige Angaben" oder
+    "Rückstellungen für Jubiläumsgelder" ist eine kurze, in sich
+    abgeschlossene Zeile OHNE Satzendezeichen, OHNE Ziffern und OHNE finites
+    Verb – im Unterschied zu einer (ggf. umgebrochenen) Fließtextzeile.
+    """
+    if not s or s[-1] in ".,;:!?":
+        return False
+    if re.search(r"\d", s):
+        return False
+    words = s.split()
+    if not (1 <= len(words) <= 8):
+        return False
+    # Einzelne verirrte Großbuchstaben (z.B. Wasserzeichen-Reste, die als
+    # eigene Zeile extrahiert werden) sind KEINE Überschrift – eine echte
+    # Überschrift hat immer mehrere Buchstaben.
+    letters = re.sub(r"[^A-Za-zÄÖÜäöüß]", "", s)
+    if len(letters) < 4:
+        return False
+    if not s[0].isupper():
+        return False
+    low_words = {w.strip("-,.:;()").lower() for w in words}
+    if low_words & _FINITE_VERB_WORDS:
+        return False
+    return True
 
 
 def _is_heading(line: str) -> bool:
     s = line.strip()
-    if _HEADING_RE.match(s):
-        return True
+    m = _HEADING_RE.match(s)
+    if m:
+        # "1. Allgemeines" ist eine Überschrift, "222 bis 234, 236 bis 240,
+        # ..." (Fortsetzung einer Paragraphen-Aufzählung im Fließtext) NICHT
+        # – entscheidend ist, ob der Rest der Zeile selbst wie ein Titel
+        # aussieht (kurz, kein weiteres Satzzeichen/Ziffer, kein Verb).
+        if _looks_like_title_line(m.group("rest")):
+            return True
     letters = re.sub(r"[^A-Za-zÄÖÜäöüß]", "", s)
     if len(letters) >= 4 and letters == letters.upper() and len(s.split()) <= 6:
+        return True
+    return _looks_like_title_line(s)
+
+
+def _is_noise_line(line: str) -> bool:
+    """Reines Extraktions-Rauschen: gehört nicht zum Anhangtext, unterbricht
+    aber (anders als eine Überschrift) NICHT den laufenden Absatz – die
+    Zeile wird einfach übersprungen.
+
+    Zwei generische Fälle:
+      * ein einzelner Großbuchstabe auf eigener Zeile – typisch für ein
+        diagonales Wasserzeichen, dessen Buchstaben pdfplumber je nach
+        Kreuzungspunkt mit einer Textzeile als eigenes Segment ausliest;
+        eine echte Textzeile besteht nie aus nur einem Buchstaben.
+      * eine Unterschriften-Punktlinie ("....... ......."), wie sie am Ende
+        von Anhängen üblich ist – kein inhaltlicher Text.
+    """
+    s = line.strip()
+    if not s:
+        return False
+    if len(s) == 1 and s.isalpha() and s.isupper():
+        return True
+    compact = s.replace(" ", "")
+    if len(compact) >= 10 and compact.count(".") / len(compact) > 0.8:
         return True
     return False
 
@@ -185,6 +290,28 @@ def _is_table_header_line(line: str) -> bool:
     return bool(_TABLE_HEADER_RE.match(line.strip()))
 
 
+def _is_table_only_page(text: str) -> bool:
+    """True, wenn eine Seite überwiegend aus Tabellenzeilen besteht.
+
+    Die grobe Anhang-Seitenerkennung (anhang_page_range) markiert bei
+    manchen Layouts eine angehängte Beilage (z.B. Anlagenspiegel direkt nach
+    dem Anhangtext) noch als Anhang-Seite. Eine solche Seite ist aber KEIN
+    erzählender Absatztext, sondern eine Zahlentabelle (die prüft der
+    Zahlenvergleich) – und bei unterschiedlicher OCR-Lesbarkeit zwischen den
+    Jahren würde sie sonst als Scheinunterschied ("Tabelle nur heuer
+    lesbar") im Textvergleich auftauchen. Erkennung rein strukturell über
+    den Anteil an Zahlen-/Tabellenkopfzeilen – keine Layout-Annahme über ein
+    bestimmtes Dokument.
+    """
+    lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+    if len(lines) < 4:
+        return False
+    table_like = sum(
+        1 for ln in lines if _is_number_row(ln) or _is_table_header_line(ln)
+    )
+    return table_like / len(lines) > 0.5
+
+
 def _extract_paragraphs(pdf_path: Path) -> list[tuple[str, int]]:
     """Liefert (Absatztext, Seite) für alle erzählenden Absätze."""
     out: list[tuple[str, int]] = []
@@ -193,6 +320,8 @@ def _extract_paragraphs(pdf_path: Path) -> list[tuple[str, int]]:
     start, end = anhang_page_range(page_texts)
     for page_num in range(start + 1, end + 1):    # nur Anhang-Seiten
         text = page_texts[page_num - 1]
+        if _is_table_only_page(text):
+            continue                              # angehängte Zahlentabelle
         buf: list[str] = []
 
         def flush() -> None:
@@ -204,7 +333,12 @@ def _extract_paragraphs(pdf_path: Path) -> list[tuple[str, int]]:
 
         for raw in text.split("\n"):
             ln = raw.strip()
-            if not ln or _is_heading(ln) or _is_number_row(ln) or _is_table_header_line(ln):
+            if not ln:
+                flush()
+                continue
+            if _is_noise_line(ln):
+                continue                          # Rauschen: Absatz läuft weiter
+            if _is_heading(ln) or _is_number_row(ln) or _is_table_header_line(ln):
                 flush()
                 continue
             buf.append(ln)
@@ -239,18 +373,27 @@ def _detect_tables(pdf_path: Path) -> list[str]:
 def _coverage(frag: str, pool: list[str]) -> float:
     """Höchster Deckungsgrad von 'frag' in einem der Absätze aus 'pool' (0..1).
 
-    Deckungsgrad = übereinstimmende Zeichen / Länge von 'frag'. Erfasst den
-    Fall, dass ein Absatz auf der Gegenseite nur ANDERS AUFGETEILT ist (er
-    steckt vollständig in einem längeren Absatz).
+    Deckungsgrad = übereinstimmende Zeichen ODER Wörter / Umfang von 'frag'
+    (das jeweils bessere Maß zählt – siehe _similarity). Erfasst den Fall,
+    dass ein Absatz auf der Gegenseite nur ANDERS AUFGETEILT oder durch
+    OCR-Spaltenfehler umsortiert ist (er steckt inhaltlich vollständig in
+    einem längeren/anders geordneten Absatz).
     """
     if not frag:
         return 1.0
+    frag_words = Counter(frag.split())
+    frag_word_total = sum(frag_words.values())
     best = 0.0
     for other in pool:
         if not other:
             continue
         sm = SequenceMatcher(None, frag, other, autojunk=False)
-        cov = sum(bl.size for bl in sm.get_matching_blocks()) / len(frag)
+        char_cov = sum(bl.size for bl in sm.get_matching_blocks()) / len(frag)
+        word_cov = 0.0
+        if frag_word_total:
+            other_words = Counter(other.split())
+            word_cov = sum((frag_words & other_words).values()) / frag_word_total
+        cov = max(char_cov, word_cov)
         if cov > best:
             best = cov
             if best >= PARA_CONTAIN_THRESHOLD:
@@ -277,25 +420,29 @@ def _pair_paragraphs(cur: list[tuple[str, int]], pri: list[tuple[str, int]]) -> 
         for j in range(len(b)):
             if not b[j]:
                 continue
-            r = SequenceMatcher(None, a[i], b[j], autojunk=False).ratio()
+            r = _similarity(a[i], b[j])
             if r >= PARA_MATCH_THRESHOLD:
                 pairs.append((r, i, j))
     pairs.sort(key=lambda x: x[0], reverse=True)
 
-    match_of: dict[int, int] = {}
+    match_of: dict[int, tuple[int, float]] = {}
     used_prior: set[int] = set()
-    for _r, i, j in pairs:
+    for r, i, j in pairs:
         if i in match_of or j in used_prior:
             continue
-        match_of[i] = j
+        match_of[i] = (j, r)
         used_prior.add(j)
 
     rows: list[TextRow] = []
     for i, (ct, cp) in enumerate(cur):           # in Reihenfolge des aktuellen Anhangs
-        j = match_of.get(i)
-        if j is not None:
+        m = match_of.get(i)
+        if m is not None:
+            j, r = m
             pt, pp = pri[j]
-            status = "IDENT" if a[i] == b[j] else "GEÄNDERT"
+            # OCR-Rauschen (verwürfelte Wortreihenfolge, Satzzeichen-
+            # Fehllesungen) soll NICHT als Wortlautänderung erscheinen –
+            # daher Ähnlichkeitsschwelle statt exakter Gleichheit.
+            status = "IDENT" if r >= IDENT_THRESHOLD else "GEÄNDERT"
             rows.append(TextRow(ct, pt, status, cp, pp))
         elif _coverage(a[i], b) < PARA_CONTAIN_THRESHOLD:
             rows.append(TextRow(ct, "", "NEU", cp, None))   # wirklich neuer Text

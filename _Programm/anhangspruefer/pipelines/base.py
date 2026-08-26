@@ -63,8 +63,15 @@ class Pipeline:
     # Modus 1 – Vorjahresvergleich
     # ------------------------------------------------------------------
     def extract_anhang_items(self, pdf_path: Path) -> list[AnhangItem]:
-        """Liest die vergleichbaren Anhang-Posten (Label + Werte) aus einem PDF."""
-        return _std_extract_items(pdf_path, extra_noise=self.compiled_noise())
+        """Liest vergleichbare Posten aus Bilanz, GuV und Anhang.
+
+        Der Zahlen-Vorjahresvergleich braucht den ganzen Jahresabschluss-Kern
+        (nicht nur den Anhang-Abschnitt). Der Textvergleich bleibt separat
+        auf den Anhang beschränkt.
+        """
+        return _std_extract_items(
+            pdf_path, extra_noise=self.compiled_noise(), scope="ja",
+        )
 
     # ------------------------------------------------------------------
     # Modus 2 – Belegprüfung (Detailzahlenvergleich)

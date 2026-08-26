@@ -140,6 +140,10 @@ def split_label_and_trailing_numbers(line: str) -> tuple[str, list[float]]:
 
         'Erläuterungen zu einzelnen Posten von Bilanz und GuV'
         -> ('Erläuterungen zu einzelnen Posten von Bilanz und GuV', [])
+
+        '2100 Grundanteil Whg Färbermühlgasse 13 6.708,65 6.708,65'
+        -> ('2100 Grundanteil Whg Färbermühlgasse 13', [6708.65, 6708.65])
+        (die Hausnummer "13" ist KEIN Betrag, siehe Regel unten)
     """
     # Nachlaufende Währungseinheiten/Fußnotenmarker abschneiden, sonst bricht
     # die Rückwärtssuche sofort ab und die Zeile liefert GAR KEINE Zahlen
@@ -154,19 +158,141 @@ def split_label_and_trailing_numbers(line: str) -> tuple[str, list[float]]:
 
     nums: list[float] = []
     label_end = len(line)
+    # Beträge in diesen Abschlüssen haben IMMER ein Dezimalkomma. Sobald wir
+    # rückwärts eine Zahl MIT Komma eingesammelt haben, darf eine weitere
+    # ganzzahlige Zahl OHNE Komma nicht mehr als Betrag gelten – das ist eine
+    # im Bezeichnungstext stehende Zahl (Hausnummer, Kontonummer im Namen wie
+    # "ERSTE BANK 8880 6201"), kein Wert. Zeilen OHNE jedes Komma (Nutzungsdauer
+    # "3", Arbeitnehmerzahl "18") sind davon nicht betroffen, weil dort nie ein
+    # Komma-Wert gesehen wurde.
+    seen_decimal = False
     # rückwärts: nur kontinuierliche Zahlen am Ende einsammeln
     for m in reversed(matches):
         between = line[m.end():label_end]
         if between.strip() != "":
             break
-        v = parse_german_number(m.group())
+        token = m.group()
+        has_decimal = "," in token
+        if not has_decimal and seen_decimal:
+            break
+        v = parse_german_number(token)
         if v is None:
             break
+        if has_decimal:
+            seen_decimal = True
         nums.insert(0, v)
         label_end = m.start()
 
     label = line[:label_end].rstrip(" \t.,;:")
     return label, nums
+
+
+# ---------------------------------------------------------------------------
+# OCR-Zahlartefakte reparieren (Fehler D)
+# ---------------------------------------------------------------------------
+# Der Bild-Scan-OCR des Vorjahres-Abschlusses liest Beträge gelegentlich
+# falsch: Punkt statt Komma als Dezimaltrennzeichen ('7715.93'), Komma statt
+# Punkt als Tausendertrennzeichen ('48,882,57'), doppelte/verrutschte
+# Trennzeichen ('636,.72', '47.243,.80'), Leerzeichen nach dem Komma
+# ('174.282, 24'). Wir reparieren NUR eindeutig erkennbare Muster.
+#
+# BEWUSST NICHT repariert: Fälle, in denen die OCR ein Minuszeichen als
+# Ziffer gelesen hat (z.B. '2314.953,82' statt '-314.953,82', '4320.095,21'
+# statt '-320.095,21'). Der erste Ziffernblock ist dort 4-stellig statt der
+# sonst überall 1-3-stelligen Tausendergruppe – jede Korrektur wäre eine
+# Vermutung ins Blaue. Solche Zahlen matchen keines der Muster unten, bleiben
+# für NUMBER_RE unsichtbar und landen unverändert (unangetastet) im
+# Labeltext – sie werden dadurch nie als falscher Betrag gemeldet
+# (Präzision vor Vollständigkeit).
+_OCR_DOUBLE_SEP_RE = re.compile(r"(?<=[.,])[.,]")
+_OCR_SPACE_AFTER_COMMA_RE = re.compile(r",\s+(?=\d{2}\b)")
+_OCR_COMMA_THOUSANDS_RE = re.compile(r"\b(\d{1,3}(?:,\d{3})+),(\d{2})\b")
+_OCR_DOT_DECIMAL_RE = re.compile(r"\b(\d{3,})\.(\d{1,2})\b(?!,)")
+# Leerzeichen statt Komma ("119.749 46" statt "119.749,46"). NUR wenn davor
+# eine VOLLE Tausender-Dreiergruppe steht (fixe Lookbehind-Breite \d{3}) –
+# das grenzt zuverlässig gegen Faelle wie "69 00 69 00" ab (dort stehen vor
+# jedem Leerzeichen nie 3 zusammenhaengende Ziffern), wo Komma vs. eigen-
+# staendige Ganzzahl nicht unterscheidbar waere und wir NICHT raten wollen.
+# UND nur, wenn die zwei Nachkommastellen dort auch wirklich ENDEN (nicht
+# selbst der Anfang einer laengeren, eigenstaendigen Zahl sind wie in
+# "RAIBA 12018081 14.903,11" – dort waere "14" der Beginn von "14.903,11",
+# keine Cent-Gruppe, sonst entsteht "12018081,14.903,11").
+_OCR_SPACE_AS_COMMA_RE = re.compile(r"(?<=\d{3})\s(?=\d{2}(?![.,\d]))")
+# Einzelner Großbuchstabe DIREKT (ohne Leerzeichen) vor einer Zahl geklebt
+# ('F7.313,43' statt '7.313,43') – ein Extraktions-Artefakt, das auch im
+# digitalen Berichtsjahres-PDF vorkommt (vermutlich eine überlagerte
+# Korrektur-/Fußnotenmarkierung), nicht nur im OCR-Scan. NUMBER_RE lehnt
+# 'F7.313,43' sonst komplett ab (Wortgrenze links verletzt), der Betrag geht
+# spurlos verloren. Nur EIN isolierter Buchstabe direkt vor der Ziffer –
+# echte Wortanfänge wie 'Anlage 5' bleiben unberührt (Leerzeichen davor).
+_STRAY_LETTER_BEFORE_NUMBER_RE = re.compile(r"(?<!\S)[A-Z](?=\d)")
+
+
+def _fix_ocr_number_artifacts(line: str) -> str:
+    """Repariert erkennbare OCR-Zahlfehler VOR der eigentlichen Extraktion.
+
+    Reihenfolge ist wichtig: erst doppelte/verrutschte Trennzeichen
+    zusammenfassen und Leerraum nach dem Komma entfernen, danach die beiden
+    Vertauschungsfälle auflösen (Komma als Tausender-, Punkt als
+    Dezimaltrennzeichen). Wirkt auf ECHTEN Text (z.B. den digitalen
+    Berichtsjahres-PDF) nicht, weil dort keines der Muster vorkommt – korrekt
+    formatierte deutsche Beträge nutzen nie mehrere Kommas oder einen Punkt
+    mit nur 1-2 Nachkommastellen.
+    """
+    s = line
+    s = _STRAY_LETTER_BEFORE_NUMBER_RE.sub("", s)
+    s = _OCR_DOUBLE_SEP_RE.sub("", s)
+    s = _OCR_SPACE_AFTER_COMMA_RE.sub(",", s)
+    s = _OCR_SPACE_AS_COMMA_RE.sub(",", s)
+    s = _OCR_COMMA_THOUSANDS_RE.sub(
+        lambda m: m.group(1).replace(",", ".") + "," + m.group(2), s
+    )
+    s = _OCR_DOT_DECIMAL_RE.sub(lambda m: m.group(1) + "," + m.group(2), s)
+    return s
+
+
+# ---------------------------------------------------------------------------
+# Verklebte OCR-Zeilen auftrennen (Fehler C)
+# ---------------------------------------------------------------------------
+# Der Bild-Scan-OCR liefert manchmal zwei Bilanzzeilen ohne Zeilenumbruch
+# hintereinander: '<Text> <Betrag> <Betrag> <Text> <Betrag> <Betrag>'. Wir
+# suchen die Nahtstelle "zwei Beträge, dann ein großgeschriebenes Wort" und
+# trennen dort NUR, wenn beide entstehenden Teile für sich genommen wie ein
+# eigenständiger Posten aussehen (Label + eigene(r) Betrag/Beträge) –
+# Präzision vor Vollständigkeit, sonst bleibt die Zeile unverändert.
+_GLUE_BOUNDARY_RE = re.compile(
+    r"""
+    \d[\d.,]*\d                  # Betrag 1 (heuristisch, Feindetails übernimmt
+    (?:\s+\d[\d.,]*\d)?          # split_label_and_trailing_numbers) optional Betrag 2
+    \s+
+    (?=[A-ZÄÖÜ][\wÄÖÜäöüß.\-]*(?:\s|$))   # Nahtstelle: neues, großgeschriebenes Wort
+    """,
+    re.VERBOSE,
+)
+
+
+def _split_glued_lines(line: str) -> list[str]:
+    """Zerlegt eine verklebte OCR-Doppelzeile in ihre logischen Teilzeilen.
+
+    Greift nur, wenn NACH der Trennstelle nachweislich wieder Text mit
+    eigenem Betrag folgt und VOR der Trennstelle noch ein eigenes Label mit
+    eigenem Betrag steht – sonst ist es kein Verklebungsfall, sondern
+    normaler Text, der zufällig mit einem Großbuchstaben weitergeht (z.B.
+    ein Firmenname), und die Zeile bleibt unangetastet.
+    """
+    m = _GLUE_BOUNDARY_RE.search(line)
+    if not m:
+        return [line]
+    left, right = line[:m.end()], line[m.end():]
+    if not left.strip() or not right.strip():
+        return [line]
+    left_label, left_nums = split_label_and_trailing_numbers(left)
+    if not left_label.strip() or not left_nums:
+        return [line]
+    right_label, right_nums = split_label_and_trailing_numbers(right)
+    if not right_label.strip() or not right_nums:
+        return [line]
+    return [left] + _split_glued_lines(right)
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +328,17 @@ def compact_key(label: str) -> str:
     return normalize_label(label).replace(" ", "")
 
 
+# Sachkonto-Nummer (4-5 Ziffern), der KEIN weiteres Zeichen vorausgeht (Wort-
+# grenze links) und der Whitespace + entweder ein Buchstabe ODER eine weitere
+# Gliederungsnummer mit Punkt ("3.", "12.") folgt (Wortanfang rechts). Der
+# Gliederungsnummer-Fall greift, wenn die Kontonummer beim Label-Zusammenbau
+# vor eine Gliederungsüberschrift gestellt wurde ("62000 3. Personalaufwand
+# ... Gehälter" statt "3. Personalaufwand ... 62000 Gehälter"), siehe
+# extract_items(). Wird in normalize_label() entfernt (siehe dort für die
+# Begründung).
+_KONTONUMMER_RE = re.compile(r"(?<!\S)\d{4,5}(?=\s+(?:[a-zäöüß]|\d+\.))")
+
+
 def normalize_label(label: str) -> str:
     """Normalisiert ein Label für robustes Matching zwischen zwei PDFs."""
     s = label.lower().strip()
@@ -211,6 +348,17 @@ def normalize_label(label: str) -> str:
          .replace("ü", "ue")
          .replace("ß", "ss")
     )
+    # Sachkonto-Nummer entfernen (4-5-stellig, gefolgt von einem Wortanfang).
+    # Der aktuelle Abschluss enthält Kontonummern ('20500 Abgrenzungen
+    # Forderungen'), der gescannte Vorjahres-Abschluss nicht ('Abgrenzungen
+    # Forderungen') – ohne Entfernung matcht das nie. GILT AN BELIEBIGER
+    # STELLE im Label, nicht nur am Anfang: Gliederungs-Zwischenzeilen wie
+    # '1. Wertpapiere (Wertrechte) des Anlagevermögens 8310 Wertpapiere'
+    # tragen die Kontonummer mitten im zusammengesetzten Label. Bewusst NICHT
+    # 1-3-stellige Zahlen ("3 Monate", "18 Arbeitnehmer") und NICHT Zahlen
+    # ohne folgenden Buchstaben ("2025 2024" – Jahreszahlen-Paare, da dort
+    # keine Wortgrenze mit Buchstaben folgt).
+    s = _KONTONUMMER_RE.sub("", s)
     # Aufzählungszeichen/Nummerierungen am Anfang weg – ITERATIV, damit auch
     # mehrstufige Gliederungen ("A.II.1. Sachanlagen", "1.2.3 Anlagevermögen")
     # vollständig entfernt werden. Ohne die Schleife bliebe ein Rest stehen und
@@ -227,6 +375,15 @@ def normalize_label(label: str) -> str:
         if s == vorher:
             break
     s = re.sub(r"[^a-z0-9\s]", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    # Isolierte Einzelbuchstaben entfernen: der digitale Berichtsjahres-PDF
+    # hat ein diagonales Wasserzeichen, dessen Buchstaben ("ENTWURF") beim
+    # Textextrahieren einzeln zwischen echte Wörter rutschen ("Vorsorge für
+    # Abfertigungen W", "Nachrichtenaufwand W Portogebühren"). Ohne Entfernung
+    # verhindert dieser Zufallsbuchstabe den Match gegen das saubere
+    # Vorjahres-Label. Ein einzelner Buchstabe ist in diesen Kontenbezeich-
+    # nungen nie inhaltstragend.
+    s = re.sub(r"\b[a-z]\b", " ", s)
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
@@ -351,6 +508,49 @@ def anhang_page_range(page_texts: list[str]) -> tuple[int, int]:
 
 
 # ---------------------------------------------------------------------------
+# Jahresabschluss-Kern (Bilanz + GuV + Anhang) für den Zahlenvergleich
+# ---------------------------------------------------------------------------
+# Modus 1 prüft die Vorjahreszahlen des ganzen Abschlusses, nicht nur des
+# Anhangs. AAB gehören nicht dazu. Der Textvergleich bleibt bei
+# ``anhang_page_range``.
+_AAB_RE = re.compile(r"allgemeine\s+auftragsbedingungen", re.I)
+_AAB_SHORT_RE = re.compile(r"(?m)^\s*AAB\b")
+# Inhaltsverzeichnis-Zeilen sind kurz; der echte AAB-Text ist eine lange Seite.
+_AAB_MIN_CHARS = 4000
+_BILANZ_GUV_RE = re.compile(
+    r"\baktiva\b|\bpassiva\b|gewinn-?\s*und\s*verlustrechnung",
+    re.I,
+)
+
+
+def aab_page_index(page_texts: list[str]) -> int:
+    """Erste Seite des AAB-Blocks (0-basiert); sonst Dokumentende.
+
+    ``_is_anhang_end`` darf hier nicht verwendet werden: dort gilt schon
+    ``Bilanz`` als Ende. Kurze Inhaltsverzeichnis-Zeilen zählen nicht.
+    """
+    for i, t in enumerate(page_texts):
+        if len(t) < _AAB_MIN_CHARS:
+            continue
+        if (
+            _AAB_RE.search(t)
+            or _AAB_SHORT_RE.search(t)
+            or re.search(r"auftragsbedingungen", t, re.I)
+        ):
+            return i
+    return len(page_texts)
+
+
+def ja_page_range(page_texts: list[str]) -> tuple[int, int]:
+    """Seiten von Bilanz, GuV und Anhang bis vor die AAB.
+
+    Startet am Dokumentanfang: Deckblatt/Inhaltsverzeichnis erzeugen kaum
+    Posten (Rauschfilter), eine Bilanz-Suche würde TOC-Treffer riskieren.
+    """
+    return (0, aab_page_index(page_texts))
+
+
+# ---------------------------------------------------------------------------
 # Hauptfunktion
 # ---------------------------------------------------------------------------
 _INLINE_VORJAHR_RE = re.compile(
@@ -385,21 +585,25 @@ def _extract_inline_vorjahr(page_text: str, page: int) -> list:
 
 def extract_items(pdf_path: Path,
                   page_range: Optional[tuple[int, Optional[int]]] = None,
-                  extra_noise=()) -> list[AnhangItem]:
+                  extra_noise=(),
+                  scope: str = "anhang") -> list[AnhangItem]:
     """
-    Extrahiert alle Anhang-Posten aus einer PDF.
+    Extrahiert vergleichbare Posten (Label + Werte) aus einem Abschluss.
 
     Args:
         pdf_path:   Dokument (PDF oder DOCX – über den Konnektor).
         page_range: Optionaler Seitenbereich (start, end) als 0-basierte
-                    Indizes, end exklusiv. Ohne Angabe wird der automatisch
-                    erkannte Anhang-Abschnitt verwendet. Damit lässt sich auch
-                    der VORDERE Teil (Bilanz/GuV) getrennt einlesen.
+                    Indizes, end exklusiv. Ohne Angabe entscheidet ``scope``.
                     ``end=None`` liest bis zum Dokumentende – das ganze
                     Dokument ist also ``(0, None)``.
         extra_noise: Zusätzliche kompilierte Regexe für mandantenspezifische
                     Möblierung (Briefkopf, Kanzleiname, Aktenzeichen). Kommt
                     aus dem Mandanten-Plugin, nicht aus diesem Modul.
+        scope:      Nur relevant ohne ``page_range``.
+                    ``"anhang"`` = nur der Anhang-Abschnitt (Textvergleich,
+                    interner Abgleich hinten).
+                    ``"ja"`` = Bilanz, GuV und Anhang bis vor die AAB
+                    (Vorjahres-Zahlenvergleich).
 
     Returns:
         Liste von AnhangItem in Lesereihenfolge. Jeder Eintrag enthält
@@ -418,11 +622,25 @@ def extract_items(pdf_path: Path,
         # Aufrufer verliert das Dokument stillschweigend.
         start = max(0, start)
         end = len(page_texts) if end is None else min(end, len(page_texts))
+    elif scope == "ja":
+        start, end = ja_page_range(page_texts)
     else:
         start, end = anhang_page_range(page_texts)
+    # Spaltenkopf "GJ | VJ" gilt oft für Folgeseiten (Bilanz/GuV über mehrere
+    # Blätter). Darum dokumentweit merken, nicht je Seite zurücksetzen.
+    two_column_mode = False
     for page_index in range(start + 1, end + 1):   # 1-basierte Seitennummer
         text = page_texts[page_index - 1]
         raw_lines = [ln.rstrip() for ln in text.split("\n")]
+        # Fehler D zuerst (OCR-Zahlartefakte reparieren), DANACH Fehler C
+        # (verklebte Zeilen trennen) – die Trennstellen-Erkennung braucht
+        # bereits reparierte Beträge, sonst bleiben z.B. Punkt-Dezimalzahlen
+        # ('7715.93') für die Betragserkennung unsichtbar.
+        raw_lines = [_fix_ocr_number_artifacts(ln) for ln in raw_lines]
+        expanded_lines: list[str] = []
+        for ln in raw_lines:
+            expanded_lines.extend(_split_glued_lines(ln))
+        raw_lines = expanded_lines
 
         # Nur der ANLAGENSPIEGEL hat echte Doppelzeilen-Posten (Stand 1.1.
         # über Stand 31.12., je 6 Spalten). Andere Spiegel (Rückstellungen,
@@ -431,9 +649,22 @@ def extract_items(pdf_path: Path,
         # "Anschaffungs-/Herstellungskosten … Buchwert".
         _tl = text.lower()
         page_is_anlagenspiegel = ("buchwert" in _tl) and ("anschaff" in _tl)
-
-        # Modus: zwei Zahlen pro Item-Zeile = (current, prior)?
-        two_column_mode = False
+        # Rueckstellungs-/Verbindlichkeitenspiegel: Stand | Bewegung | Stand.
+        # Die Jahreszahlen in den Stand-Koepfen duerfen NICHT als
+        # Zwei-Spalten-Modus (GJ|VJ) gelten – sonst zerlegt Modus 3b die
+        # vier Bewegungsspalten in ein falsches Wertepaar.
+        page_is_bewegungsspiegel = ("stand" in _tl) and any(
+            w in _tl for w in (
+                "zuweisung", "verwendung", "verbrauch",
+                "aufloesung", "auflösung",
+            )
+        )
+        if (
+            not page_is_anlagenspiegel
+            and not page_is_bewegungsspiegel
+            and _BILANZ_GUV_RE.search(text)
+        ):
+            two_column_mode = True
 
         pending_label_parts: list[str] = []
         i = 0
@@ -490,9 +721,24 @@ def extract_items(pdf_path: Path,
             if len(label_words) >= 2:
                 full_label = label_part.strip()
             else:
-                full_label = " ".join(
-                    pending_label_parts + ([label_part] if label_part else [])
-                ).strip()
+                # Führt label_part mit einer Kontonummer ein ('8310
+                # Wertpapiere'), zieht die Kontonummer beim Zusammenbau ganz
+                # nach vorne ('8310 1. Wertpapiere ... Wertpapiere') statt sie
+                # mitten im kombinierten Label zu vergraben ('1. Wertpapiere
+                # ... 8310 Wertpapiere'). Rein kosmetisch für Berichte/Debug –
+                # normalize_label() entfernt die Kontonummer ohnehin an
+                # beliebiger Stelle, das Match-Verhalten ändert sich nicht.
+                _konto_m = re.match(r"^(\d{4,5})\s+(?=[A-Za-zÄÖÜäöüß])", label_part) if label_part else None
+                if _konto_m:
+                    konto = _konto_m.group(1)
+                    rest = label_part[_konto_m.end():]
+                    full_label = (
+                        konto + " " + " ".join(pending_label_parts + ([rest] if rest else []))
+                    ).strip()
+                else:
+                    full_label = " ".join(
+                        pending_label_parts + ([label_part] if label_part else [])
+                    ).strip()
             pending_label_parts.clear()
 
             if page_is_anlagenspiegel:
@@ -546,19 +792,46 @@ def extract_items(pdf_path: Path,
                     is_double_row = True
                     i += 1  # zweite Zeile konsumieren
 
-            # Modus 3: Spaltenkopf "31.12.YYYY 31.12.YYYY" gesehen,
-            #          keine Vorjahr-Zeile, genau 2 Zahlen -> [current, prior]
+            # Modus 3: Spaltenkopf "31.12.YYYY 31.12.YYYY" gesehen
+            #          (oder Bilanz/GuV-Seite), keine Vorjahr-Zeile,
+            #          genau 2 Zahlen -> [current, prior]
             if (
                 not prior_values
                 and two_column_mode
                 and len(nums) == 2
+                and not page_is_anlagenspiegel
+                and not page_is_bewegungsspiegel
+            ):
+                current_values = [nums[0]]
+                prior_values = [nums[1]]
+
+            # Modus 3b: wie Modus 3, aber MEHR als 2 Zahlen (OCR-Verklebung
+            # ohne trennenden Labeltext). Typischer Fall im Bild-Scan: der
+            # letzte Posten einer Gruppe zieht die direkt anschließende
+            # Zwischen-/Endsumme auf dieselbe Zeile ("... 152.508,49
+            # 152.508,49 3.380.486,22 3.695.440,04" – die letzten beiden
+            # Zahlen sind die Summenzeile, kein eigener Posten). Nur die
+            # ERSTEN beiden Zahlen gehören zum Posten selbst; der Rest wird
+            # verworfen statt geraten. Nicht im Anlagenspiegel (dort ist die
+            # Wide-Zeile ein eigenes, bereits behandeltes Muster).
+            elif (
+                not prior_values
+                and two_column_mode
+                and len(nums) > 2
+                and not page_is_anlagenspiegel
+                and not page_is_bewegungsspiegel
             ):
                 current_values = [nums[0]]
                 prior_values = [nums[1]]
 
             if not prior_values and _wide_anlagenspiegel:
-                current_values = [nums[-2]]
-                prior_values = [nums[-1]]
+                # Die letzten beiden Spalten sind "Buchwert Stand 01.01." (=
+                # Eröffnung, Vorjahr) und "Buchwert Stand 31.12." (= Schluss,
+                # Berichtsjahr) – siehe Kopfzeile "... Buchwerte / Stand
+                # 01.01.JJJJ / Stand 31.12.JJJJ". Reihenfolge daher [-2]=prior,
+                # [-1]=current (NICHT vertauscht, siehe Regression unten).
+                current_values = [nums[-1]]
+                prior_values = [nums[-2]]
 
             items.append(
                 AnhangItem(

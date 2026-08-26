@@ -52,6 +52,11 @@ output/
 *.log
 *.ocr.json
 
+# Entwickler-Temp (Patch-Skripte, nicht Teil des Produkts)
+_Programm/_tmp*
+_Programm/_tmp_*/
+_apply_batch*.py
+
 # Backups
 *.bak
 *.bak_encoding

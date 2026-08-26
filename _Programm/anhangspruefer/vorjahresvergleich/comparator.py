@@ -1,9 +1,9 @@
 """
-Vergleicher für die Vorjahreszahlen zwischen zwei Anhang-PDFs.
+Vergleicher für die Vorjahreszahlen zwischen zwei Abschlüssen.
 
 Eingabe:
-  - aktueller Anhang (z.B. 2025): "Vorjahr"-Spalte/-Zeile enthält 2024-Werte
-  - vorjähriger Anhang (z.B. 2024): Berichtsjahr-Werte sind die 2024-Werte
+  - aktueller Abschluss (z.B. 2025): Vorjahresspalte enthält 2024-Werte
+  - vorjähriger Abschluss (z.B. 2024): Berichtsjahr-Werte sind die 2024-Werte
 
 Ziel:
   Prüfen, ob die im 2025er Anhang ausgewiesenen 2024-Werte mit den im
@@ -27,9 +27,7 @@ from typing import Optional
 
 from .extractor import (
     AnhangItem,
-    anhang_page_range,
     compact_key,
-    extract_items,
     normalize_label,
 )
 from .text_compare import TextRow, align_texts
@@ -136,10 +134,48 @@ class CompareResult:
 # ---------------------------------------------------------------------------
 # Hilfsfunktionen
 # ---------------------------------------------------------------------------
+def _is_leading_digit_ocr_artifact(a: float, b: float) -> bool:
+    """True, wenn a und b sich NUR durch eine fehlende führende Ziffer
+    unterscheiden – ein bekannter OCR-Fehler des Bild-Scans (z.B. wird
+    '1.366,32' als '366,32' gelesen, die '1' fällt weg). Bewusst sehr eng
+    gefasst: gleiches Vorzeichen, gleiche Nachkommastellen, die Ziffernfolge
+    des kleineren Betrags muss GENAU der um eine führende Ziffer gekürzten
+    Ziffernfolge des größeren entsprechen. Eine zufällige Kollision mit einer
+    echten Abweichung ist bei beliebigen Eurobeträgen praktisch ausgeschlossen
+    (Präzision vor Vollständigkeit – wir raten NICHT, welche Ziffer fehlt,
+    wir erkennen nur, DASS das Muster exakt zu einem Ziffernverlust passt).
+    """
+    if (a < 0) != (b < 0):
+        return False
+    hi, lo = (abs(a), abs(b)) if abs(a) > abs(b) else (abs(b), abs(a))
+    hi_digits = f"{hi:.2f}".replace(".", "")
+    lo_digits = f"{lo:.2f}".replace(".", "")
+    if len(hi_digits) != len(lo_digits) + 1:
+        return False
+    return hi_digits[1:] == lo_digits
+
+
+def _is_missing_minus_ocr_artifact(a: float, b: float) -> bool:
+    """True, wenn a und b bis auf das Vorzeichen exakt übereinstimmen.
+
+    Der Bild-Scan-OCR verliert gelegentlich ein Minuszeichen komplett (dünner
+    Strich vor der Zahl, leicht zu übersehen), z.B. wird '-636,72' als
+    '636,72' gelesen. Bewusst NUR auf exakte Betragsgleichheit geprüft (nicht
+    auf Toleranzband) – ein zufälliges Zusammentreffen von exakt gleichem
+    Betrag bei tatsächlich unterschiedlichem Vorzeichen wäre ein extrem
+    seltener Zufall. Wir raten nicht, WELCHES Vorzeichen richtig ist, wir
+    erkennen nur, dass genau dieses bekannte OCR-Fehlerbild vorliegt, und
+    melden dann bewusst KEINEN Fehlalarm (Präzision vor Vollständigkeit).
+    """
+    return abs(a) == abs(b) and (a < 0) != (b < 0)
+
+
 def _values_match(a: Optional[float], b: Optional[float]) -> bool:
     if a is None or b is None:
         return False
-    return abs(a - b) <= VALUE_TOLERANCE
+    if abs(a - b) <= VALUE_TOLERANCE:
+        return True
+    return _is_leading_digit_ocr_artifact(a, b) or _is_missing_minus_ocr_artifact(a, b)
 
 
 def _label_similarity(a: str, b: str) -> float:
@@ -152,18 +188,19 @@ _GEGENPROBE_MIN_LEN = 10
 
 
 def _anhang_compact_text(pdf_path: Path) -> str:
-    """Anhang-Volltext des Dokuments als leerzeichenfreier Suchschlüssel.
+    """Dokument-Volltext als leerzeichenfreier Suchschlüssel.
 
     Dient als von der Posten-Extraktion UNABHÄNGIGE Gegenprobe: kommt eine
     Bezeichnung hier vor, ist der Posten im Dokument vorhanden – auch wenn der
     Extraktor ihn (z.B. mangels Wertespalte) nicht als Posten erfasst hat.
+    Es wird das ganze Dokument gelesen (Bilanz/GuV/Anhang), nicht nur der
+    Anhang-Abschnitt: sonst unterdrückt die Gegenprobe Bilanzposten nicht.
     """
     try:
         from ..parsers.document_text import load_page_texts
 
         pages = load_page_texts(pdf_path)
-        start, end = anhang_page_range(pages)
-        return compact_key(" ".join(pages[start:end]))
+        return compact_key(" ".join(pages))
     except Exception:
         return ""
 
@@ -217,6 +254,71 @@ def _find_match(
             best = candidates[0]
     if best is not None and best_score >= FUZZY_THRESHOLD:
         return best, best_score
+
+    # Suffix-Fallback: eine Seite traegt eine zusaetzliche Gliederungs-
+    # Ueberschrift als Praefix, die andere nicht (z.B. verklebt der OCR-Scan
+    # "Verbindlichkeiten aus Lieferungen und Leistungen" + "Sammelkonto
+    # Lieferantenverbindl" zu einer Zeile, waehrend der digitale Abschluss
+    # beide auf getrennten Zeilen hat und die Ueberschrift beim Zusammenbau
+    # bewusst verwirft, siehe extract_items). Der SequenceMatcher-Score liegt
+    # dann oft weit unter der Fuzzy-Schwelle, obwohl der hintere Teil exakt
+    # uebereinstimmt. Nur EIN eindeutiger Kandidat und eine Mindestlaenge
+    # verhindern Zufallstreffer bei kurzen, generischen Schluesseln.
+    #
+    # BEWUSST NUR endswith, nicht zusaetzlich startswith: ein Praefix-Fallback
+    # (kuerzerer Schluessel ist Anfang des laengeren) trifft bei verklebten
+    # OCR-Zeilen leicht den FALSCHEN Posten, wenn die verklebte Zeile mit
+    # genau dem Text eines ANDEREN, eigentlich unabhaengigen Postens beginnt
+    # (Regression: 'Verrechnung Wiener Dienstgeberabgabe' (Konto 35510) matchte
+    # sonst faelschlich gegen die verklebte OCR-Zeile 'Verrechnung Wiener
+    # Dienstgeberabgabe Verr. Dienstgeberabgabe', die eigentlich zu Konto
+    # 35620 gehoert).
+    def _extra_prefix_has_letters(longer: str, shorter: str) -> bool:
+        # Der ABGESCHNITTENE Praefix muss selbst aus Buchstaben bestehen
+        # (eine zusaetzliche Gliederungs-Ueberschrift wie "verbindlichkeiten
+        # aus lieferungen und leistungen"). Ist er rein numerisch, ist es
+        # kein Ueberschriften-Praefix, sondern eine verrutschte Zahl aus
+        # einer benachbarten Zeile ("1083,30 0,00 Reisespesen") – DANN darf
+        # der Fallback nicht greifen, sonst matcht er gegen die falsche Zeile.
+        prefix = longer[: len(longer) - len(shorter)]
+        return bool(re.search(r"[a-z]", prefix))
+
+    suffix_candidates = [
+        (k, cands) for k, cands in prior_index.items()
+        if len(k) >= _GEGENPROBE_MIN_LEN
+        and len(cur_key) >= _GEGENPROBE_MIN_LEN
+        and (
+            (cur_key.endswith(k) and _extra_prefix_has_letters(cur_key, k))
+            or (k.endswith(cur_key) and _extra_prefix_has_letters(k, cur_key))
+        )
+    ]
+    if len(suffix_candidates) == 1:
+        return suffix_candidates[0][1][0], 0.90
+
+    return None, 0.0
+
+
+def _find_match_by_unique_value(
+    target: Optional[float],
+    prior_items: list[AnhangItem],
+    used_keys: set[str],
+) -> tuple[Optional[AnhangItem], float]:
+    """Label-unabhaengiger Fallback: genau EIN unbenutzter Vorjahres-Posten
+    hat denselben Schlusswert.
+
+    Typisch, wenn der Scan den Namen verstellt, den Betrag aber korrekt liest.
+    0,00 und Mehrfachtreffer werden nicht geraten.
+    """
+    if target is None or abs(target) < 0.01:
+        return None, 0.0
+    hits = [
+        it for it in prior_items
+        if it.label_key_compact not in used_keys
+        and closing_value(it) is not None
+        and _values_match(target, closing_value(it))
+    ]
+    if len(hits) == 1:
+        return hits[0], 0.80
     return None, 0.0
 
 
@@ -306,6 +408,10 @@ def compare_anhaenge(current_pdf: Path, prior_pdf: Path, pipeline=None) -> Compa
             continue
 
         match, score = _find_match(cur.label_key_compact, prior_index, new_open)
+        if match is None:
+            match, score = _find_match_by_unique_value(
+                new_open, prior_items, matched_prior_keys
+            )
 
         if match is None:
             # Gegenprobe: steht die Bezeichnung im Vorjahres-Anhang doch im

@@ -1,17 +1,15 @@
 """
 Excel-Export des Vorjahresvergleichs.
 
-Erzeugt eine .xlsx-Datei mit drei Tabellenblättern:
-  1. Übersicht       — Zusammenfassung + Statistik
-  2. Alle Posten     — Vollständige Vergleichsliste mit Status, Werten, Differenzen
-  3. Abweichungen    — Nur Zeilen mit Status ABWEICHUNG (für schnelle Prüfung)
-
-Nutzt openpyxl. Die Statuszellen werden farblich hinterlegt:
-  OK             → grün
-  ABWEICHUNG     → rot
-  NUR_AKTUELL    → orange
-  NUR_VORJAHR    → orange
-  FEHLENDER_WERT → grau
+Blätter:
+  1. Übersicht                 — Zahlenstatistik + Textzähler
+  2. Alle Posten               — Vollständige Zahlenliste (Bilanz, GuV, Anhang)
+  3. Abweichungen              — Nur Status ABWEICHUNG
+  4. Nur aktuell               — Posten nur im neuen Abschluss
+  5. Nur Vorjahr               — Posten nur im Vorjahresabschluss
+  6. Neu im Bericht            — Text, der im Vorjahr fehlt
+  7. Fehlt gegenüber Vorjahr   — Text, der heuer fehlt
+  8. Geänderter Text           — gleicher Absatz, anderer Wortlaut
 """
 
 from __future__ import annotations
@@ -40,6 +38,10 @@ HEADER_ALIGN = Alignment(horizontal="center", vertical="center", wrap_text=True)
 THIN = Side(style="thin", color="BFBFBF")
 BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 
+HINT_FONT = Font(italic=True, color="7F7F7F")
+TOP = Alignment(wrap_text=True, vertical="top")
+CTR = Alignment(horizontal="center", vertical="top")
+
 
 def _set_header(ws, row, headers, widths):
     for col, (h, w) in enumerate(zip(headers, widths), start=1):
@@ -57,7 +59,7 @@ def _write_uebersicht(wb: Workbook, result: CompareResult) -> None:
     ws = wb.active
     ws.title = "Übersicht"
 
-    title = ws.cell(row=1, column=1, value="Vorjahresvergleich – Anhang")
+    title = ws.cell(row=1, column=1, value="Vorjahresvergleich – Bilanz, GuV, Anhang")
     title.font = Font(bold=True, size=14)
     ws.merge_cells("A1:D1")
 
@@ -91,28 +93,44 @@ def _write_uebersicht(wb: Workbook, result: CompareResult) -> None:
             c1.font = Font(bold=True)
             c2.font = Font(bold=True)
 
-    ws.column_dimensions["A"].width = 32
+    ws.column_dimensions["A"].width = 38
     ws.column_dimensions["B"].width = 14
+    ws.column_dimensions["C"].width = 36
 
-    # Eigener Bereich: Textvergleich (Vollständigkeit)
     fehlt = sum(1 for t in result.text_rows if t.status == "FEHLT")
     neu = sum(1 for t in result.text_rows if t.status == "NEU")
     geaendert = sum(1 for t in result.text_rows if t.status == "GEÄNDERT")
-    ws.cell(row=14, column=1, value="Textvergleich (Vollständigkeit)").font = Font(bold=True)
-    tc = ws.cell(row=14, column=2,
-                 value=f"FEHLT: {fehlt} · NEU: {neu} · GEÄNDERT: {geaendert}")
-    tc.font = Font(bold=True)
-    if fehlt:
-        tc.fill = STATUS_FILLS["ABWEICHUNG"]
-    ws.cell(row=14, column=3,
-            value="→ Blatt 'Textvergleich'").font = Font(italic=True, color="7F7F7F")
+    ident = sum(1 for t in result.text_rows if t.status == "IDENT")
 
-    ws.cell(row=16, column=1,
+    ws.cell(row=14, column=1, value="Textvergleich").font = Font(bold=True)
+
+    r15a = ws.cell(row=15, column=1, value="Neu im aktuellen Bericht")
+    r15b = ws.cell(row=15, column=2, value=neu)
+    r15a.fill = _TEXT_STATUS_FILL["NEU"]
+    r15b.fill = _TEXT_STATUS_FILL["NEU"]
+    ws.cell(row=15, column=3, value="→ Blatt 'Neu im Bericht'").font = HINT_FONT
+
+    r16a = ws.cell(row=16, column=1, value="Fehlt gegenüber Vorjahr")
+    r16b = ws.cell(row=16, column=2, value=fehlt)
+    r16a.fill = _TEXT_STATUS_FILL["FEHLT"]
+    r16b.fill = _TEXT_STATUS_FILL["FEHLT"]
+    ws.cell(row=16, column=3, value="→ Blatt 'Fehlt gegenüber Vorjahr'").font = HINT_FONT
+
+    r17a = ws.cell(row=17, column=1, value="Geänderter Wortlaut")
+    r17b = ws.cell(row=17, column=2, value=geaendert)
+    r17a.fill = _TEXT_STATUS_FILL["GEÄNDERT"]
+    r17b.fill = _TEXT_STATUS_FILL["GEÄNDERT"]
+    ws.cell(row=17, column=3, value="→ Blatt 'Geänderter Text'").font = HINT_FONT
+
+    ws.cell(row=18, column=1, value="Unverändert (nicht einzeln ausgewiesen)")
+    ws.cell(row=18, column=2, value=ident)
+
+    ws.cell(row=20, column=1,
             value=("Hinweis: Heuristische Analyse (Regex + Fuzzy-Label-Matching, "
                    "Textvergleich ohne Zahlen). Ersetzt KEINE prüferische Beurteilung. "
                    "Manuelle Validierung erforderlich.")
-            ).font = Font(italic=True, color="7F7F7F")
-    ws.merge_cells("A16:D16")
+            ).font = HINT_FONT
+    ws.merge_cells("A20:D20")
 
 
 def _write_rows(ws, rows, headers, widths):
@@ -166,44 +184,12 @@ def _write_alle(wb: Workbook, result: CompareResult) -> None:
     _write_rows(ws, result.rows, _HEADERS, _WIDTHS)
 
 
-_TEXT_HEADERS = ["Textteil aktuell", "Textteil Vorjahr", "Status", "S. akt.", "S. VJ", "Unterschied (Auszug)"]
-_TEXT_WIDTHS = [70, 70, 12, 8, 8, 60]
-NEW_TEXT_FILL = PatternFill("solid", fgColor="FFEB9C")
-
 _TEXT_STATUS_FILL = {
     "IDENT":    PatternFill("solid", fgColor="FFFFFF"),
     "GEÄNDERT": PatternFill("solid", fgColor="FFEB9C"),
     "NEU":      PatternFill("solid", fgColor="DDEBF7"),
-    "FEHLT":    PatternFill("solid", fgColor="FFC7CE"),  # Vollständigkeitslücke!
+    "FEHLT":    PatternFill("solid", fgColor="FFC7CE"),
 }
-
-
-def _write_textvergleich(wb: Workbook, result: CompareResult) -> None:
-    """Gegenüberstellung der Textteile aktuell ↔ Vorjahr (Vollständigkeit)."""
-    ws = wb.create_sheet("Textvergleich")
-    _set_header(ws, 1, _TEXT_HEADERS, _TEXT_WIDTHS)
-
-    trows = result.text_rows
-    if not trows:
-        c = ws.cell(row=2, column=1, value="Kein vergleichbarer Text gefunden.")
-        c.font = Font(italic=True, color="7F7F7F")
-        ws.merge_cells("A2:F2")
-        return
-
-    top = Alignment(wrap_text=True, vertical="top")
-    ctr = Alignment(horizontal="center", vertical="top")
-    for r_idx, tr in enumerate(trows, start=2):
-        c1 = ws.cell(row=r_idx, column=1, value=tr.current); c1.alignment = top
-        c2 = ws.cell(row=r_idx, column=2, value=tr.prior);   c2.alignment = top
-        c3 = ws.cell(row=r_idx, column=3, value=tr.status);  c3.alignment = ctr
-        ws.cell(row=r_idx, column=4, value=tr.page_current).alignment = ctr
-        ws.cell(row=r_idx, column=5, value=tr.page_prior).alignment = ctr
-        c6 = ws.cell(row=r_idx, column=6, value=diff_excerpt(tr.current, tr.prior))
-        c6.alignment = top
-        fill = _TEXT_STATUS_FILL.get(tr.status)
-        if fill:
-            for col in range(1, 7):
-                ws.cell(row=r_idx, column=col).fill = fill
 
 
 def _write_abweichungen(wb: Workbook, result: CompareResult) -> None:
@@ -212,50 +198,130 @@ def _write_abweichungen(wb: Workbook, result: CompareResult) -> None:
     _write_rows(ws, rows, _HEADERS, _WIDTHS)
 
 
+def _write_nur_aktuell(wb: Workbook, result: CompareResult) -> None:
+    ws = wb.create_sheet("Nur aktuell")
+    rows = [r for r in result.rows if r.status == "NUR_AKTUELL"]
+    _write_rows(ws, rows, _HEADERS, _WIDTHS)
 
-_CHG_HEADERS = ["Status", "S. akt.", "S. VJ", "Entfernt / nur Vorjahr", "Hinzugefügt / nur aktuell", "Text aktuell", "Text Vorjahr"]
-_CHG_WIDTHS = [12, 8, 8, 45, 45, 50, 50]
+
+def _write_nur_vorjahr(wb: Workbook, result: CompareResult) -> None:
+    ws = wb.create_sheet("Nur Vorjahr")
+    rows = [r for r in result.rows if r.status == "NUR_VORJAHR"]
+    _write_rows(ws, rows, _HEADERS, _WIDTHS)
 
 
-def _write_textaenderungen(wb: Workbook, result: CompareResult) -> None:
-    """Nur geaenderte/neue/fehlende Textteile — Wortunterschiede aufgeschluesselt."""
-    ws = wb.create_sheet("Textänderungen")
-    _set_header(ws, 1, _CHG_HEADERS, _CHG_WIDTHS)
-    rows = [t for t in result.text_rows if t.status != "IDENT"]
-    if not rows:
-        c = ws.cell(row=2, column=1, value="Keine Textänderungen gegenüber dem Vorjahr.")
-        c.font = Font(italic=True, color="7F7F7F")
-        ws.merge_cells("A2:G2")
-        return
-    top = Alignment(wrap_text=True, vertical="top")
-    ctr = Alignment(horizontal="center", vertical="top")
-    for r_idx, tr in enumerate(rows, start=2):
-        excerpt = diff_excerpt(tr.current, tr.prior, max_len=800)
-        removed = added = ""
-        if "Vorjahr:" in excerpt or "aktuell:" in excerpt:
-            for p in excerpt.split(" || "):
-                if p.startswith("Vorjahr:"):
-                    removed = p[len("Vorjahr:"):].strip()
-                elif p.startswith("aktuell:"):
-                    added = p[len("aktuell:"):].strip()
-        elif excerpt.startswith("nur"):
-            if "Vorjahr" in excerpt:
-                removed = excerpt
-            else:
-                added = excerpt
+def _split_diff(current: str, prior: str) -> tuple[str, str]:
+    """Zerlegt den Wort-Diff in (nur Vorjahr / entfernt, nur aktuell / neu)."""
+    excerpt = diff_excerpt(current, prior, max_len=800)
+    removed = added = ""
+    if "Vorjahr:" in excerpt or "aktuell:" in excerpt:
+        for p in excerpt.split(" || "):
+            if p.startswith("Vorjahr:"):
+                removed = p[len("Vorjahr:"):].strip()
+            elif p.startswith("aktuell:"):
+                added = p[len("aktuell:"):].strip()
+    elif excerpt.startswith("nur"):
+        if "Vorjahr" in excerpt:
+            removed = excerpt
         else:
             added = excerpt
-        ws.cell(row=r_idx, column=1, value=tr.status).alignment = ctr
-        ws.cell(row=r_idx, column=2, value=tr.page_current).alignment = ctr
-        ws.cell(row=r_idx, column=3, value=tr.page_prior).alignment = ctr
-        ws.cell(row=r_idx, column=4, value=removed).alignment = top
-        ws.cell(row=r_idx, column=5, value=added).alignment = top
-        ws.cell(row=r_idx, column=6, value=tr.current).alignment = top
-        ws.cell(row=r_idx, column=7, value=tr.prior).alignment = top
-        fill = _TEXT_STATUS_FILL.get(tr.status)
-        if fill:
-            for col in range(1, 8):
-                ws.cell(row=r_idx, column=col).fill = fill
+    else:
+        added = excerpt
+    return removed, added
+
+
+def _write_empty(ws, message: str, cols: int) -> None:
+    c = ws.cell(row=3, column=1, value=message)
+    c.font = HINT_FONT
+    ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=cols)
+
+
+def _write_neu(wb: Workbook, result: CompareResult) -> None:
+    """Absätze, die im aktuellen Bericht stehen und im Vorjahr fehlen."""
+    ws = wb.create_sheet("Neu im Bericht")
+    hint = ws.cell(
+        row=1, column=1,
+        value="Neu: steht im aktuellen Bericht, im Vorjahresbericht so nicht enthalten.",
+    )
+    hint.font = Font(bold=True)
+    ws.merge_cells("A1:D1")
+    headers = ["Seite aktuell", "Neuer Text"]
+    widths = [14, 110]
+    _set_header(ws, 2, headers, widths)
+    rows = [t for t in result.text_rows if t.status == "NEU"]
+    if not rows:
+        _write_empty(ws, "Nichts Neues gegenüber dem Vorjahr.", 2)
+        return
+    for r_idx, tr in enumerate(rows, start=3):
+        ws.cell(row=r_idx, column=1, value=tr.page_current).alignment = CTR
+        c2 = ws.cell(row=r_idx, column=2, value=tr.current)
+        c2.alignment = TOP
+        for col in range(1, 3):
+            ws.cell(row=r_idx, column=col).fill = _TEXT_STATUS_FILL["NEU"]
+        ws.row_dimensions[r_idx].height = min(90, 18 + 12 * (1 + len(tr.current) // 90))
+
+
+def _write_fehlt(wb: Workbook, result: CompareResult) -> None:
+    """Absätze, die im Vorjahr standen und heuer fehlen."""
+    ws = wb.create_sheet("Fehlt gegenüber Vorjahr")
+    hint = ws.cell(
+        row=1, column=1,
+        value="Fehlt: stand im Vorjahresbericht, im aktuellen Bericht so nicht enthalten.",
+    )
+    hint.font = Font(bold=True)
+    ws.merge_cells("A1:D1")
+    headers = ["Seite Vorjahr", "Fehlender Text (Vorjahr)"]
+    widths = [14, 110]
+    _set_header(ws, 2, headers, widths)
+    rows = [t for t in result.text_rows if t.status == "FEHLT"]
+    if not rows:
+        _write_empty(ws, "Gegenüber dem Vorjahr fehlt kein Textabschnitt.", 2)
+        return
+    for r_idx, tr in enumerate(rows, start=3):
+        ws.cell(row=r_idx, column=1, value=tr.page_prior).alignment = CTR
+        c2 = ws.cell(row=r_idx, column=2, value=tr.prior)
+        c2.alignment = TOP
+        for col in range(1, 3):
+            ws.cell(row=r_idx, column=col).fill = _TEXT_STATUS_FILL["FEHLT"]
+        ws.row_dimensions[r_idx].height = min(90, 18 + 12 * (1 + len(tr.prior) // 90))
+
+
+def _write_geaendert(wb: Workbook, result: CompareResult) -> None:
+    """Absätze, die in beiden Berichten stehen, aber anders formuliert sind."""
+    ws = wb.create_sheet("Geänderter Text")
+    hint = ws.cell(
+        row=1, column=1,
+        value="Geändert: derselbe Absatz in beiden Berichten, abweichender Wortlaut.",
+    )
+    hint.font = Font(bold=True)
+    ws.merge_cells("A1:F1")
+    headers = [
+        "S. akt.",
+        "S. VJ",
+        "Entfernt (nur Vorjahr)",
+        "Hinzugefügt (nur aktuell)",
+        "Text aktuell",
+        "Text Vorjahr",
+    ]
+    widths = [10, 10, 40, 40, 50, 50]
+    _set_header(ws, 2, headers, widths)
+    rows = [t for t in result.text_rows if t.status == "GEÄNDERT"]
+    if not rows:
+        _write_empty(ws, "Kein geänderter Wortlaut gegenüber dem Vorjahr.", 6)
+        return
+    for r_idx, tr in enumerate(rows, start=3):
+        removed, added = _split_diff(tr.current, tr.prior)
+        ws.cell(row=r_idx, column=1, value=tr.page_current).alignment = CTR
+        ws.cell(row=r_idx, column=2, value=tr.page_prior).alignment = CTR
+        ws.cell(row=r_idx, column=3, value=removed).alignment = TOP
+        ws.cell(row=r_idx, column=4, value=added).alignment = TOP
+        ws.cell(row=r_idx, column=5, value=tr.current).alignment = TOP
+        ws.cell(row=r_idx, column=6, value=tr.prior).alignment = TOP
+        fill = _TEXT_STATUS_FILL["GEÄNDERT"]
+        for col in range(1, 7):
+            ws.cell(row=r_idx, column=col).fill = fill
+        longest = max(len(tr.current or ""), len(tr.prior or ""), 1)
+        ws.row_dimensions[r_idx].height = min(110, 18 + 12 * (1 + longest // 80))
 
 
 def generate_excel(result: CompareResult, output_path: Path) -> Path:
@@ -264,8 +330,11 @@ def generate_excel(result: CompareResult, output_path: Path) -> Path:
     _write_uebersicht(wb, result)
     _write_alle(wb, result)
     _write_abweichungen(wb, result)
-    _write_textvergleich(wb, result)
-    _write_textaenderungen(wb, result)
+    _write_nur_aktuell(wb, result)
+    _write_nur_vorjahr(wb, result)
+    _write_neu(wb, result)
+    _write_fehlt(wb, result)
+    _write_geaendert(wb, result)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(output_path)

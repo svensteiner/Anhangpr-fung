@@ -39,15 +39,20 @@ Ein Klick auf eine Stufe startet den jeweiligen Modus:
 
 MODUS 1 - VORJAHRESVERGLEICH
 -----------------------------
-Prueft, ob die Vorjahreszahlen im aktuellen Anhang korrekt
-aus dem Vorjahres-Anhang uebernommen wurden.
+Prueft, ob die Vorjahreszahlen in Bilanz, GuV und Anhang
+korrekt aus dem Vorjahresabschluss uebernommen wurden.
 
-  1. Aktuellen Anhang (z.B. 2025) hochladen
-  2. Vorjahres-Anhang (z.B. 2024) hochladen
+  1. Aktuellen Abschluss (z.B. JAB 2025) hochladen
+  2. Vorjahres-Abschluss (z.B. JAB 2024) hochladen
   3. "Vergleich starten" klicken
 
   Ergebnis: Excel mit allen verglichenen Positionen.
-  Blatt "Abweichungen" zeigt nur die abweichenden Posten.
+  Blatt "Abweichungen"        abweichende Zahlen
+  Blatt "Nur aktuell"         Posten nur im neuen Abschluss
+  Blatt "Nur Vorjahr"         Posten nur im Vorjahr
+  Blaetter "Neu im Bericht" /
+  "Fehlt gegenueber Vorjahr" /
+  "Geaenderter Text"          Textvergleich des Anhangs
 
 
 MODUS 2 - DETAILZAHLENVERGLEICH (BELEGPRUEFUNG)

@@ -412,7 +412,7 @@ HTML = r"""<!DOCTYPE html>
       </div>
       <table class="fortschritt" id="fortschritt-table"><tbody>
         <tr class="clickable" onclick="pickMode('vorjahr')">
-          <td><div class="fs-stage">Stufe 1 · Vorjahresvergleich</div><div class="fs-sub">gegen Vorjahres-Anhang</div></td>
+          <td><div class="fs-stage">Stufe 1 · Vorjahresvergleich</div><div class="fs-sub">Bilanz, GuV, Anhang gegen Vorjahr</div></td>
           <td class="fs-state" id="fs-vorjahr"></td>
         </tr>
         <tr class="clickable" onclick="pickMode('beleg')">
@@ -431,7 +431,7 @@ HTML = r"""<!DOCTYPE html>
       <div class="mode-card" onclick="pickMode('vorjahr')">
         <div class="mode-icon">📊</div>
         <div class="mode-title">Vorjahresvergleich</div>
-        <div class="mode-desc">Vergleicht die im aktuellen Anhang ausgewiesenen Vorjahreswerte mit dem Vorjahres-Anhang.</div>
+        <div class="mode-desc">Vergleicht Vorjahreszahlen in Bilanz, GuV und Anhang mit dem Vorjahresabschluss. Textänderungen im Anhang gesondert.</div>
       </div>
       <div class="mode-card" onclick="pickMode('beleg')">
         <div class="mode-icon">📑</div>
@@ -459,15 +459,15 @@ HTML = r"""<!DOCTYPE html>
       <div class="step"        id="vj-step3"><div class="step-num">3</div><div class="step-label">Ergebnis laden</div></div>
     </div>
     <div class="card" id="vj-upload">
-      <h2><span class="num">1</span>Anhänge hochladen (PDF oder Word)</h2>
+      <h2><span class="num">1</span>Abschlüsse hochladen (PDF oder Word)</h2>
       <div class="upload-grid">
         <div class="upload-area" id="vj-area-current"
              ondragover="dragOn(event,'vj-area-current')" ondragleave="dragOff('vj-area-current')"
              ondrop="dropPdf(event,'vj-area-current','vj-file-current','vjCurrent','vj-name-current')">
           <input type="file" id="vj-file-current" accept=".pdf,.docx" onchange="vjSelect('current')">
           <div class="upload-icon">📄</div>
-          <div class="upload-label">Aktueller Anhang</div>
-          <div class="upload-hint">z.B. Anhang 2025 · PDF oder Word</div>
+          <div class="upload-label">Aktueller Abschluss</div>
+          <div class="upload-hint">z.B. JAB 2025 · PDF oder Word</div>
           <div class="upload-filename" id="vj-name-current"></div>
         </div>
         <div class="upload-area" id="vj-area-prior"
@@ -475,8 +475,8 @@ HTML = r"""<!DOCTYPE html>
              ondrop="dropPdf(event,'vj-area-prior','vj-file-prior','vjPrior','vj-name-prior')">
           <input type="file" id="vj-file-prior" accept=".pdf,.docx" onchange="vjSelect('prior')">
           <div class="upload-icon">📂</div>
-          <div class="upload-label">Vorjahres-Anhang</div>
-          <div class="upload-hint">z.B. Anhang 2024 · PDF oder Word</div>
+          <div class="upload-label">Vorjahres-Abschluss</div>
+          <div class="upload-hint">z.B. JAB 2024 · PDF oder Word</div>
           <div class="upload-filename" id="vj-name-prior"></div>
         </div>
       </div>
@@ -501,7 +501,7 @@ HTML = r"""<!DOCTYPE html>
         <div class="stat-box stat-fehlt"><div class="stat-val" id="vj-textfehlt">—</div><div class="stat-lbl">Fehlende Textteile</div></div>
         <div class="stat-box stat-text"><div class="stat-val" id="vj-textneu">—</div><div class="stat-lbl">Neue Textteile</div></div>
       </div>
-      <div class="result-note">Zwei Bereiche im Bericht: <strong>Zahlenvergleich</strong> (Vorjahreszahlen ↔ Vorjahresbericht) und <strong>Textvergleich</strong> (Absätze aktuell ↔ Vorjahr, Vollständigkeit — Blatt „Textvergleich").</div>
+      <div class="result-note">Zwei Bereiche im Bericht: <strong>Zahlenvergleich</strong> (Bilanz, GuV, Anhang — Blätter „Abweichungen“, „Nur aktuell“, „Nur Vorjahr“) und <strong>Textvergleich</strong> (Blätter „Neu im Bericht“, „Fehlt gegenüber Vorjahr“, „Geänderter Text“).</div>
       <div class="result-warn hidden" id="vj-warn"></div>
       <div class="result-saved" id="vj-saved"></div>
       <button class="btn-download" id="vj-dl" onclick="openResults()">📂 Ergebnis-Ordner öffnen</button>
@@ -662,7 +662,7 @@ function dropPdf(e, areaId, inputId, varName, nameId) {
 function pickMode(m) {
   hide('mode-picker');
   document.getElementById('btn-back').classList.remove('hidden');
-  if (m === 'vorjahr') { show('mode-vorjahr'); document.getElementById('hero-sub').textContent = 'Vergleich der Vorjahreszahlen mit dem Vorjahres-Anhang.'; }
+  if (m === 'vorjahr') { show('mode-vorjahr'); document.getElementById('hero-sub').textContent = 'Vergleich der Vorjahreszahlen (Bilanz, GuV, Anhang) mit dem Vorjahresabschluss.'; }
   if (m === 'beleg')   { show('mode-beleg');   document.getElementById('hero-sub').textContent = 'Vergleich der Anhang-Werte mit hochgeladenen Detailunterlagen.'; }
   if (m === 'ugb')     { show('mode-ugb');     document.getElementById('hero-sub').textContent = 'Inhaltliche Prüfung gegen §§ 236-243 UGB.'; }
 }

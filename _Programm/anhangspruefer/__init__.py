@@ -12,7 +12,7 @@ to the financial statements (Anhang) under Austrian commercial law (UGB),
 specifically §§ 236-243 UGB.
 """
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 __author__ = "Audit Support Tool Development"
 
 DISCLAIMER = """
