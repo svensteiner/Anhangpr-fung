@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import docx
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -50,8 +52,6 @@ def test_struktur_start_ist_server_nicht_exe():
 
 
 def test_vorstellung_kein_pc_copy_keine_exe():
-    import docx
-
     doc = docx.Document(str(ROOT / "LLP Anhangspruefer - Vorstellung und Anleitung.docx"))
     blob = "\n".join(p.text for p in doc.paragraphs)
     for table in doc.tables:
@@ -79,6 +79,15 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "anleitung.txt" in low
     assert "foundry-tor" in low or "foundry tor" in low
     assert "daneben" in low
+    assert "pruefen.bat" in low
+    assert "kein ollama-rest" in low
+    assert "keine streamlit-datei" in low
+    assert "bei jedem start" in low
+    assert "sagt installieren das klar" in low
+    assert "llp_start" in low
+    assert "start_windows.ps1" in low
+    assert "nicht streamlit" in low
+    assert "dieselbe .env" in low or "dieselbe .env wie bisher" in low
 
 
 def test_share_anleitung_fuer_kollegen():
