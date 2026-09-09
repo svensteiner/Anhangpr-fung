@@ -1,7 +1,8 @@
 Gemeinsamer Start der LLP-Tools
 ===============================
 
-Doppelklick auf Start.bat in diesem Ordner.
+Doppelklick auf Start.bat in diesem Ordner
+oder auf Tools_starten.bat im Anhangspruefer-Ordner.
 
 Das Programm selbst wird nicht kopiert. Jedes Tool bleibt
 in seinem Ordner neben _Gemeinsam.

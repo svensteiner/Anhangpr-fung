@@ -16,6 +16,8 @@ def test_anleitung_kein_exe_copy_und_modus3_pflicht():
     assert "fachliche unterlagen" in text
     assert "ohne bestaetigung" in text
     assert "unbekannt" in text
+    assert "tools_starten.bat" in text
+    assert "llp_start" in text
 
 
 def test_installieren_kopiert_keine_exe():
@@ -23,6 +25,8 @@ def test_installieren_kopiert_keine_exe():
     assert "nicht auf den pc kopiert" in text
     assert "anhangspruefer.exe" not in text
     assert "starten.bat" in text
+    assert "tools_starten.bat" in text
+    assert "llp ai tools" in text
 
 
 def test_struktur_start_ist_server_nicht_exe():
@@ -77,6 +81,15 @@ def test_werkzeuge_pseudokrat_ohne_foundry():
     assert "keine" in text and "foundry" in text
     assert "llp_ai" in text
     assert "anwenden.bat" in text
+    assert "pruefen.bat" in text
+    assert "tools_starten.bat" in text
+
+
+def test_tools_starten_ruft_llp_start_auf():
+    text = (ROOT / "Tools_starten.bat").read_text(encoding="utf-8")
+    assert "LLP_SHARED_AI_ROOT" in text
+    assert "llp_start\\Start.bat" in text
+    assert ".exe" not in text.lower()
 
 
 def test_text_verbessern_foundry_kit_liegt_bereit():

@@ -10,6 +10,7 @@ Diese Datei dokumentiert, was wohin gehört. Bitte halten, nicht zumüllen.
 | `Anhangspruefer.spec` | Nur interne Build-Definition. Anwender kopieren keine EXE. |
 | `dist/` | Build-Ausgabe, gitignoriert. Nicht der Startweg für die Kanzlei. |
 | `Starten.bat` | **Start für Anwender** (Desktop-Verknüpfung zeigt hierher). Programm bleibt auf dem Server. |
+| `Tools_starten.bat` | Gemeinsames Menü (Anhangsprüfer, Text verbessern, Pseudokrat) über `_Gemeinsam\\llp_start`. |
 | `_Gemeinsam/` | Zentraler Foundry-Layer (`llp_ai`) und gemeinsamer Start (`llp_start`). Gehört auf `AI Tools\_Gemeinsam`. |
 | `Tests_starten.bat` | Führt die Pytest-Tests aus `_Programm/tests/` aus. |
 | `ANLEITUNG.txt` | Anwender-Kurzanleitung. |

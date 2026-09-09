@@ -18,6 +18,11 @@ SO STARTEN SIE:
 
   ZUM BEENDEN: Knopf "Beenden" oben rechts.
 
+  ALLE LLP-TOOLS (Anhangspruefer, Text verbessern, Pseudokrat):
+    Doppelklick auf  Tools_starten.bat
+    oder  _Gemeinsam\llp_start\Start.bat
+    Status ohne Schluessel:  _Gemeinsam\Pruefen.bat
+
   Entwickler: Starten.bat braucht Python 3.11+
   (Häkchen "Add Python to PATH" bei der Installation).
 
@@ -87,7 +92,8 @@ KI (MICROSOFT FOUNDRY):
   Ist der Zugang nicht erreichbar: Heuristik, kein stiller Wechsel.
   Pseudokrat bleibt lokal und nutzt Foundry nicht.
 
-  Status ohne Schluessel: _Gemeinsam\llp_ai\Pruefen.bat
+  Status ohne Schluessel: _Gemeinsam\Pruefen.bat
+  (zeigt Foundry und ob Text verbessern noch Mistral nutzt)
   In der Oberflaeche unten kurz "KI: bereit" oder "KI: aus".
 
 

@@ -30,12 +30,19 @@ if errorlevel 1 (
     exit /b 1
 )
 
+set "TOOLS=%~dp0Tools_starten.bat"
+if exist "%TOOLS%" (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+      "$d=[Environment]::GetFolderPath('Desktop'); $w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut(\"$d\LLP AI Tools.lnk\"); $s.TargetPath='%TOOLS%'; $s.WorkingDirectory='%~dp0'; $s.Description='LLP AI Tools'; $s.Save()"
+)
+
 echo.
 echo ============================================================
 echo   FERTIG!
 echo.
 echo   Auf dem Desktop liegt die Verknuepfung "Anhangspruefer".
 echo   Doppelklick startet das Tool. Der Browser oeffnet sich.
+echo   "LLP AI Tools" oeffnet das gemeinsame Startmenue.
 echo ============================================================
 echo.
 pause

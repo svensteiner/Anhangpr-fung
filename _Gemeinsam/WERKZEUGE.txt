@@ -37,5 +37,11 @@ KI:     KEINE. Bleibt lokal, ohne Foundry.
 
 Gemeinsamer Start
 -----------------
-llp_start\Start.bat  versucht, die Tools im Nachbarordner
-zu oeffnen. Fehlt ein Ordner, steht dort, wo er liegt.
+llp_start\Start.bat  oder im Anhangspruefer-Ordner
+Tools_starten.bat. Oeffnet die Tools im Nachbarordner,
+kopiert sie nicht.
+
+Status ohne Schluessel
+----------------------
+Pruefen.bat in diesem Ordner. Zeigt Foundry und ob
+Text verbessern noch Mistral nutzt. Keine Schluessel.

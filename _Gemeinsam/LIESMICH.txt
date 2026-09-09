@@ -17,7 +17,8 @@ auf Ollama, OpenAI oder Anthropic.
    (derselbe Zugang, der beim Anhangsprüfer schon ging).
 2. Nicht neu anlegen, wenn die Datei schon da ist.
 3. Tools starten wie gewohnt (Starten.bat).
-4. Status ohne Schlüssel: llp_ai\Pruefen.bat doppelklicken.
+4. Status ohne Schlüssel: Pruefen.bat in diesem Ordner
+   doppelklicken (Foundry und Nachbar-Tools, keine Schlüssel).
 5. Anderes Tool anbinden: `from llp_ai.company_ai import ask_ai, is_ai_ready`.
    Kein eigener OpenAI-/Ollama-Client. Ist Foundry aus: Heuristik/Regeln.
 
@@ -31,7 +32,7 @@ im Nachbarordner, kopiert sie nicht.
 
 text_verbessern_foundry
 -----------------------
-Einmal Anwenden.bat, wenn Text verbessern noch Mistral
-zeigt. Stellt die gruendliche Fassung auf llp_ai/Foundry.
+Start.bat Punkt 2 stellt die gruendliche Fassung auf
+Foundry um. Reserve: Anwenden.bat in diesem Ordner.
 
 Pseudokrat bleibt lokal und nutzt llp_ai nicht.
