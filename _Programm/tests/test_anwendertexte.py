@@ -16,6 +16,7 @@ def test_anleitung_kein_exe_copy_und_modus3_pflicht():
     assert "fachliche unterlagen" in text
     assert "ohne bestaetigung" in text
     assert "teil 1" in text
+    assert "teil 2" in text
     assert "unbekannt" in text
     assert "tools_starten.bat" in text
     assert "llp_start" in text
@@ -76,6 +77,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "foundry" in text
     assert "pseudokrat" in text and "ohne foundry" in text
     assert "teil 1" in text
+    assert "teil 2" in text
     assert "unbekannt" in text
     assert "pruefen.bat" in text
     assert "tools_starten" in text or "llp ai tools" in text
