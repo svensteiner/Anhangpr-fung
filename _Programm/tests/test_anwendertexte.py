@@ -40,6 +40,9 @@ def test_struktur_start_ist_server_nicht_exe():
     assert "start für anwender" in text
     assert "anwender kopieren keine exe" in text
     assert "llp_ai" in text
+    assert "/ugb_eingrenzung" in text
+    assert "teil 2" in text
+    assert "teil 1" in text
 
 
 def test_vorstellung_kein_pc_copy_keine_exe():
@@ -85,9 +88,21 @@ def test_share_anleitung_fuer_kollegen():
     assert "pruefen.bat" in text
     assert "tools_starten" in text or "llp ai tools" in text
     assert "nicht mistral" in text
+    assert "anwenden.bat" in text
     assert "healthz" not in text
     lies = (ROOT / "_Gemeinsam" / "LIESMICH.txt").read_text(encoding="utf-8").lower()
     assert "anleitung.txt" in lies
+
+
+def test_entwicklerdoku_verweist_auf_browser_nicht_alte_gui():
+    text = (ROOT / "_Programm" / "README_entwickler.md").read_text(encoding="utf-8").lower()
+    assert "starten.bat" in text
+    assert "gui-version (empfohlen)" not in text
+    assert "benutzerfreundliche gui" not in text
+    assert "run_gui.py" in text
+    assert "abgeschaltet" in text
+    assert "teil 2: rest prüfen" in text or "teil 2: rest pruefen" in text
+    assert "unbekannt" in text
 
 
 def test_klienten_liesmich_ohne_healthz():

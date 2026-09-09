@@ -26,7 +26,12 @@ class ComplianceStatus(Enum):
             self.NOT_APPLICABLE: "Nicht anwendbar auf diesen Abschluss",
             self.PENDING_REVIEW: "Wartet auf manuelle Prüfung",
         }
-        return explanations.get(self, self.value)
+        try:
+            return explanations[self]
+        except KeyError as exc:
+            raise ValueError(
+                "Prüfstatus ohne Anzeigetext – kein stilles unbekannt."
+            ) from exc
 
 
 class DocumentType(Enum):

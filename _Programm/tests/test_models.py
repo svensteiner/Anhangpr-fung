@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from anhangspruefer.compliance.reporting.protocol_formatter import ProtocolFormatter
 from anhangspruefer.models.enums import ComplianceStatus, SectionType
 from anhangspruefer.models.checklist import Checklist, ChecklistItem
 from anhangspruefer.models.finding import Finding, EvidenceItem, ReviewResult
@@ -10,6 +11,18 @@ from anhangspruefer.models.finding import Finding, EvidenceItem, ReviewResult
 def test_compliance_status_display_text():
     assert "erfüllt" in ComplianceStatus.COMPLIANT.to_display_text().lower()
     assert ComplianceStatus.NOT_COMPLIANT.value == "NICHT ENTSPRECHEND"
+    for status in ComplianceStatus:
+        text = status.to_display_text()
+        assert text
+        assert "unbekannt" not in text.lower()
+
+
+def test_protocol_formatter_hat_jeden_status_ohne_unbekannt():
+    assert set(ProtocolFormatter.STATUS_DISPLAY) == set(ComplianceStatus)
+    for status in ComplianceStatus:
+        text, symbol = ProtocolFormatter.display_status(status)
+        assert text and symbol
+        assert "unbekannt" not in text.lower()
 
 
 def test_checklist_add_and_lookup():

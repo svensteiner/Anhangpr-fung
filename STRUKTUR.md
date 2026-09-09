@@ -55,7 +55,7 @@ Diese Datei dokumentiert, was wohin gehört. Bitte halten, nicht zumüllen.
 |-------|------------|------------|--------|
 | 1 · Vorjahresvergleich | `vorjahresvergleich/` | `POST /compare` | `Ergebnisse/vergleich_*.xlsx` |
 | 2 · Detailzahlenvergleich | `pruefung/` | `POST /pruefen` (+ `/detect_type`) | `Ergebnisse/pruefung_*.xlsx` |
-| 3 · UGB-Inhaltsprüfung | `compliance/` + `ugb_pipeline.py` | `POST /ugb_profil`, `POST /ugb_review` | `Ergebnisse/UGB-Checkliste_*.xlsx` |
+| 3 · UGB-Inhaltsprüfung | `compliance/` + `ugb_pipeline.py` | `POST /ugb_profil`, `POST /ugb_eingrenzung` (Teil 1), `POST /ugb_review` (Teil 2) | `Ergebnisse/UGB-Checkliste_*.xlsx` |
 
 Health-Endpoint: `GET /healthz` → JSON mit Mode-Liste.
 

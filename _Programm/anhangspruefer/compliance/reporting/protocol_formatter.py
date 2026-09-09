@@ -27,6 +27,22 @@ class ProtocolFormatter:
         ComplianceStatus.PENDING_REVIEW: ("OFFEN", "○"),
     }
 
+    @classmethod
+    def display_status(cls, status: ComplianceStatus) -> tuple[str, str]:
+        """Jeder bekannte Status hat eine Anzeige – kein stilles „unbekannt“."""
+        try:
+            return cls.STATUS_DISPLAY[status]
+        except KeyError as exc:
+                raise ValueError(
+                "Prüfstatus ohne Anzeige – kein stilles unbekannt."
+            ) from exc
+
+
+if set(ProtocolFormatter.STATUS_DISPLAY) != set(ComplianceStatus):
+    raise RuntimeError(
+        "STATUS_DISPLAY deckt nicht alle ComplianceStatus ab – kein stilles unbekannt."
+    )
+
     def format_finding_structured(
         self,
         finding: Finding,
@@ -43,10 +59,7 @@ class ProtocolFormatter:
         description = item.description if item else finding.checklist_item_id
         ugb_ref = ", ".join(finding.ugb_references) if finding.ugb_references else "—"
 
-        status_text, status_symbol = self.STATUS_DISPLAY.get(
-            finding.effective_status,
-            ("UNBEKANNT", "?")
-        )
+        status_text, status_symbol = self.display_status(finding.effective_status)
 
         lines.append(f"### {number}. {description}")
         lines.append("")
@@ -136,9 +149,7 @@ class ProtocolFormatter:
         lines.append("|:---:|---------------|:--------:|-----|:------:|")
 
         for i, finding in enumerate(result.findings, 1):
-            status_text, status_symbol = self.STATUS_DISPLAY.get(
-                finding.effective_status, ("?", "?")
-            )
+            status_text, status_symbol = self.display_status(finding.effective_status)
             ugb = ", ".join(finding.ugb_references[:2]) if finding.ugb_references else "—"
             reviewed = "☑" if finding.auditor_reviewed else "☐"
 
@@ -172,7 +183,7 @@ class ProtocolFormatter:
         for status in ComplianceStatus:
             count = status_counts.get(status.value, 0)
             if count > 0:
-                text, symbol = self.STATUS_DISPLAY.get(status, ("?", "?"))
+                text, symbol = self.display_status(status)
                 bar_length = int(count / total * 30)
                 bar = "█" * bar_length + "░" * (30 - bar_length)
                 lines.append(f"│ {symbol} {text:20} {bar} {count:2}/{total} │")

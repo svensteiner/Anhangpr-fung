@@ -29,7 +29,7 @@ Unternehmensgesetzbuch (UGB), insbesondere §§ 236-243.
 
 ### Funktionen
 
-- **Benutzerfreundliche GUI**: Einfache Oberfläche für Anfänger
+- **Browser-Oberfläche**: Start über `Starten.bat`. `run_gui.py` / `gui.py` sind abgeschaltet.
 - **Dokumentenanalyse**: Parsen von Anhang-PDFs und Extraktion von Textinhalten
 - **Anforderungsabgleich**: Automatischer Abgleich mit UGB-Angabepflichten
 - **Compliance-Bewertung**: Vorläufige Statusbestimmung pro Prüfungspunkt
@@ -67,9 +67,11 @@ python app.py
 
 ## Verwendung
 
-### GUI-Version (empfohlen)
+### Browser (Anwender)
 
-Starten Sie die Oberfläche mit `Starten.bat` oder:
+`Starten.bat` oder die Desktop-Verknüpfung. Modus 3: zuerst Gesellschaft
+bestätigen, dann Knopf **Teil 2: Rest prüfen**. Kein stilles „unbekannt“.
+
 ```bash
 python app.py
 ```
