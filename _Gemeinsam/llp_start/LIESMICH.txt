@@ -14,4 +14,6 @@ Start.bat setzt LLP_SHARED_AI_ROOT auf diesen Ordner,
 damit jedes Tool denselben Zugang findet.
 Pseudokrat bleibt lokal ohne Foundry.
 Text verbessern gruendlich: Foundry, nicht Mistral/Ollama.
-Start.bat Punkt 2 stellt die Anbindung selbst um.
+Start.bat Punkt 2 oeffnet die Foundry-Seite
+und stellt die Anbindung selbst um. Ein
+Mistral-rephraser wird nicht gestartet.
