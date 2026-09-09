@@ -116,6 +116,7 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert "Text-Pipeline:" in blob
     assert "Hybrid-Weg:" in blob
     assert "Paketdatei:" in blob
+    assert "Original-Start:" in blob
     assert module.text_foundry_ok(gemeinsam) is True
 
 
@@ -449,6 +450,25 @@ def test_report_foundry_desktop_aber_pyproject_ist_nicht_ok(tmp_path: Path) -> N
     assert "pyproject.toml" in blob
     assert module.text_foundry_ok(gemeinsam) is False
     assert module.text_has_leftovers(data) is True
+
+
+def test_report_foundry_aber_original_cmd_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    (tools / "rephraser" / "TEXT VERBESSERN.original.cmd").write_text(
+        "@echo off\r\nstart TextVerbessern.exe\r\n",
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_original_cmd"] is not None
+    blob = module.format_report(data)
+    assert "original.cmd" in blob.lower()
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Original-CMD" in module.leftovers_in_tool(tools / "rephraser")
 
 
 def test_leftovers_in_tool_unabhaengig_vom_ordnernamen(tmp_path: Path) -> None:

@@ -116,6 +116,9 @@ def test_share_anleitung_fuer_kollegen():
     assert "healthz" not in text
     lies = (ROOT / "_Gemeinsam" / "LIESMICH.txt").read_text(encoding="utf-8").lower()
     assert "anleitung.txt" in lies
+    assert "bitte pruefen.bat" in lies
+    assert "bei jedem start" in lies
+    assert "wie gewohnt" not in lies
 
 
 def test_entwicklerdoku_verweist_auf_browser_nicht_alte_gui():

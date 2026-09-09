@@ -20,7 +20,8 @@ auf Ollama, OpenAI oder Anthropic.
 1. Bestehende Datei llp_ai\.env auf dem Server behalten
    (derselbe Zugang, der beim Anhangsprüfer schon ging).
 2. Nicht neu anlegen, wenn die Datei schon da ist.
-3. Tools starten wie gewohnt (Starten.bat).
+3. Starten.bat oder Desktop-Verknuepfung. Bleibt ein alter Weg,
+   erscheint eine Zeile („Bitte Pruefen.bat“).
 4. Status ohne Schlüssel: Pruefen.bat in diesem Ordner
    doppelklicken (Foundry und Nachbar-Tools, keine Schlüssel).
 5. Anderes Tool anbinden: `from llp_ai.company_ai import ask_ai, is_ai_ready`.
@@ -36,7 +37,8 @@ im Nachbarordner, kopiert sie nicht.
 
 text_verbessern_foundry
 -----------------------
-Start.bat Punkt 2 stellt die gruendliche Fassung auf
-Foundry um. Reserve: Anwenden.bat in diesem Ordner.
+Starten.bat und das Startmenue stellen Text verbessern
+bei jedem Start um. Bleibt ein alter Weg, Pruefen.bat.
+Oder einmal Anwenden.bat in diesem Ordner.
 
 Pseudokrat bleibt lokal und nutzt llp_ai nicht.

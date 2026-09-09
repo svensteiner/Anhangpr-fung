@@ -62,6 +62,14 @@ def find_text_cmd(roots: list[Path]) -> Path | None:
     return None
 
 
+def find_text_original_cmd(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "TEXT VERBESSERN.original.cmd")
+        if found is not None:
+            return found
+    return None
+
+
 def text_cmd_modus(path: Path | None) -> str:
     if path is None:
         return "nicht gefunden"
@@ -295,6 +303,7 @@ def report(start: Path | None = None) -> dict[str, object]:
     desktop = find_text_desktop(roots)
     startskript = find_text_startskript(roots)
     cmd = find_text_cmd(roots)
+    original_cmd = find_text_original_cmd(roots)
     exe = find_live_text_exe(roots)
     provider = find_foundry_provider(roots)
     runtime = find_local_runtime(roots)
@@ -323,6 +332,7 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_start": start_modus,
         "text_cmd": cmd,
         "text_cmd_modus": cmd_modus,
+        "text_original_cmd": original_cmd,
         "text_exe": exe,
         "text_provider": provider,
         "text_runtime": runtime,
@@ -372,6 +382,8 @@ def format_report(data: dict[str, object]) -> str:
         "  Text-Pipeline:   " + str(data["text_pipeline_modus"]),
         "  Hybrid-Weg:      " + str(data["text_hybrid_modus"]),
         "  Paketdatei:      " + str(data["text_pyproject_modus"]),
+        "  Original-Start:  "
+        + ("noch da – Anwenden.bat" if data["text_original_cmd"] else "beiseite"),
         "  Alte EXE:        "
         + ("noch da – Anwenden.bat" if data["text_exe"] else "beiseite"),
         "  Pseudokrat:      "
@@ -436,6 +448,11 @@ def format_report(data: dict[str, object]) -> str:
             "  pyproject.toml zieht noch Streamlit oder uvicorn nach."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_original_cmd"] is not None:
+        lines.append(
+            "  TEXT VERBESSERN.original.cmd startet noch den alten Weg."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     lines.append("  Keine Schluessel in dieser Anzeige.")
     lines.append("  Anleitung: ANLEITUNG.txt in diesem Ordner.")
     return "\n".join(lines)
@@ -456,6 +473,9 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
     cmd = tool_root / "TEXT VERBESSERN.cmd"
     if cmd.is_file() and text_cmd_modus(cmd) != "Foundry-Tor":
         reasons.append("Startbefehl")
+    original_cmd = tool_root / "TEXT VERBESSERN.original.cmd"
+    if original_cmd.is_file():
+        reasons.append("Original-CMD")
     ps1 = tool_root / "scripts" / "start_windows.ps1"
     if ps1.is_file() and text_startskript_modus(ps1) != "Foundry-Tor":
         reasons.append("Startskript")
@@ -499,6 +519,7 @@ def text_has_leftovers(
         data["text_modus"] == "noch Mistral"
         or data["text_start"] == "noch Streamlit"
         or data["text_cmd_modus"] == "noch alt"
+        or data["text_original_cmd"] is not None
         or data["text_exe"] is not None
         or data["text_runtime_modus"] == "noch Ollama"
         or data["text_mistral_modus"] == "noch Ollama"
@@ -515,6 +536,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     data = report(start)
     start_ok = data["text_start"] in {"Foundry-Tor", "nicht gefunden"}
     cmd_ok = data["text_cmd_modus"] in {"Foundry-Tor", "nicht gefunden"}
+    original_ok = data["text_original_cmd"] is None
     exe_ok = data["text_exe"] is None
     provider_ok = data["text_provider"] is not None or data["text_desktop"] is None
     runtime_ok = data["text_runtime_modus"] in {"kein Ollama", "nicht gefunden"}
@@ -528,6 +550,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         data["text_modus"] == "Foundry"
         and start_ok
         and cmd_ok
+        and original_ok
         and exe_ok
         and provider_ok
         and runtime_ok

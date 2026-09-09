@@ -219,14 +219,25 @@ STREAMLIT_STUB = (
 PYPROJECT_REL = Path("pyproject.toml")
 
 
+def _park_file(path: Path) -> Path | None:
+    if not path.is_file():
+        return None
+    parked = path.with_name(path.name + ".llp-alt")
+    if not parked.is_file():
+        parked.write_bytes(path.read_bytes())
+    path.unlink()
+    return parked
+
+
 def _patch_launcher(tool_root: Path) -> Path | None:
     """Direktklick auf TEXT VERBESSERN.cmd: Foundry-Tor, kein Mistral."""
     cmd = tool_root / LAUNCHER_NAME
-    backup = tool_root / LAUNCHER_BACKUP
+    parked = tool_root / f"{LAUNCHER_NAME}.llp-alt"
     if cmd.is_file():
         current = cmd.read_text(encoding="utf-8", errors="replace")
-        if LAUNCHER_MARK not in current and not backup.is_file():
-            backup.write_text(current, encoding="utf-8")
+        if LAUNCHER_MARK not in current and not parked.is_file():
+            parked.write_text(current, encoding="utf-8")
+    _park_file(tool_root / LAUNCHER_BACKUP)
     cmd.write_text(LAUNCHER_CMD, encoding="utf-8")
     return cmd
 

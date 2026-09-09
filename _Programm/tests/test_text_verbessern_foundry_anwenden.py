@@ -425,7 +425,8 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "from app.desktop import main" not in launcher
     assert "app\\desktop.py" not in launcher
     assert "text_verbessern_foundry" in launcher.lower()
-    backup = (tool / "TEXT VERBESSERN.original.cmd").read_text(encoding="utf-8")
+    assert not (tool / "TEXT VERBESSERN.original.cmd").is_file()
+    backup = (tool / "TEXT VERBESSERN.cmd.llp-alt").read_text(encoding="utf-8")
     assert "TextVerbessern.exe" in backup
     assert "LLP-FOUNDRY-TOR" not in backup
 
@@ -491,7 +492,8 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     ok2, msg2 = module.apply_foundry(tool)
     assert ok2, msg2
     assert "bereits auf Foundry" in msg2
-    backup2 = (tool / "TEXT VERBESSERN.original.cmd").read_text(encoding="utf-8")
+    assert not (tool / "TEXT VERBESSERN.original.cmd").is_file()
+    backup2 = (tool / "TEXT VERBESSERN.cmd.llp-alt").read_text(encoding="utf-8")
     assert backup2 == backup
     ps1_again = (tool / "scripts" / "start_windows.ps1").read_text(encoding="utf-8")
     assert ps1_again == ps1
@@ -550,6 +552,20 @@ def test_anwenden_ohne_tool_gibt_hinweis(tmp_path: Path) -> None:
     leer = tmp_path / "_Gemeinsam" / "text_verbessern_foundry"
     leer.mkdir(parents=True)
     assert module.find_tool_root(leer) is None
+
+
+def test_anwenden_legt_original_cmd_beiseite(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    live = tool / "TEXT VERBESSERN.original.cmd"
+    live.write_text("@echo off\r\nstart TextVerbessern.exe\r\n", encoding="utf-8")
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    assert not live.is_file()
+    parked = tool / "TEXT VERBESSERN.original.cmd.llp-alt"
+    assert parked.is_file()
+    assert "TextVerbessern.exe" in parked.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
 
 
 def test_anwenden_ersetzt_einzelnen_mistral_return(tmp_path: Path) -> None:
