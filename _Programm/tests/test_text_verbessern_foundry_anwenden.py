@@ -269,7 +269,12 @@ def _fake_rephraser(tmp_path: Path) -> Path:
     dist.mkdir(parents=True, exist_ok=True)
     (dist / "TextVerbessern.exe").write_bytes(b"mz-dist")
     (tool / "app" / "main.py").write_text(
-        'parser.add_argument("--provider", choices=["fast-editor", "rules", "mistral-local"])\n',
+        'parser.add_argument("--provider", choices=["fast-editor", "rules", "mistral-local"])\n'
+        "def transform(request: TransformRequest) -> TransformResult:\n"
+        "    try:\n"
+        "        return run_pipeline(request.text, request.options)\n"
+        "    except ProviderError as error:\n"
+        "        raise HTTPException(status_code=503, detail=str(error)) from error\n",
         encoding="utf-8",
     )
     (tool / "app" / "local_runtime.py").write_text(
@@ -447,6 +452,9 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     cli = (tool / "app" / "main.py").read_text(encoding="utf-8")
     assert 'choices=["fast-editor", "rules", "foundry"]' in cli
     assert "mistral-local" not in cli
+    assert "uvicorn startet nicht" in cli
+    assert "LLP-FOUNDRY-TOR" in cli
+    assert "return run_pipeline(request.text, request.options)" not in cli
 
     ok2, msg2 = module.apply_foundry(tool)
     assert ok2, msg2

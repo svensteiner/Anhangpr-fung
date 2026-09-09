@@ -311,6 +311,7 @@ def _patch_leftover_docs(tool_root: Path) -> list[str]:
             'choices=["fast-editor", "rules", "mistral-local"]',
             'choices=["fast-editor", "rules", "foundry"]',
         )
+        updated = _disable_fastapi(updated)
         if updated != text:
             bak = cli.with_name(cli.name + ".llp-alt")
             if not bak.is_file():
@@ -318,6 +319,29 @@ def _patch_leftover_docs(tool_root: Path) -> list[str]:
             cli.write_text(updated, encoding="utf-8")
             written.append(str(cli))
     return written
+
+
+def _disable_fastapi(text: str) -> str:
+    """uvicorn app.main:app darf keine Mistral-API mehr anbieten."""
+    if "LLP-FOUNDRY-TOR" in text and "uvicorn startet nicht" in text:
+        return text
+    return _replace_all_if_present(
+        text,
+        "def transform(request: TransformRequest) -> TransformResult:\n"
+        "    try:\n"
+        "        return run_pipeline(request.text, request.options)\n"
+        "    except ProviderError as error:\n"
+        "        raise HTTPException(status_code=503, detail=str(error)) from error",
+        "def transform(request: TransformRequest) -> TransformResult:\n"
+        "    raise HTTPException(\n"
+        "        status_code=503,\n"
+        "        detail=(\n"
+        '            "Bitte Desktop Text verbessern oder "\n'
+        '            "_Gemeinsam\\\\text_verbessern_foundry\\\\Starten.bat. "\n'
+        '            "uvicorn startet nicht. Nur Foundry, kein Mistral."\n'
+        "        ),\n"
+        "    )  # LLP-FOUNDRY-TOR",
+    )
 
 
 WEB_HTML_NAMES = (
