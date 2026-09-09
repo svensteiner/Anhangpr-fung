@@ -82,9 +82,9 @@ Ueberschreibbare Schritte (siehe pipelines/base.py):
 WENN EIN PLUGIN NICHT LAEDT
 ---------------------------
 Das Werkzeug startet trotzdem - aber es verschweigt es nicht:
-  * beim Start eine WARNUNG im Statusfenster,
+  * auf der Startseite ein sichtbarer Hinweis,
   * bei JEDEM Prueflauf ein Hinweis in der Ergebniskarte,
-  * abrufbar unter http://localhost:5555/healthz
+  * KI-Status ohne Schluessel: _Gemeinsam\llp_ai\Pruefen.bat
 
 Ein Lauf ohne das Mandantenprofil liefert ein anderes Ergebnis.
 Darum bitte nicht ignorieren.

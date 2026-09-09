@@ -52,6 +52,13 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "bestaetig" in low or "bestätig" in low
 
 
+def test_klienten_liesmich_ohne_healthz():
+    text = (ROOT / "Klienten" / "_LIESMICH.txt").read_text(encoding="utf-8").lower()
+    assert "healthz" not in text
+    assert "pruefen.bat" in text
+    assert "startseite" in text
+
+
 def test_werkzeuge_pseudokrat_ohne_foundry():
     text = (ROOT / "_Gemeinsam" / "WERKZEUGE.txt").read_text(encoding="utf-8").lower()
     assert "pseudokrat" in text
