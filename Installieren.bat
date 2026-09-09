@@ -1,52 +1,41 @@
 @echo off
 chcp 65001 >nul
-title LLP Anhangspruefer - Installation
+title LLP Anhangspruefer - Verknuepfung
 setlocal
 
 echo ============================================================
-echo   LLP ANHANGSPRUEFER - Lokale Installation
+echo   LLP ANHANGSPRUEFER
 echo ============================================================
 echo.
-echo   Dieses Tool wird vom Netzlaufwerk auf Ihren PC kopiert,
-echo   damit es SCHNELL startet (ca. 2 Sekunden statt 60).
+echo   Das Programm bleibt auf dem Server.
+echo   Es wird NICHT auf den PC kopiert.
+echo.
+echo   Es wird nur eine Desktop-Verknuepfung angelegt.
 echo.
 
-set "QUELLE=%~dp0dist\Anhangspruefer"
-set "ZIEL=%LOCALAPPDATA%\LLP-Anhangspruefer"
-
-if not exist "%QUELLE%\Anhangspruefer.exe" (
-    echo   FEHLER: Programmordner nicht gefunden:
-    echo   %QUELLE%
+set "START=%~dp0Starten.bat"
+if not exist "%START%" (
+    echo   FEHLER: Starten.bat nicht gefunden:
+    echo   %START%
     echo.
     pause
     exit /b 1
 )
 
-echo   Ziel: %ZIEL%
-echo.
-echo   Kopiere... (einen Moment bitte)
-
-if exist "%ZIEL%" rmdir /s /q "%ZIEL%"
-xcopy "%QUELLE%" "%ZIEL%\" /e /i /q /y >nul
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$d=[Environment]::GetFolderPath('Desktop'); $w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut(\"$d\Anhangspruefer.lnk\"); $s.TargetPath='%START%'; $s.WorkingDirectory='%~dp0'; $s.Description='LLP Anhangspruefer'; $s.Save()"
 if errorlevel 1 (
-    echo   FEHLER beim Kopieren.
+    echo   FEHLER: Verknuepfung konnte nicht angelegt werden.
     pause
     exit /b 1
 )
-
-echo   Erstelle Desktop-Verknuepfung "Anhangspruefer"...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$d=[Environment]::GetFolderPath('Desktop'); $w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut(\"$d\Anhangspruefer.lnk\"); $s.TargetPath='%ZIEL%\Anhangspruefer.exe'; $s.WorkingDirectory='%ZIEL%'; $s.Description='LLP Anhangspruefer'; $s.Save()"
 
 echo.
 echo ============================================================
 echo   FERTIG!
 echo.
-echo   Auf dem Desktop liegt jetzt die Verknuepfung
-echo   "Anhangspruefer".
-echo.
-echo   Doppelklick darauf startet das Tool (schnell, lokal).
-echo   Der Browser oeffnet sich automatisch.
+echo   Auf dem Desktop liegt die Verknuepfung "Anhangspruefer".
+echo   Doppelklick startet das Tool. Der Browser oeffnet sich.
 echo ============================================================
 echo.
 pause

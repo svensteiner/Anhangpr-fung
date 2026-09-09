@@ -3,107 +3,92 @@
   Pruefungsunterstuetzung fuer Anhaenge zum Jahresabschluss
 ============================================================
 
-SO STARTEN SIE (EINMALIG INSTALLIEREN):
----------------------------------------
+SO STARTEN SIE:
+---------------
 
-  SCHRITT 1 - EINMALIG:  Doppelklick auf  Installieren.bat
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  Kopiert das Tool vom Netzlaufwerk auf Ihren PC und legt
-  eine Verknuepfung "Anhangspruefer" auf den DESKTOP.
-  (Wichtig: vom Netzlaufwerk startet es langsam ~60 s,
-   lokal nur ~2 s. Darum einmal installieren.)
+  EINMALIG (Verknuepfung auf den Desktop):
+    Doppelklick auf  Installieren.bat
+    Das Programm bleibt auf dem Server. Es wird NICHT
+    auf Ihren PC kopiert.
 
-  SCHRITT 2 - IMMER:  Doppelklick auf die Desktop-Verknuepfung
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  Der Browser oeffnet sich automatisch (http://localhost:5555).
-  KEIN Python noetig, KEIN schwarzes Fenster.
+  IMMER:
+    Doppelklick auf die Desktop-Verknuepfung "Anhangspruefer"
+    oder auf  Starten.bat  im Programmordner.
+    Der Browser oeffnet sich automatisch.
 
-  ZUM BEENDEN: Knopf "Beenden" oben rechts in der Oberflaeche.
+  ZUM BEENDEN: Knopf "Beenden" oben rechts.
 
-  (Alternativ fuer Entwickler: Starten.bat - braucht Python.)
+  Entwickler: Starten.bat braucht Python 3.11+
+  (Häkchen "Add Python to PATH" bei der Installation).
 
 
 MANDANT & FORTSCHRITT (auf der Startseite):
 -------------------------------------------
-Oben tragen Sie den MANDANTEN ein. Darunter sehen Sie auf
-einen Blick, welche der 3 Pruefungsstufen fuer diesen
-Mandanten schon erledigt sind (mit Datum) und welche offen:
+Oben den MANDANTEN eintragen. Darunter sehen Sie, welche
+der 3 Pruefungsstufen schon erledigt sind:
 
-  Stufe 1 - Vorjahresvergleich   (gegen Vorjahres-Anhang)
-  Stufe 2 - Detailpruefung       (gegen Detailbelege)
-  Stufe 3 - UGB-Inhaltspruefung  (gegen SS 236-243 UGB)
-
-Der Stand bleibt gespeichert - auch nach Neustart des Tools.
-Ein Klick auf eine Stufe startet den jeweiligen Modus:
+  Stufe 1 - Vorjahresvergleich
+  Stufe 2 - Detailpruefung
+  Stufe 3 - UGB-Inhaltspruefung
 
 
 MODUS 1 - VORJAHRESVERGLEICH
 -----------------------------
-Prueft, ob die Vorjahreszahlen in Bilanz, GuV und Anhang
-korrekt aus dem Vorjahresabschluss uebernommen wurden.
+  1. Aktuellen Abschluss hochladen (PDF oder Word)
+  2. Vorjahres-Abschluss hochladen
+  3. "Vergleich starten"
 
-  1. Aktuellen Abschluss (z.B. JAB 2025) hochladen
-  2. Vorjahres-Abschluss (z.B. JAB 2024) hochladen
-  3. "Vergleich starten" klicken
-
-  Ergebnis: Excel mit allen verglichenen Positionen.
-  Blatt "Abweichungen"        abweichende Zahlen
-  Blatt "Nur aktuell"         Posten nur im neuen Abschluss
-  Blatt "Nur Vorjahr"         Posten nur im Vorjahr
-  Blaetter "Neu im Bericht" /
-  "Fehlt gegenueber Vorjahr" /
-  "Geaenderter Text"          Textvergleich des Anhangs
+  Ergebnis: Excel im Ordner Ergebnisse\
+  Zahlen: Abweichungen, Nur aktuell, Nur Vorjahr
+  Text:   Neu im Bericht, Fehlt, Geaenderter Text
 
 
-MODUS 2 - DETAILZAHLENVERGLEICH (BELEGPRUEFUNG)
-------------------------------------------------
-Prueft, ob die Zahlen im Anhang mit den Detailunterlagen
-uebereinstimmen (z.B. Bankgarantien, Personalstand).
-
+MODUS 2 - DETAILZAHLENVERGLEICH
+--------------------------------
   1. Anhang (PDF) hochladen
-  2. Detailunterlagen hinzufuegen - beliebig viele:
-       - Bankgarantien / Haftungsobligo (PDF)
-       - Personalstand / Mitarbeiter   (Excel)
-     Das Tool erkennt den Typ automatisch.
-  3. "Pruefung starten" klicken
+  2. Detailunterlagen hinzufuegen (Bank, Personal, ...)
+  3. "Pruefung starten"
 
-  Ergebnis: Excel mit Status OK / ABWEICHUNG je Position.
-  Hinweis: Bei Haftungen mehrere Bankbelege hochladen
-  (Tool summiert automatisch auf).
+  Ergebnis: Excel mit OK / ABWEICHUNG.
 
 
-MODUS 3 - UGB-INHALTSPRUEFUNG
-------------------------------
-Prueft, ob die nach den UGB-Vorschriften erforderlichen
-Angaben (insbesondere §§ 236-243 UGB) im Anhang enthalten sind.
+MODUS 3 - UGB-INHALTSPRUEFUNG (zwei Schritte)
+---------------------------------------------
+  Schritt 1: Anhang hochladen (PDF oder Word).
+             Das Tool schlaegt Rechtsform und Groesse vor.
+             Bitte GmbH oder AG und klein / mittel / groes
+             bestaetigen. Ohne Auswahl startet nichts.
 
-  1. Anhang (PDF) hochladen
-  2. "Inhaltspruefung starten" klicken
+  Schritt 2: "Inhaltspruefung starten".
+             Zuerst fallen Fragen weg, die fuer diese
+             Gesellschaft nicht gelten (n. a. Rechtsgrund).
+             Danach wird nur der Rest geprueft.
 
-  Ergebnis: Markdown-Protokoll mit Findings je Pflichtangabe.
+  Ergebnis: Excel-Checkliste.
+  Beispiel: "Fuer GmbH klein: 42 von 180 Fragen geprueft."
+  Offene Punkte in Excel im Dropdown bestaetigen.
+
+
+KI (MICROSOFT FOUNDRY):
+-----------------------
+  Alle LLP-Tools nutzen denselben zentralen KI-Layer.
+  Liegt unter: AI Tools\_Gemeinsam\llp_ai
+  Schluessel niemals ins Programm oder ins Git legen.
+
+  Ist Foundry aus: das Tool arbeitet mit der Heuristik.
+  Es wechselt nicht still auf ein anderes Modell.
 
 
 ERGEBNISSE:
 -----------
-  Alle Auswertungen landen im Ordner: Ergebnisse\
-    vergleich_DATUM_UHRZEIT.xlsx        (Modus 1)
-    pruefung_DATUM_UHRZEIT.xlsx         (Modus 2)
-    ugb_protokoll_DATUM_UHRZEIT.md      (Modus 3)
-
-
-VORAUSSETZUNGEN:
-----------------
-  Python 3.11+ (https://www.python.org/downloads/)
-  Beim Setup: Haekchen bei "Add Python to PATH" setzen!
-
-  Erster Start: kurze Internetverbindung noetig (Bibliotheken).
-  Danach: vollstaendig offline, kein Datenversand.
+  Vergleich_DATUM_UHRZEIT.xlsx        (Modus 1)
+  pruefung_DATUM_UHRZEIT.xlsx         (Modus 2)
+  UGB-Checkliste_DATUM_UHRZEIT.xlsx   (Modus 3)
 
 
 HAFTUNGSAUSSCHLUSS:
 -------------------
-  Dieses Tool dient ausschliesslich der Pruefungsunterstuetzung.
-  Es ersetzt NICHT die fachliche Beurteilung durch den Pruefer.
-  Alle Ergebnisse sind manuell zu validieren.
+  Nur Pruefungsunterstuetzung. Ersetzt nicht die
+  fachliche Beurteilung. Alle Ergebnisse pruefen.
 
 ============================================================

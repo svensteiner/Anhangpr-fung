@@ -4,6 +4,8 @@ Nur synthetische Daten – keine Mandanten-/KPMG-Unterlagen.
 """
 
 from datetime import datetime
+from pathlib import Path
+import sys
 
 import openpyxl
 
@@ -13,10 +15,14 @@ from anhangspruefer.models.enums import ComplianceStatus
 from anhangspruefer.compliance.knowledge.checklist_loader import ChecklistLoader
 from anhangspruefer.compliance.knowledge.relevance import (
     _detect_legal_form,
+    _detect_size_class,
     _item_applicable,
     _size_class_applicable,
+    apply_company_scope,
     apply_relevance,
     category_applicable,
+    detect_company_profile,
+    profile_hint,
 )
 
 
@@ -80,6 +86,24 @@ def test_detect_legal_form():
     assert _detect_legal_form("die musterfirma handels gmbh mit stammkapital") == "gmbh"
     assert _detect_legal_form("die muster aktiengesellschaft mit grundkapital") == "ag"
     assert _detect_legal_form("unklarer text ohne rechtsform") is None
+
+
+def test_detect_size_class():
+    assert _detect_size_class("die gesellschaft ist eine kleine kapitalgesellschaft") == "klein"
+    assert _detect_size_class("mittelgroße kapitalgesellschaft nach § 221 ugb") == "mittel"
+    assert _detect_size_class("die große aktiengesellschaft mit grundkapital") == "gross"
+    assert _detect_size_class("nicht als kleine kapitalgesellschaft einzustufen") is None
+    assert _detect_size_class("ohne groessenangabe") is None
+
+
+def test_detect_company_profile_and_hint():
+    profil = detect_company_profile(
+        "Die Musterfirma Handels GmbH ist eine kleine Kapitalgesellschaft."
+    )
+    assert profil["rechtsform"] == "gmbh"
+    assert profil["groessenklasse"] == "klein"
+    assert "GmbH" in profile_hint(profil) and "klein" in profile_hint(profil)
+    assert "Bitte" in profile_hint({"rechtsform": None, "groessenklasse": None})
 
 
 def test_size_class_excludes_ag_only_items_for_gmbh():
@@ -323,6 +347,95 @@ def test_machine_na_reason_carries_prefix():
     f = res.findings[0]
     assert f.status == ComplianceStatus.NOT_APPLICABLE
     assert f.technical_reasoning.startswith("Maschinell n. a. – bitte stichprobenweise prüfen:")
+
+
+def test_heuristic_does_not_overwrite_rechtsgrund_na():
+    """Teil 1 (Rechtsgrund) darf durch die Fundstellen-Heuristik nicht kippen."""
+    from anhangspruefer.compliance.knowledge.llm_matcher import apply_heuristic_fundstellen
+
+    cl = Checklist(name="t", version="")
+    cl.add_item(ChecklistItem(
+        item_id="K905", category="Allgemein",
+        description="Angabe der Aktiengattungen",
+        search_keywords=["Aktiengattung"],
+        size_classes=["AG groß", "AG mittel"],
+    ))
+    cl.add_item(ChecklistItem(
+        item_id="K001", category="Vorräte",
+        description="Angabe der Vorratsbewertung",
+        search_keywords=["Vorratsbewertung"],
+        size_classes=["AG groß; AG mittel; AG klein; GmbH groß; GmbH mittel; GmbH klein"],
+    ))
+    res = ReviewResult(document_name="d", checklist_name="t", review_timestamp=datetime(2026, 1, 1))
+    res.add_finding(_finding("K905"))
+    res.add_finding(_finding("K001"))
+
+    teil1 = apply_company_scope(res, cl, "gmbh", "klein")
+    assert teil1["zu_pruefen"] == 1
+    apply_heuristic_fundstellen(
+        res, cl,
+        [("Die Vorratsbewertung erfolgt zu Anschaffungskosten. Aktiengattungen A und B.", 2)],
+    )
+    by_id = {f.checklist_item_id: f for f in res.findings}
+    assert by_id["K905"].status == ComplianceStatus.NOT_APPLICABLE
+    assert "Nicht erforderlich für GmbH klein" in by_id["K905"].technical_reasoning
+    assert by_id["K001"].status != ComplianceStatus.NOT_APPLICABLE
+
+
+def test_ugb_review_requires_anhang_and_profile():
+    root = Path(__file__).resolve().parents[2]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    import app as webapp
+
+    client = webapp.app.test_client()
+    missing_file = client.post("/ugb_review")
+    assert missing_file.status_code == 400
+    assert "Anhang" in missing_file.get_json()["error"]
+
+    import io
+    data = {
+        "rechtsform": "",
+        "groessenklasse": "",
+        "anhang": (io.BytesIO(b"kein pdf"), "anhang.pdf"),
+    }
+    missing_profil = client.post("/ugb_review", data=data, content_type="multipart/form-data")
+    assert missing_profil.status_code == 400
+    assert "Rechtsform" in missing_profil.get_json()["error"]
+
+
+def test_review_checklist_two_stage(tmp_path):
+    import docx
+    from anhangspruefer.compliance.ugb_pipeline import review_checklist
+
+    doc = docx.Document()
+    doc.add_paragraph(
+        "Die Musterfirma Handels GmbH ist eine kleine Kapitalgesellschaft. "
+        "Die Vorräte werden zu Anschaffungskosten bewertet. "
+        "Die Vorratsbewertung erfolgt zu Anschaffungskosten."
+    )
+    p = tmp_path / "anhang.docx"
+    doc.save(str(p))
+
+    cl = Checklist(name="t", version="")
+    cl.add_item(ChecklistItem(
+        item_id="K1", category="Vorräte",
+        description="Angabe der Vorratsbewertung",
+        search_keywords=["Vorratsbewertung"],
+        size_classes=["AG groß; AG mittel; AG klein; GmbH groß; GmbH mittel; GmbH klein"],
+    ))
+    cl.add_item(ChecklistItem(
+        item_id="K2", category="Allgemein",
+        description="Angabe der Aktiengattungen",
+        size_classes=["AG groß", "AG mittel"],
+    ))
+    result, info = review_checklist(p, cl, "gmbh", "klein")
+    st = {f.checklist_item_id: f.status for f in result.findings}
+    assert st["K2"] == ComplianceStatus.NOT_APPLICABLE
+    assert info["zu_pruefen"] == 1
+    assert info["ki"] is None
+    reason = next(f.technical_reasoning for f in result.findings if f.checklist_item_id == "K2")
+    assert "Nicht erforderlich" in reason
 
 
 def test_rechtsgrund_na_reason_has_no_machine_prefix():

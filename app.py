@@ -15,7 +15,7 @@ Eine App, drei Modi:
        Prüft, ob die nach §§ 236-243 UGB erforderlichen Angaben im
        Anhang vorhanden sind, und erstellt ein strukturiertes Protokoll.
 
-Vollständig lokal, keine externen Aufrufe.
+Foundry nur über den zentralen LLP-Layer. Ohne Foundry: Heuristik.
 """
 
 from __future__ import annotations
@@ -72,11 +72,22 @@ from anhangspruefer.pipelines import (
 
 # Mindesttextprüfung: schützt alle drei Modi davor, aus einem Scan ohne
 # Texterkennung ein leeres, aber vollständig formatiertes Arbeitspapier zu bauen.
-from anhangspruefer.parsers.document_text import pruefe_textausbeute
+from anhangspruefer.parsers.document_text import load_page_texts, pruefe_textausbeute
 
-# Modus 3: UGB-Anhangsprüfung
-from anhangspruefer.compliance.engine import ReviewEngine
-from anhangspruefer.compliance.reporting.markdown_report import MarkdownReportGenerator
+# Modus 3: UGB-Anhangsprüfung (zweistufig: Gesellschaft, dann Inhalt)
+from anhangspruefer.compliance.knowledge.checklist_loader import ChecklistLoader
+from anhangspruefer.compliance.knowledge.relevance import (
+    LEGAL_FORMS,
+    SIZE_CLASSES,
+    detect_company_profile,
+    profile_hint,
+)
+from anhangspruefer.compliance.reporting.checklist_excel import generate_checklist_xlsx
+from anhangspruefer.compliance.ugb_pipeline import review_checklist
+from anhangspruefer.services.company_ai import is_ai_ready
+from anhangspruefer.utils.logging_config import get_logger
+
+logger = get_logger("app")
 
 
 # ---------------------------------------------------------------------------
@@ -391,7 +402,7 @@ HTML = r"""<!DOCTYPE html>
 
 <div class="hero">
   <h1><strong>Anhangsprüfer</strong></h1>
-  <p id="hero-sub">Wählen Sie einen Prüfungsmodus. Vollständig lokal – kein Datenversand.</p>
+  <p id="hero-sub">Wählen Sie einen Prüfungsmodus. KI nur über den zentralen Foundry-Layer.</p>
 </div>
 
 <main>
@@ -441,7 +452,7 @@ HTML = r"""<!DOCTYPE html>
       <div class="mode-card" onclick="pickMode('ugb')">
         <div class="mode-icon">⚖️</div>
         <div class="mode-title">UGB Inhaltsprüfung</div>
-        <div class="mode-desc">Prüft, ob die nach §§ 236-243 UGB erforderlichen Angaben im Anhang enthalten sind.</div>
+        <div class="mode-desc">Zuerst Fragen nach GmbH/AG und Größe eingrenzen, dann nur den Rest prüfen.</div>
       </div>
     </div>
     <div class="disclaimer">
@@ -569,37 +580,40 @@ HTML = r"""<!DOCTYPE html>
   <!-- =========================================================== -->
   <section id="mode-ugb" class="hidden">
     <div class="steps">
-      <div class="step active" id="ug-step1"><div class="step-num">1</div><div class="step-label">Anhang auswählen</div></div>
+      <div class="step active" id="ug-step1"><div class="step-num">1</div><div class="step-label">Anhang und Gesellschaft</div></div>
       <div class="step"        id="ug-step2"><div class="step-num">2</div><div class="step-label">Prüfung läuft</div></div>
-      <div class="step"        id="ug-step3"><div class="step-num">3</div><div class="step-label">Protokoll laden</div></div>
+      <div class="step"        id="ug-step3"><div class="step-num">3</div><div class="step-label">Checkliste laden</div></div>
     </div>
     <div class="card" id="ug-upload">
-      <h2><span class="num">1</span>Anhang hochladen (PDF)</h2>
+      <h2><span class="num">1</span>Anhang hochladen (PDF oder Word)</h2>
       <div class="upload-area" id="ug-area"
            ondragover="dragOn(event,'ug-area')" ondragleave="dragOff('ug-area')"
            ondrop="dropPdf(event,'ug-area','ug-file','ugFile','ug-name')">
-        <input type="file" id="ug-file" accept=".pdf" onchange="ugSelect()">
+        <input type="file" id="ug-file" accept=".pdf,.docx" onchange="ugSelect()">
         <div class="upload-icon">⚖️</div>
         <div class="upload-label">Anhang zum Jahresabschluss</div>
-        <div class="upload-hint">wird gegen §§ 236-243 UGB geprüft</div>
+        <div class="upload-hint">PDF oder Word · danach Gesellschaft bestätigen</div>
         <div class="upload-filename" id="ug-name"></div>
       </div>
+      <h2 style="margin-top:28px"><span class="num">2</span>Gesellschaft bestätigen</h2>
+      <div class="result-note">Zuerst werden die Fragen eingegrenzt (nur was für diese Rechtsform und Größe gilt). Alles andere ist n. a. (Rechtsgrund), nicht „fehlt“. Danach prüft das Tool nur den Rest.</div>
       <div class="mandant-row">
         <label for="ug-rechtsform">Rechtsform:</label>
-        <select id="ug-rechtsform" class="mandant-input" style="flex:0 0 200px;">
-          <option value="unbekannt">unbekannt</option>
+        <select id="ug-rechtsform" class="mandant-input" style="flex:0 0 200px;" onchange="ugRefreshStart()">
+          <option value="">Bitte wählen</option>
           <option value="gmbh">GmbH</option>
           <option value="ag">AG</option>
         </select>
         <label for="ug-groessenklasse">Größenklasse § 221 UGB:</label>
-        <select id="ug-groessenklasse" class="mandant-input" style="flex:0 0 200px;">
-          <option value="unbekannt">unbekannt</option>
+        <select id="ug-groessenklasse" class="mandant-input" style="flex:0 0 200px;" onchange="ugRefreshStart()">
+          <option value="">Bitte wählen</option>
           <option value="klein">klein</option>
           <option value="mittel">mittel</option>
           <option value="gross">groß</option>
         </select>
       </div>
-      <div class="result-note">„unbekannt" bedeutet: größenabhängige Erleichterungen werden NICHT gefiltert (jeder Punkt gilt als möglicherweise relevant).</div>
+      <div class="result-note" id="ug-profil-hint">Bitte GmbH oder AG und klein / mittel / groß wählen. Ohne Auswahl startet die Prüfung nicht.</div>
+      <div class="result-note" id="ug-ki-hint">KI: wird geprüft…</div>
       <button class="btn-run" id="ug-btn" disabled onclick="ugRun()">▶ Inhaltsprüfung starten</button>
     </div>
     <div class="card hidden" id="ug-progress">
@@ -619,6 +633,7 @@ HTML = r"""<!DOCTYPE html>
         <div class="stat-box stat-fehlt"><div class="stat-val" id="ug-fehl">—</div><div class="stat-lbl">Fehlt</div></div>
         <div class="stat-box stat-total"><div class="stat-val" id="ug-na">—</div><div class="stat-lbl">n. a.</div></div>
       </div>
+      <div class="result-note" id="ug-hinweis"></div>
       <div class="result-warn hidden" id="ug-warn"></div>
       <div class="result-saved" id="ug-saved"></div>
       <button class="btn-download" id="ug-dl" onclick="openResults()">📂 Ergebnis-Ordner öffnen</button>
@@ -628,7 +643,7 @@ HTML = r"""<!DOCTYPE html>
 </main>
 
 <footer>
-  <strong>LLP</strong> · Anhangsprüfer · Lokale Prüfungsunterstützung · Kein Datenversand
+  <strong>LLP</strong> · Anhangsprüfer · Foundry zentral, sonst Heuristik · <span id="ki-badge">KI: …</span>
 </footer>
 
 <script>
@@ -664,13 +679,13 @@ function pickMode(m) {
   document.getElementById('btn-back').classList.remove('hidden');
   if (m === 'vorjahr') { show('mode-vorjahr'); document.getElementById('hero-sub').textContent = 'Vergleich der Vorjahreszahlen (Bilanz, GuV, Anhang) mit dem Vorjahresabschluss.'; }
   if (m === 'beleg')   { show('mode-beleg');   document.getElementById('hero-sub').textContent = 'Vergleich der Anhang-Werte mit hochgeladenen Detailunterlagen.'; }
-  if (m === 'ugb')     { show('mode-ugb');     document.getElementById('hero-sub').textContent = 'Inhaltliche Prüfung gegen §§ 236-243 UGB.'; }
+  if (m === 'ugb')     { show('mode-ugb');     document.getElementById('hero-sub').textContent = 'Zuerst Gesellschaft eingrenzen, dann den Rest prüfen.'; }
 }
 function showModePicker() {
   hide('mode-vorjahr'); hide('mode-beleg'); hide('mode-ugb');
   show('mode-picker');
   document.getElementById('btn-back').classList.add('hidden');
-  document.getElementById('hero-sub').textContent = 'Wählen Sie einen Prüfungsmodus. Vollständig lokal – kein Datenversand.';
+  document.getElementById('hero-sub').textContent = 'Wählen Sie einen Prüfungsmodus. KI nur über den zentralen Foundry-Layer.';
   loadStatus();
 }
 
@@ -923,29 +938,58 @@ function bgError(msg) {
    MODUS 3 — UGB-INHALTSPRÜFUNG
    =================================================================== */
 let ugFile = null;
-function ugSelect() {
+function ugRefreshStart() {
+  const form = document.getElementById('ug-rechtsform').value;
+  const size = document.getElementById('ug-groessenklasse').value;
+  document.getElementById('ug-btn').disabled = !(ugFile && form && size);
+}
+async function ugSelect() {
   const f = document.getElementById('ug-file').files[0];
   if (!f) return;
   ugFile = f;
   document.getElementById('ug-area').classList.add('has-file');
   document.getElementById('ug-name').textContent = f.name;
-  document.getElementById('ug-btn').disabled = false;
+  ugRefreshStart();
+  const hint = document.getElementById('ug-profil-hint');
+  hint.textContent = 'Gesellschaft wird aus dem Anhang gelesen…';
+  const fd = new FormData();
+  fd.append('anhang', f);
+  try {
+    const resp = await fetch('/ugb_profil', { method:'POST', body:fd });
+    const data = await resp.json();
+    if (!resp.ok) {
+      hint.textContent = data.error || 'Der Anhang konnte nicht gelesen werden.';
+      return;
+    }
+    if (data.rechtsform) document.getElementById('ug-rechtsform').value = data.rechtsform;
+    if (data.groessenklasse) document.getElementById('ug-groessenklasse').value = data.groessenklasse;
+    hint.textContent = data.hinweis || '';
+  } catch (e) {
+    hint.textContent = 'Bitte GmbH oder AG und klein / mittel / groß selbst wählen.';
+  }
+  ugRefreshStart();
 }
 async function ugRun() {
   if (!ugFile) return;
+  const form = document.getElementById('ug-rechtsform').value;
+  const size = document.getElementById('ug-groessenklasse').value;
+  if (!form || !size) {
+    ugError('Bitte zuerst Rechtsform und Größenklasse wählen.');
+    return;
+  }
   hide('ug-upload'); hide('ug-error'); hide('ug-result'); show('ug-progress');
   setStep('ug', 2);
   const bar = document.getElementById('ug-bar'), txt = document.getElementById('ug-text');
   let pct = 0, mi = 0;
-  const msgs = [[15,'Anhang wird eingelesen…'],[40,'Sektionen werden erkannt…'],[70,'UGB-Anforderungen werden geprüft…'],[88,'Protokoll wird erstellt…']];
+  const msgs = [[15,'Anhang wird gelesen…'],[40,'Teil 1: Fragen nach Gesellschaft eingrenzen…'],[70,'Teil 2: verbleibende Angaben prüfen…'],[88,'Checkliste wird geschrieben…']];
   const iv = setInterval(() => {
     if (mi < msgs.length && pct >= msgs[mi][0]) { txt.textContent = msgs[mi][1]; mi++; }
     if (pct < 90) { pct += 1; bar.style.width = pct + '%'; }
   }, 120);
   const fd = new FormData(); fd.append('anhang', ugFile);
   fd.append('mandant', currentMandant);
-  fd.append('rechtsform', document.getElementById('ug-rechtsform').value);
-  fd.append('groessenklasse', document.getElementById('ug-groessenklasse').value);
+  fd.append('rechtsform', form);
+  fd.append('groessenklasse', size);
   try {
     const resp = await fetch('/ugb_review', { method:'POST', body:fd });
     clearInterval(iv); bar.style.width = '100%';
@@ -960,6 +1004,13 @@ function ugShowResult(data) {
   document.getElementById('ug-keinhinweis').textContent = data.kein_hinweis;
   document.getElementById('ug-fehl').textContent = data.fehlend;
   document.getElementById('ug-na').textContent   = data.nicht_anwendbar;
+  const note = document.getElementById('ug-hinweis');
+  const parts = [];
+  if (data.hinweis) parts.push(data.hinweis);
+  parts.push(data.ki
+    ? 'KI: Foundry hat offene Punkte bewertet.'
+    : 'KI war aus – Ergebnis kommt aus der Heuristik. Bitte offene Punkte in Excel bestätigen.');
+  note.textContent = parts.join(' ');
   showWarnungen('ug', data.warnungen);
   resultReady('ug', data.filename);
   refreshStatusAfterRun();
@@ -1038,6 +1089,15 @@ async function quitApp() {
     }
   } catch (e) {}
   loadStatus().then(checkFolderFiles);
+  fetch('/healthz').then(r => r.json()).then(d => {
+    const txt = d.foundry_bereit
+      ? 'KI: Microsoft Foundry (zentral)'
+      : 'KI: aus – Prüfung läuft mit Heuristik';
+    const badge = document.getElementById('ki-badge');
+    const hint = document.getElementById('ug-ki-hint');
+    if (badge) badge.textContent = txt;
+    if (hint) hint.textContent = txt;
+  }).catch(() => {});
 })();
 </script>
 </body>
@@ -1060,6 +1120,7 @@ def healthz():
         # Nur die Profilnamen, keine Mandantenschlüssel.
         "pipelines": available_pipelines(),
         "plugin_fehler": plugin_errors(),
+        "foundry_bereit": is_ai_ready(),
     })
 
 
@@ -1377,21 +1438,57 @@ def pruefen_route():
                     "warnungen": warnungen})
 
 
+def _pflicht_profil() -> tuple[str, str] | None:
+    form = (request.form.get("rechtsform") or "").strip().lower()
+    size = (request.form.get("groessenklasse") or "").strip().lower()
+    if form not in LEGAL_FORMS or size not in SIZE_CLASSES:
+        return None
+    return form, size
+
+
 # ---------- Modus 3: UGB-Inhaltsprüfung ----------
+@app.route("/ugb_profil", methods=["POST"])
+def ugb_profil_route():
+    anhang_file = request.files.get("anhang")
+    if not anhang_file:
+        return jsonify({"error": "Bitte zuerst den Anhang hochladen."}), 400
+    suffix = Path(anhang_file.filename or "anhang.pdf").suffix.lower()
+    if suffix not in (".pdf", ".docx"):
+        return jsonify({"error": "Bitte eine PDF- oder Word-Datei wählen."}), 400
+    with tempfile.TemporaryDirectory() as tmp:
+        anhang_p = Path(tmp) / (anhang_file.filename or f"anhang{suffix}")
+        anhang_file.save(str(anhang_p))
+        try:
+            pages = load_page_texts(anhang_p)
+        except Exception:
+            logger.exception("Anhang-Profil konnte nicht gelesen werden")
+            return jsonify({"error": "Der Anhang konnte nicht gelesen werden."}), 400
+        profil = detect_company_profile("\n".join(pages))
+        return jsonify({
+            "rechtsform": profil["rechtsform"],
+            "groessenklasse": profil["groessenklasse"],
+            "hinweis": profile_hint(profil),
+        })
+
+
 @app.route("/ugb_review", methods=["POST"])
 def ugb_review_route():
     anhang_file = request.files.get("anhang")
     if not anhang_file:
-        return jsonify({"error": "Anhang-PDF fehlt."}), 400
+        return jsonify({"error": "Bitte den Anhang hochladen."}), 400
+
+    profil = _pflicht_profil()
+    if profil is None:
+        return jsonify({
+            "error": "Bitte Rechtsform (GmbH oder AG) und Größenklasse (klein, mittel oder groß) wählen.",
+        }), 400
+    legal_form, size_class = profil
 
     with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp)
-        anhang_p = tmp_path / (anhang_file.filename or "anhang.pdf")
+        suffix = Path(anhang_file.filename or "anhang.pdf").suffix.lower() or ".pdf"
+        anhang_p = Path(tmp) / (anhang_file.filename or f"anhang{suffix}")
         anhang_file.save(str(anhang_p))
 
-        # Mindesttextprüfung ZUERST: bei textlosem Anhang würde jede Pflicht-
-        # angabe als "nicht anwendbar" oder "Fehlt" gewertet und das Arbeits-
-        # papier sähe vollständig geprüft aus.
         warnungen: list[str] = _neue_warnungen()
         try:
             _pruefe_lesbarkeit(
@@ -1401,93 +1498,81 @@ def ugb_review_route():
         except LeereUnterlage as e:
             return jsonify({"error": str(e)}), 400
 
-        # Prüfprogramm laden: bevorzugt das erweiterbare Excel im Fachordner,
-        # sonst die Code-Standardliste.
-        from anhangspruefer.compliance.knowledge.checklist_loader import ChecklistLoader
         loader = ChecklistLoader()
+        default_used = False
         try:
             pp = _find_pruefprogramm()
             if pp is not None:
                 checklist = loader.load_from_xlsx(pp)
             else:
                 checklist = loader.load_default_checklist()
+                default_used = True
         except Exception:
-            checklist = loader.load_default_checklist()
-
-        try:
-            engine = ReviewEngine()
-            review_result = engine.review(notes_path=anhang_p, checklist=checklist)
-        except Exception as e:
-            return jsonify({"error": f"Fehler bei der UGB-Prüfung: {e}"}), 500
-
-        # Rechtsform/Größenklasse aus der UI (Pflicht-Auswahl vor dem Start).
-        # "unbekannt" => keine größenabhängige Filterung (konservativ).
-        _rechtsform_raw = (request.form.get("rechtsform", "unbekannt") or "unbekannt").strip().lower()
-        _groessenklasse_raw = (request.form.get("groessenklasse", "unbekannt") or "unbekannt").strip().lower()
-        _legal_form = _rechtsform_raw if _rechtsform_raw in ("gmbh", "ag") else None
-        _size_class = _groessenklasse_raw if _groessenklasse_raw in ("klein", "mittel", "gross") else None
-        if _legal_form is None or _size_class is None:
+            logger.exception("Prüfprogramm konnte nicht gelesen werden")
+            return jsonify({
+                "error": "Das Prüfprogramm konnte nicht gelesen werden. "
+                         "Bitte die Excel-Datei im Ordner "
+                         "„Fachliche Unterlagen / UGB-Inhaltsprüfung“ prüfen.",
+            }), 500
+        if default_used:
             warnungen.append(
-                "Ohne Rechtsform/Größenklasse bleiben größenabhängige Erleichterungen ungefiltert."
+                "Es wurde die Standard-Checkliste verwendet, nicht das Excel-Prüfprogramm."
             )
 
-        # Relevanz-Filter: Angaben zu nicht vorhandenen Bilanz-/GuV-Positionen
-        # -> "NICHT ANWENDBAR" (Angabe nur nötig, wenn die Position vorliegt).
         try:
-            from anhangspruefer.compliance.knowledge.relevance import apply_relevance
-            import pdfplumber
-            with pdfplumber.open(str(anhang_p)) as _pdf:
-                _doc_text = "\n".join((p.extract_text() or "") for p in _pdf.pages)
-            apply_relevance(review_result, checklist, _doc_text,
-                            legal_form=_legal_form, size_class=_size_class)
-        except Exception:
-            pass  # optional – ohne Filter bleibt das bisherige Verhalten
-
-        # Fundstellen + ehrliches Verdikt (Heuristik, OHNE LLM): je Prüfpunkt die
-        # beste Anhang-Textstelle; Verdikt Fehlt nur bei bewiesener Abwesenheit,
-        # sonst Offen — der Prüfer bestätigt "Ja" per Dropdown in der Excel.
-        # (Der lokale Mistral war als Ja/Nein-Auswähler unzuverlässig — siehe
-        # Council-Analyse; er bleibt als Modul erhalten, aber standardmäßig aus.)
-        ki_info = None
-        try:
-            from anhangspruefer.compliance.knowledge.llm_matcher import (
-                extract_paragraphs, apply_heuristic_fundstellen,
+            review_result, info = review_checklist(
+                anhang_p, checklist, legal_form, size_class,
             )
-            apply_heuristic_fundstellen(review_result, checklist, extract_paragraphs(anhang_p))
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
         except Exception:
-            pass  # optional – Prüfung darf nie an der Fundstellensuche scheitern
+            logger.exception("UGB-Inhaltsprüfung fehlgeschlagen")
+            return jsonify({
+                "error": "Die Inhaltsprüfung ist fehlgeschlagen. Bitte Datei und Auswahl prüfen.",
+            }), 500
 
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         stem = Path(anhang_file.filename or "anhang").stem[:35]
-        # Doku = die KPMG-Checkliste selbst, ausgefüllt (Excel-Arbeitspapier).
         out_fname = f"UGB-Checkliste_{stem}_{ts}.xlsx"
         out_path = OUTPUT_DIR / out_fname
         try:
-            from anhangspruefer.compliance.reporting.checklist_excel import generate_checklist_xlsx
-            generate_checklist_xlsx(checklist, review_result, out_path,
-                                    legal_form=_legal_form, size_class=_size_class)
-        except Exception as e:
-            return jsonify({"error": f"Fehler beim Bericht-Export: {e}"}), 500
+            generate_checklist_xlsx(
+                checklist, review_result, out_path,
+                legal_form=legal_form, size_class=size_class,
+            )
+        except Exception:
+            logger.exception("Checkliste konnte nicht geschrieben werden")
+            return jsonify({"error": "Die Checkliste konnte nicht gespeichert werden."}), 500
 
-    # Zählung nach ComplianceStatus; "Offen" (NICHT BEURTEILBAR) wird anhand
-    # von technical_reasoning weiter aufgesplittet (Angabe gefunden -> zu
-    # bestätigen; sonst -> kein Hinweis gefunden).
     findings = getattr(review_result, "findings", []) or []
+
     def _n(*vals):
         return sum(1 for f in findings if getattr(getattr(f, "status", None), "value", "") in vals)
+
     def _offen_mit(praefix):
-        return sum(1 for f in findings
-                   if getattr(getattr(f, "status", None), "value", "") == "NICHT BEURTEILBAR"
-                   and (getattr(f, "technical_reasoning", "") or "").startswith(praefix))
+        return sum(
+            1 for f in findings
+            if getattr(getattr(f, "status", None), "value", "") == "NICHT BEURTEILBAR"
+            and (getattr(f, "technical_reasoning", "") or "").startswith(praefix)
+        )
+
+    form_txt = "GmbH" if legal_form == "gmbh" else "AG"
+    size_txt = {"klein": "klein", "mittel": "mittel", "gross": "groß"}[size_class]
+    ki_info = info.get("ki")
     summary = {
         "zu_bestaetigen": _offen_mit("Angabe gefunden"),
         "kein_hinweis": _offen_mit("Kein Hinweis"),
         "fehlend": _n("NICHT ENTSPRECHEND"),
         "nicht_anwendbar": _n("NICHT ANWENDBAR"),
         "gesamt": len(findings),
-        "rechtsform": _legal_form or "unbekannt",
-        "groessenklasse": _size_class or "unbekannt",
-        "ki": ki_info,
+        "zu_pruefen": info.get("zu_pruefen", len(findings)),
+        "rechtsform": legal_form,
+        "groessenklasse": size_class,
+        "ki": ki_info["ki"] if isinstance(ki_info, dict) else None,
+        "hinweis": (
+            f"Für {form_txt} {size_txt}: "
+            f"{info.get('zu_pruefen', 0)} von {len(findings)} Fragen geprüft."
+        ),
     }
     _record_stage(request.form.get("mandant", ""), "ugb", out_fname, summary)
     return jsonify({**summary, "filename": out_fname, "warnungen": warnungen})

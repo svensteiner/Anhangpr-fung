@@ -12,9 +12,12 @@ from anhangspruefer.models.checklist import Checklist, ChecklistItem
 from anhangspruefer.models.enums import ComplianceStatus
 from anhangspruefer.models.finding import Finding, ReviewResult
 from anhangspruefer.compliance.knowledge.llm_matcher import (
+    FoundryLLM,
     LocalLLM,
     _parse_assessment,
     build_prompt,
+    paragraphs_from_pages,
+    refine_binaer,
     refine_findings,
     select_candidates,
 )
@@ -295,6 +298,54 @@ def test_apply_heuristic_fundstellen_splits_offen_via_technical_reasoning():
     assert st["K1"].technical_reasoning == "Angabe gefunden – bitte bestätigen"
     assert st["K2"].status == ComplianceStatus.NOT_ASSESSABLE
     assert st["K2"].technical_reasoning == "Kein Hinweis gefunden"
+
+
+def test_paragraphs_from_pages_keeps_page_and_splits():
+    pages = [
+        "Kurzer Kopf\n\nDie Vorräte werden zu Anschaffungskosten bewertet und erläutert.\n\n1. Haftungen\nIm Geschäftsjahr sind keine Haftungsverhältnisse auszuweisen.",
+        "",
+    ]
+    paras = paragraphs_from_pages(pages)
+    assert any("Vorräte" in t and p == 1 for t, p in paras)
+    assert any("Haftungsverhältnisse" in t for t, _p in paras)
+
+
+def test_foundry_llm_unavailable_without_layer():
+    llm = FoundryLLM()
+    assert llm.is_available() is False
+    assert llm.generate_json("egal") is None
+
+
+def test_refine_binaer_defaults_to_foundry_not_ollama(monkeypatch):
+    from anhangspruefer.compliance.knowledge import llm_matcher as m
+
+    created: list[str] = []
+
+    class Boom(m.LocalLLM):
+        def __init__(self, *a, **k):
+            created.append("local")
+            raise AssertionError("LocalLLM darf nicht still als Fallback dienen")
+
+    monkeypatch.setattr(m, "LocalLLM", Boom)
+    cl, res, paras = _setup()
+    out = m.refine_binaer(res, cl, paras)
+    assert created == []
+    assert out["ki"] is None
+
+
+def test_refine_binaer_with_fake_foundry():
+    cl, res, paras = _setup()
+    from anhangspruefer.compliance.knowledge.llm_matcher import apply_heuristic_fundstellen
+    apply_heuristic_fundstellen(res, cl, paras)
+    llm = FakeLLM([
+        {"enthalten": "ja", "beleg": "Restlaufzeit von mehr als fünf Jahren", "fehlt_konkret": None},
+        {"enthalten": "nein", "beleg": None, "fehlt_konkret": "Haftungsangabe fehlt"},
+    ])
+    llm.model = "foundry-fake"
+    out = refine_binaer(res, cl, paras, llm=llm)
+    st = {f.checklist_item_id: f.status for f in res.findings}
+    assert st["K3"] == ComplianceStatus.NOT_APPLICABLE
+    assert out["ki"] == "foundry-fake"
 
 
 def test_build_prompt_contains_rules_and_candidates():

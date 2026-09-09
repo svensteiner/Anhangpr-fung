@@ -1,23 +1,11 @@
 """
-Lokale KI-Zuordnung: Anhang-Textstellen <-> KPMG-Prüfpunkte (Modus 3).
+KI-Zuordnung: Anhang-Textstellen <-> KPMG-Prüfpunkte (Modus 3).
 
-Der Stichwort-Matcher findet nur grobe Kandidaten (generische Wörter wie
-"Angabe"/"Erläuterung" treffen fast jeden Absatz). Diese Schicht lässt ein
-LOKALES Sprachmodell (Ollama + Mistral, http://127.0.0.1:11434) je Prüfpunkt
-entscheiden, ob und WO die geforderte Angabe im Anhang steht.
+Produktionsweg: zentraler Microsoft-Foundry-Layer (llp_ai). Kein stiller
+Wechsel auf Ollama oder einen anderen Anbieter. Ist Foundry aus oder nicht
+erreichbar, bleibt das Heuristik-Ergebnis stehen.
 
-VERTRAULICHKEIT (hart erzwungen):
-    Mandantendaten sind geheim. Der Client verbindet sich AUSSCHLIESSLICH zu
-    localhost — jede andere Adresse wird mit ValueError abgelehnt. Es findet
-    kein Datenversand an Cloud-Dienste statt; ist Ollama nicht verfügbar,
-    bleibt einfach das bisherige (Stichwort-)Ergebnis stehen.
-
-Ablauf je (relevantem) Prüfpunkt:
-    1. Kandidaten-Absätze per Stichwort-Überlappung vorauswählen (billig).
-    2. Mistral prüft mit strenger JSON-Antwort: erfüllt ja/nein/unklar +
-       Absatznummer + Kurzbegründung. Negativaussagen ("keine ...", "EUR 0,00")
-       zählen ausdrücklich als Angabe.
-    3. Finding aktualisieren: Status, Fundstelle (Absatz + Seite), Begründung.
+LocalLLM (Ollama, nur localhost) bleibt für Tests und bewusste lokale Läufe.
 """
 
 from __future__ import annotations
@@ -28,11 +16,13 @@ import time
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Protocol
 
 from ...models.checklist import Checklist, ChecklistItem
 from ...models.enums import ComplianceStatus
 from ...models.finding import EvidenceItem, ReviewResult
+from ...parsers.document_text import load_page_texts
+from ...services.company_ai import CompanyAIError, ask_json, is_ai_ready
 from ...utils.logging_config import get_logger
 
 logger = get_logger("llm_matcher")
@@ -66,36 +56,40 @@ def _keywords(item: ChecklistItem) -> set[str]:
 # Absatz-Extraktion mit Seitenzahlen (auch Tabellenzeilen behalten –
 # Fundstellen stehen oft in Zahlenzeilen wie "... EUR 0,00 ...")
 # ---------------------------------------------------------------------------
-def extract_paragraphs(pdf_path: Path) -> list[tuple[str, int]]:
-    import pdfplumber
-
+def paragraphs_from_pages(pages: list[str]) -> list[tuple[str, int]]:
+    """Absätze aus bereits geladenen Seitentexten."""
     out: list[tuple[str, int]] = []
-    try:
-        with pdfplumber.open(str(pdf_path)) as pdf:
-            for page_num, page in enumerate(pdf.pages, 1):
-                text = page.extract_text(x_tolerance=2) or ""
-                buf: list[str] = []
+    for page_num, text in enumerate(pages, 1):
+        buf: list[str] = []
 
-                def flush() -> None:
-                    if buf:
-                        para = re.sub(r"\s+", " ", " ".join(buf)).strip()
-                        if len(para) >= 30:
-                            out.append((para, page_num))
-                        buf.clear()
+        def flush() -> None:
+            if buf:
+                para = re.sub(r"\s+", " ", " ".join(buf)).strip()
+                if len(para) >= 30:
+                    out.append((para, page_num))
+                buf.clear()
 
-                for raw in text.split("\n"):
-                    ln = raw.strip()
-                    if not ln:
-                        flush()
-                        continue
-                    # nummerierte Überschriften trennen Absätze
-                    if re.match(r"^\d+(?:\.\d+)*\.?\s+\S", ln) and buf:
-                        flush()
-                    buf.append(ln)
+        for raw in (text or "").split("\n"):
+            ln = raw.strip()
+            if not ln:
                 flush()
-    except Exception:
-        logger.exception("Absatz-Extraktion fehlgeschlagen: %s", pdf_path)
+                continue
+            # nummerierte Überschriften trennen Absätze
+            if re.match(r"^\d+(?:\.\d+)*\.?\s+\S", ln) and buf:
+                flush()
+            buf.append(ln)
+        flush()
     return out
+
+
+def extract_paragraphs(path: Path) -> list[tuple[str, int]]:
+    """Absätze aus PDF oder Word. Bei Lesefehler: leere Liste."""
+    try:
+        pages = load_page_texts(path)
+    except Exception:
+        logger.exception("Absatz-Extraktion fehlgeschlagen: %s", path)
+        return []
+    return paragraphs_from_pages(pages)
 
 
 def _norm_compact(text: str) -> str:
@@ -277,6 +271,34 @@ class LocalLLM:
         except Exception:
             logger.exception("Ollama-Aufruf fehlgeschlagen")
             return None
+
+
+class FoundryLLM:
+    """Zentraler Foundry-Layer. Kein stiller Wechsel auf Ollama."""
+
+    def __init__(self) -> None:
+        self.model = "foundry"
+
+    def is_available(self) -> bool:
+        return is_ai_ready()
+
+    def generate_json(self, prompt: str, num_predict: int = 120) -> Optional[dict]:
+        if not is_ai_ready():
+            return None
+        try:
+            data = ask_json(prompt)
+        except CompanyAIError:
+            logger.exception("Foundry-Aufruf fehlgeschlagen")
+            return None
+        return data if isinstance(data, dict) else None
+
+
+class LLMClient(Protocol):
+    model: str
+
+    def is_available(self) -> bool: ...
+
+    def generate_json(self, prompt: str, num_predict: int = 120) -> Optional[dict]: ...
 
 
 # ---------------------------------------------------------------------------
@@ -463,26 +485,27 @@ def refine_binaer(
     result: ReviewResult,
     checklist: Checklist,
     paragraphs: list[tuple[str, int]],
-    llm: Optional[LocalLLM] = None,
+    llm: Optional[LLMClient] = None,
     max_seconds: Optional[float] = None,
     progress: Optional[Callable[[int, int], None]] = None,
     answer_cache: Optional[dict] = None,
 ) -> dict:
-    """Entscheidet offene Prüfpunkte mit dem LOKALEN Modell (Ja/Nein je Absatz).
+    """Entscheidet offene Prüfpunkte mit Foundry (Ja/Nein je Absatz).
 
     Voraussetzung: `apply_heuristic_fundstellen()` lief bereits – die Fundstelle
-    stammt IMMER aus der Heuristik (nachweislich ~91-95 % treffsicher), das
-    Modell bewertet sie nur.
+    stammt IMMER aus der Heuristik, das Modell bewertet sie nur.
+
+    Standard ist FoundryLLM. Es gibt keinen stillen Fallback auf Ollama.
+    Ist Foundry nicht bereit, bleibt das Heuristik-Ergebnis stehen.
 
     Sicherungen gegen den bekannten Ja-Bias:
       * "ja" nur mit wörtlichem Beleg, der im Absatz nachweisbar ist,
       * und der Beleg muss einen spezifischen Fachbegriff der Prüffrage enthalten.
-    Andernfalls bleibt der Punkt "Offen". Fällt das Modell aus, bleibt ebenfalls
-    alles beim Heuristik-Ergebnis – die Prüfung kippt nie.
+    Andernfalls bleibt der Punkt "Offen".
     """
-    llm = llm or LocalLLM()
+    llm = llm or FoundryLLM()
     if not llm.is_available():
-        logger.info("Lokales Modell nicht verfügbar – Heuristik-Ergebnis bleibt.")
+        logger.info("Foundry nicht verfügbar – Heuristik-Ergebnis bleibt.")
         return {"ja": 0, "fehlt": 0, "offen": 0, "ki": None, "verbleibend": 0}
 
     by_id = {it.item_id: it for it in checklist.items}

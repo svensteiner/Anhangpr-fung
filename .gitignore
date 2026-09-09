@@ -62,6 +62,10 @@ _apply_batch*.py
 *.bak_encoding
 *.bak_*
 
+# Schlüssel und lokale Umgebung — niemals einchecken
+.env
+.env.local
+
 # OS / Editor
 Thumbs.db
 desktop.ini
