@@ -31,6 +31,7 @@ def test_anleitung_kein_exe_copy_und_modus3_pflicht():
     assert "desktop-selbsttest" in text
     assert "lokale bewertung" in text
     assert "lokale regelfassung" in text
+    assert "schnell-editor" in text
     assert "ci-rezepte" in text
     assert "anhang-ollama" in text
     assert "fremd-ki" in text
@@ -100,6 +101,7 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "keinen desktop-selbsttest" in low
     assert "keine lokale bewertung" in low
     assert "keine lokale regelfassung" in low
+    assert "keinen schnell-editor" in low
     assert "keine ci-rezepte" in low
     assert "keinen ollama-client im anhangspruefer" in low
     assert "keine fremd-ki" in low
@@ -142,6 +144,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "keinen desktop-selbsttest" in text
     assert "keine lokale bewertung" in text
     assert "keine lokale regelfassung" in text
+    assert "keinen schnell-editor" in text
     assert "keine ci-rezepte" in text
     assert "keinen ollama-client im anhangspruefer" in text
     assert "keine fremd-ki" in text
@@ -159,6 +162,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "heuristik / regeln" not in lies
     assert "text verbessern" in lies
     assert "aendert den text nicht" in lies or "ändert den text nicht" in lies
+    assert "schnell-editor" in lies
     assert "ci-rezepte" in lies
     assert "anhang-ollama" in lies
     assert "fremd-ki" in lies
@@ -254,6 +258,7 @@ def test_werkzeuge_pseudokrat_ohne_foundry():
     assert "selbsttest" in text
     assert "bewertung" in text
     assert "regelfassung" in text
+    assert "schnell-editor" in text
     assert "ci-rezepte" in text or "bewertung/offline-editor" in text
     assert "ollama-client im anhangspruefer" in text
     assert "fremd-ki" in text
@@ -304,6 +309,7 @@ def test_text_verbessern_foundry_kit_liegt_bereit():
     assert "startet nicht" in lies
     assert "schnell bleibt lokal" not in lies
     assert "keine lokale regelfassung" in lies
+    assert "schnell-editor" in lies
     assert "unveraendert" in lies or "unverändert" in lies
     assert "selbsttest" in lies
     assert "bewertung" in lies

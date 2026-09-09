@@ -28,6 +28,7 @@ EINMALIG
   keine startbare Sicherung, keine alte Kommandozeile,
   keine startbare Desktop-Oberflaeche, keinen Desktop-Selbsttest,
   keine lokale Bewertung, keine lokale Regelfassung,
+  keinen Schnell-Editor,
   keine CI-Rezepte (Bewertung oder Offline-Editor),
   keinen Ollama-Client im Anhangspruefer,
   keine Fremd-KI (OpenAI/Anthropic).

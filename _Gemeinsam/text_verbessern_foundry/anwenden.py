@@ -643,24 +643,54 @@ def _patch_local_runtime(path: Path) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _strip_provider_rewrite_calls(text: str) -> str:
+    """Auch tote Aufrufe nach dem Foundry-Tor dürfen nicht stehen bleiben."""
+    replacements = (
+        (
+            "LocalRuleProvider().rewrite",
+            'raise RuntimeError("Lokale Regeln sind abgeschaltet. Nur Foundry.")  # LLP-FOUNDRY-TOR',
+        ),
+        (
+            "FastEditorialProvider().rewrite",
+            'raise RuntimeError("Schnell-Editor ist abgeschaltet. Nur Foundry.")  # LLP-FOUNDRY-TOR',
+        ),
+    )
+    lines: list[str] = []
+    for line in text.splitlines(keepends=True):
+        replaced = False
+        for token, stub in replacements:
+            if token not in line:
+                continue
+            indent = line[: len(line) - len(line.lstrip(" \t"))]
+            ending = "\n" if line.endswith("\n") else ""
+            lines.append(f"{indent}{stub}{ending}")
+            replaced = True
+            break
+        if not replaced:
+            lines.append(line)
+    return "".join(lines)
+
+
 def _disable_local_rules(path: Path) -> None:
     """LocalRuleProvider darf den Text nicht mehr ändern."""
     text = path.read_text(encoding="utf-8")
-    if "LLP-FOUNDRY-TOR" in text and "Lokale Regeln sind abgeschaltet" in text:
-        return
-    if REWRITE_SIG not in text:
-        raise ValueError("Erwartete Stelle fehlt: LocalRuleProvider.rewrite")
-    path.write_text(text.replace(REWRITE_SIG, LOCAL_RULES_STUB, 1), encoding="utf-8")
+    if "LLP-FOUNDRY-TOR" not in text or "Lokale Regeln sind abgeschaltet" not in text:
+        if REWRITE_SIG not in text:
+            raise ValueError("Erwartete Stelle fehlt: LocalRuleProvider.rewrite")
+        text = text.replace(REWRITE_SIG, LOCAL_RULES_STUB, 1)
+    text = _strip_provider_rewrite_calls(text)
+    path.write_text(text, encoding="utf-8")
 
 
 def _disable_fast_editor(path: Path) -> None:
     """FastEditorialProvider darf den Text nicht mehr ändern."""
     text = path.read_text(encoding="utf-8")
-    if "LLP-FOUNDRY-TOR" in text and "Schnell-Editor ist abgeschaltet" in text:
-        return
-    if REWRITE_SIG not in text:
-        raise ValueError("Erwartete Stelle fehlt: FastEditorialProvider.rewrite")
-    path.write_text(text.replace(REWRITE_SIG, FAST_EDITOR_STUB, 1), encoding="utf-8")
+    if "LLP-FOUNDRY-TOR" not in text or "Schnell-Editor ist abgeschaltet" not in text:
+        if REWRITE_SIG not in text:
+            raise ValueError("Erwartete Stelle fehlt: FastEditorialProvider.rewrite")
+        text = text.replace(REWRITE_SIG, FAST_EDITOR_STUB, 1)
+    text = _strip_provider_rewrite_calls(text)
+    path.write_text(text, encoding="utf-8")
 
 
 def _disable_cloud_provider(path: Path) -> None:

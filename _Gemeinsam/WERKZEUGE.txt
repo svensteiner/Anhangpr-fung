@@ -30,7 +30,8 @@ Start:  Tools_starten.bat, Punkt 2
 KI:     gruendliche Fassung nur ueber Foundry (llp_ai).
         Ist Foundry aus, bleibt der Text unveraendert.
         Die Foundry-Seite sagt das klar (Knopf gesperrt).
-        Keine lokale Regelfassung, kein Mistral, kein Ollama.
+        Keine lokale Regelfassung, keinen Schnell-Editor,
+        kein Mistral, kein Ollama.
 Zeigt das Tool noch Mistral:
         Starten.bat und llp_start stellen das
         bei jedem Start um. Bleibt ein alter Weg,
@@ -59,7 +60,8 @@ Text verbessern noch Mistral, Streamlit, Ollama,
 den Offline-Editor (HTML/JS), eine startbare
 Sicherung, die alte Kommandozeile, den Desktop-
 Selbsttest, die lokale Bewertung, eine lokale
-Regelfassung, CI-Rezepte (Bewertung/Offline-Editor),
+Regelfassung, einen Schnell-Editor,
+CI-Rezepte (Bewertung/Offline-Editor),
 einen Ollama-Client im Anhangspruefer
 oder Fremd-KI (OpenAI/Anthropic)
 nutzt.

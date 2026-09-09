@@ -343,10 +343,20 @@ def find_local_rules(roots: list[Path]) -> Path | None:
     return None
 
 
+def _has_live_rewrite_call(text: str) -> bool:
+    """Toter Regelaufruf nach dem Foundry-Tor zählt weiter als Restweg."""
+    return (
+        "LocalRuleProvider().rewrite" in text
+        or "FastEditorialProvider().rewrite" in text
+    )
+
+
 def local_rules_modus(path: Path | None) -> str:
     if path is None:
         return "nicht gefunden"
     text = path.read_text(encoding="utf-8", errors="replace")
+    if _has_live_rewrite_call(text):
+        return "noch Regeln"
     if "LLP-FOUNDRY-TOR" in text and "Lokale Regeln sind abgeschaltet" in text:
         return "abgeschaltet"
     if "class LocalRuleProvider" in text:
@@ -366,6 +376,8 @@ def fast_editor_modus(path: Path | None) -> str:
     if path is None:
         return "nicht gefunden"
     text = path.read_text(encoding="utf-8", errors="replace")
+    if _has_live_rewrite_call(text):
+        return "noch Regeln"
     if "LLP-FOUNDRY-TOR" in text and "Schnell-Editor ist abgeschaltet" in text:
         return "abgeschaltet"
     if "class FastEditorialProvider" in text:

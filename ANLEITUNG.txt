@@ -111,7 +111,7 @@ KI (MICROSOFT FOUNDRY):
   (zeigt Foundry und Restwege: Mistral, Streamlit,
    Offline-Editor, Sicherung, alte Kommandozeile,
    Desktop-Selbsttest, lokale Bewertung, lokale Regelfassung,
-   CI-Rezepte, Anhang-Ollama, Fremd-KI)
+   Schnell-Editor, CI-Rezepte, Anhang-Ollama, Fremd-KI)
   Starten.bat zeigt eine Zeile, wenn Anwenden nicht klappt
   oder ein alter Weg bleibt („Bitte Pruefen.bat“).
   In der Oberflaeche unten kurz "KI: bereit" oder "KI: aus".

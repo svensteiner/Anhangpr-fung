@@ -516,6 +516,30 @@ def test_report_foundry_aber_lokal_provider_ist_nicht_ok(tmp_path: Path) -> None
     assert "Schnell-Editor" in reasons
 
 
+def test_report_foundry_aber_schnell_editor_regelaufruf_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    (tools / "rephraser" / "app" / "providers" / "fast_editor.py").write_text(
+        "class FastEditorialProvider:\n"
+        "    def rewrite(self, text: str, constraints: SemanticConstraints, "
+        "options: TransformOptions) -> str:\n"
+        "        raise RuntimeError(\n"
+        '            "Schnell-Editor ist abgeschaltet. Nur Foundry. '
+        'Der Text bleibt unverändert."\n'
+        "        )  # LLP-FOUNDRY-TOR\n"
+        "        cleaned = LocalRuleProvider().rewrite(text, constraints, options)\n",
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_fast_editor_modus"] == "noch Regeln"
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Schnell-Editor" in module.leftovers_in_tool(tools / "rephraser")
+
+
 def test_report_foundry_desktop_aber_regeln_pipeline_ist_nicht_ok(tmp_path: Path) -> None:
     module = _load()
     tools = tmp_path / "AI Tools"
