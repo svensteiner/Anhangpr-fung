@@ -33,6 +33,10 @@ def test_installieren_kopiert_keine_exe():
     assert "text verbessern" in text
     assert "foundry" in text
     assert "mistral" in text
+    share = text.find("..\\_gemeinsam\\llp_ai")
+    lokal = text.find("%~dp0_gemeinsam\\llp_ai")
+    assert share != -1 and lokal != -1
+    assert share < lokal
 
 
 def test_struktur_start_ist_server_nicht_exe():
@@ -122,6 +126,10 @@ def test_installieren_wendet_foundry_an():
     text = (ROOT / "Installieren.bat").read_text(encoding="utf-8", errors="replace").lower()
     assert "anwenden.py" in text
     assert "text verbessern auf foundry" in text
+    share = text.find("..\\_gemeinsam\\llp_ai")
+    lokal = text.find("%~dp0_gemeinsam\\llp_ai")
+    assert share != -1 and lokal != -1
+    assert share < lokal
 
 
 def test_llp_start_setzt_foundry_root():

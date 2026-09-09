@@ -112,6 +112,10 @@ def apply(tool_root: Path) -> list[str]:
     done.extend(_write_start_notes(tool_root))
     extra = _patch_leftover_docs(tool_root)
     done.extend(extra)
+    hybrid = tool_root / "app" / "providers" / "hybrid.py"
+    if hybrid.is_file():
+        _patch_hybrid(hybrid)
+        done.append(str(hybrid))
 
     return done
 
@@ -305,6 +309,33 @@ def _park_exe(tool_root: Path) -> list[str]:
         exe.rename(dest)
         parked.append(str(dest))
     return parked
+
+
+def _patch_hybrid(path: Path) -> None:
+    """Direktaufruf von HybridLocalProvider darf nicht mehr Mistral starten."""
+    text = path.read_text(encoding="utf-8")
+    text = _replace_all_if_present(
+        text,
+        "from app.providers.mistral_provider import LocalMistralProvider",
+        "from app.providers.foundry_provider import FoundryEditorialProvider",
+    )
+    text = _replace_all_if_present(text, 'name = "rules+mistral-local"', 'name = "rules+foundry"')
+    text = _replace_all_if_present(
+        text,
+        "self.mistral = LocalMistralProvider()",
+        "self.foundry = FoundryEditorialProvider()",
+    )
+    text = _replace_all_if_present(
+        text,
+        "self.mistral.rewrite",
+        "self.foundry.rewrite",
+    )
+    text = _replace_all_if_present(
+        text,
+        "followed by a local Mistral editorial pass.",
+        "followed by a Foundry editorial pass.",
+    )
+    path.write_text(text, encoding="utf-8")
 
 
 def _patch_pipeline(path: Path) -> None:

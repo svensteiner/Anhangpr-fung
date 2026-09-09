@@ -229,6 +229,16 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         'parser.add_argument("--provider", choices=["fast-editor", "rules", "mistral-local"])\n',
         encoding="utf-8",
     )
+    (tool / "app" / "providers" / "hybrid.py").write_text(
+        "from app.providers.mistral_provider import LocalMistralProvider\n\n"
+        "class HybridLocalProvider:\n"
+        '    name = "rules+mistral-local"\n'
+        "    def __init__(self):\n"
+        "        self.mistral = LocalMistralProvider()\n"
+        "    def rewrite(self, text, constraints, options):\n"
+        "        return self.mistral.rewrite(text, constraints, options)\n",
+        encoding="utf-8",
+    )
     return tool
 
 
@@ -256,6 +266,12 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "or mistral-local." not in pipeline
     assert 'if "mistral" not in active_provider.name:' not in pipeline
     assert "except ProviderError as error:\n        raise\n" in pipeline
+
+    hybrid = (tool / "app" / "providers" / "hybrid.py").read_text(encoding="utf-8")
+    assert "FoundryEditorialProvider" in hybrid
+    assert 'name = "rules+foundry"' in hybrid
+    assert "LocalMistralProvider" not in hybrid
+    assert "self.foundry" in hybrid
 
     desktop = (tool / "app" / "desktop.py").read_text(encoding="utf-8")
     assert 'MODE_STRONG = "Gründlich mit Foundry (Büro-KI)"' in desktop

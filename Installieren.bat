@@ -30,10 +30,16 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set "TEXTKI=%~dp0_Gemeinsam\text_verbessern_foundry\Starten.bat"
-if exist "%TEXTKI%" (
+set "SHARED="
+if exist "%~dp0..\_Gemeinsam\llp_ai" set "SHARED=%~dp0..\_Gemeinsam"
+if not defined SHARED if exist "%~dp0_Gemeinsam\llp_ai" set "SHARED=%~dp0_Gemeinsam"
+if defined SHARED set "LLP_SHARED_AI_ROOT=%SHARED%"
+
+set "TEXTKI="
+if defined SHARED set "TEXTKI=%SHARED%\text_verbessern_foundry\Starten.bat"
+if defined TEXTKI if exist "%TEXTKI%" (
     powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-      "$d=[Environment]::GetFolderPath('Desktop'); $w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut(\"$d\Text verbessern.lnk\"); $s.TargetPath='%TEXTKI%'; $s.WorkingDirectory='%~dp0_Gemeinsam\text_verbessern_foundry'; $s.Description='Text verbessern (Foundry)'; $s.Save()"
+      "$d=[Environment]::GetFolderPath('Desktop'); $w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut(\"$d\Text verbessern.lnk\"); $s.TargetPath='%TEXTKI%'; $s.WorkingDirectory='%SHARED%\text_verbessern_foundry'; $s.Description='Text verbessern (Foundry)'; $s.Save()"
 )
 
 set "TOOLS=%~dp0Tools_starten.bat"
@@ -46,7 +52,8 @@ set "PY="
 py -3 -c "import sys" >nul 2>&1 && set "PY=py -3"
 if not defined PY python -c "import sys" >nul 2>&1 && set "PY=python"
 if not defined PY python3 -c "import sys" >nul 2>&1 && set "PY=python3"
-set "ANWENDEN=%~dp0_Gemeinsam\text_verbessern_foundry\anwenden.py"
+set "ANWENDEN="
+if defined SHARED set "ANWENDEN=%SHARED%\text_verbessern_foundry\anwenden.py"
 if exist "%ANWENDEN%" if defined PY (
     echo   Stelle Text verbessern auf Foundry um ...
     %PY% "%ANWENDEN%"
