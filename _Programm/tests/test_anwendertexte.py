@@ -25,6 +25,9 @@ def test_anleitung_kein_exe_copy_und_modus3_pflicht():
     assert "tools_starten.bat" in text
     assert "llp_start" in text
     assert "_gemeinsam\\anleitung.txt" in text or "_gemeinsam/anleitung.txt" in text
+    assert "teil 2 rest" in text
+    assert "42 von 180 fragen geprueft" not in text
+    assert "aendert" in text and "den text nicht" in text
 
 
 def test_installieren_kopiert_keine_exe():
@@ -91,6 +94,7 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "bei jedem start" in low
     assert "bitte pruefen.bat" in low
     assert "vor teil 2" in low
+    assert "wie viele fragen vom rest" in low
     assert "sagt installieren das klar" in low
     assert "llp_start" in low
     assert "start_windows.ps1" in low
