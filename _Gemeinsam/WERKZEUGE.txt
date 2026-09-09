@@ -22,6 +22,9 @@ Start:  TEXT VERBESSERN.cmd im jeweiligen Ordner
 KI:     gruendliche Fassung ueber Foundry (llp_ai),
         sonst die sichere lokale Regelfassung.
         Nicht Ollama als Kanzlei-Standard.
+Zeigt das Tool noch Mistral:
+        Doppelklick auf
+        text_verbessern_foundry\Anwenden.bat
 
 
 Pseudokrat

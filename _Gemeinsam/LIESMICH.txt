@@ -29,4 +29,9 @@ llp_start
 Gemeinsames Startmenue (Start.bat). Oeffnet die Tools
 im Nachbarordner, kopiert sie nicht.
 
+text_verbessern_foundry
+-----------------------
+Einmal Anwenden.bat, wenn Text verbessern noch Mistral
+zeigt. Stellt die gruendliche Fassung auf llp_ai/Foundry.
+
 Pseudokrat bleibt lokal und nutzt llp_ai nicht.

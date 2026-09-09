@@ -51,7 +51,8 @@ exit /b 1
 
 :TEXT
 echo  Text verbessern: gruendlich nur Foundry (llp_ai).
-echo  Zeigt das Tool noch Mistral, bitte die aktuelle Fassung holen.
+echo  Zeigt das Tool noch Mistral, einmal
+echo  text_verbessern_foundry\Anwenden.bat doppelklicken.
 echo  Es gibt keinen stillen Wechsel auf Ollama.
 call :TRY "%ROOT%\rephraser" "TEXT VERBESSERN.cmd" && exit /b 0
 call :TRY "%ROOT%\paraphraser" "TEXT VERBESSERN.cmd" && exit /b 0

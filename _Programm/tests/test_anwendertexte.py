@@ -76,3 +76,17 @@ def test_werkzeuge_pseudokrat_ohne_foundry():
     assert "pseudokrat" in text
     assert "keine" in text and "foundry" in text
     assert "llp_ai" in text
+    assert "anwenden.bat" in text
+
+
+def test_text_verbessern_foundry_kit_liegt_bereit():
+    kit = ROOT / "_Gemeinsam" / "text_verbessern_foundry"
+    assert (kit / "Anwenden.bat").is_file()
+    assert (kit / "anwenden.py").is_file()
+    assert (kit / "foundry_provider.py").is_file()
+    lies = (kit / "LIESMICH.txt").read_text(encoding="utf-8").lower()
+    assert "foundry" in lies
+    assert "mistral" in lies
+    assert "ollama" in lies
+    start = (ROOT / "_Gemeinsam" / "llp_start" / "Start.bat").read_text(encoding="utf-8").lower()
+    assert "anwenden.bat" in start
