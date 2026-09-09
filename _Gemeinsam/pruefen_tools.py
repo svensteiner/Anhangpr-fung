@@ -687,7 +687,8 @@ def desktop_self_test_live_text(text: str) -> bool:
 
 
 def desktop_pipeline_live_text(text: str) -> bool:
-    return "run_pipeline(source, options)" in text
+    """Jeder run_pipeline-Aufruf in der alten Desktop-Datei ist ein Restweg."""
+    return "run_pipeline(" in text
 
 
 def desktop_pipeline_live(path: Path | None) -> bool:

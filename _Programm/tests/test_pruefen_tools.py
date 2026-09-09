@@ -799,6 +799,27 @@ def test_report_foundry_aber_desktop_pipeline_ist_nicht_ok(tmp_path: Path) -> No
     assert "Desktop-Pipeline" in module.leftovers_in_tool(tools / "rephraser")
 
 
+def test_report_foundry_aber_desktop_selbsttest_pipeline_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    desktop = tools / "rephraser" / "app" / "desktop.py"
+    desktop.write_text(
+        desktop.read_text(encoding="utf-8")
+        + "\ndef run_self_test() -> dict[str, object]:\n"
+        + '    return {"ok": False, "grund": "foundry"}  # LLP-FOUNDRY-TOR: kein Selbsttest\n'
+        + '    result = run_pipeline(source, TransformOptions(provider="rules", rewrite_strength="light"))\n',
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_desktop_pipeline"] is not None
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Desktop-Pipeline" in module.leftovers_in_tool(tools / "rephraser")
+
+
 def test_report_foundry_aber_lokale_desktop_fassung_ist_nicht_ok(tmp_path: Path) -> None:
     module = _load()
     tools = tmp_path / "AI Tools"

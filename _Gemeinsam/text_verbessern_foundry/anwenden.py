@@ -1050,9 +1050,25 @@ DESKTOP_PIPELINE_STUB = (
 )
 
 
+def _strip_desktop_pipeline_calls(desk: str) -> str:
+    """Auch tote Selbsttest-Aufrufe nach dem Foundry-Tor dürfen nicht bleiben."""
+    lines: list[str] = []
+    for line in desk.splitlines(keepends=True):
+        if "run_pipeline(" not in line:
+            lines.append(line)
+            continue
+        indent = line[: len(line) - len(line.lstrip(" \t"))]
+        ending = "\n" if line.endswith("\n") else ""
+        lines.append(
+            f'{indent}raise SystemExit("Die alte Oberflaeche startet nicht. Nur Foundry, kein Mistral.")  # LLP-FOUNDRY-TOR{ending}'
+        )
+    return "".join(lines)
+
+
 def _disable_desktop_pipeline(desk: str) -> str:
     """Kein run_pipeline mehr aus der alten Desktop-Oberfläche."""
-    return _replace_all_if_present(desk, DESKTOP_PIPELINE_OLD, DESKTOP_PIPELINE_STUB)
+    desk = _replace_all_if_present(desk, DESKTOP_PIPELINE_OLD, DESKTOP_PIPELINE_STUB)
+    return _strip_desktop_pipeline_calls(desk)
 
 
 def _disable_self_test(desk: str) -> str:
