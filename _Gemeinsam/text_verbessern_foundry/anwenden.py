@@ -621,6 +621,11 @@ def _patch_providers_init(path: Path) -> None:
     )
     text = _replace_all_if_present(text, '    "LocalMistralProvider",\n', '    "FoundryEditorialProvider",\n')
     text = _replace_all_if_present(text, '    "HybridLocalProvider",\n', '    "HybridFoundryProvider",\n')
+    if "LocalMistralProvider" in text or "HybridLocalProvider" in text:
+        raise ValueError(
+            "app/providers/__init__.py exportiert noch LocalMistralProvider "
+            "oder HybridLocalProvider."
+        )
     path.write_text(text, encoding="utf-8")
 
 

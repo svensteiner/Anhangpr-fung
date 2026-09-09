@@ -22,7 +22,8 @@ EINMALIG
   („Bitte Pruefen.bat“). Installieren.bat zeigt danach
   denselben Stand wie Pruefen.bat: kein Streamlit,
   keine Streamlit-Datei, keine alte EXE, kein Ollama-Rest,
-  keine alte API, keine Mistral-Pipeline.
+  keine alte API, keine Mistral-Pipeline,
+  kein Mistral-Export.
   Bleibt ein alter Weg, sagt Installieren das klar.
 
 TAEGLICH

@@ -110,6 +110,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "keine streamlit-datei" in text
     assert "keine alte api" in text
     assert "keine mistral-pipeline" in text
+    assert "kein mistral-export" in text
     assert "bei jedem start" in text
     assert "bitte pruefen.bat" in text
     assert "sagt installieren das klar" in text

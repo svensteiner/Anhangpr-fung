@@ -139,6 +139,25 @@ def mistral_provider_modus(path: Path | None) -> str:
     return "nicht erkannt"
 
 
+def find_providers_init(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "app/providers/__init__.py")
+        if found is not None:
+            return found
+    return None
+
+
+def providers_init_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "LocalMistralProvider" in text or "HybridLocalProvider" in text:
+        return "noch Mistral"
+    if "FoundryEditorialProvider" in text:
+        return "Foundry"
+    return "nicht erkannt"
+
+
 def find_foundry_provider(roots: list[Path]) -> Path | None:
     for root in roots:
         found = _first_existing(root, TOOL_NAMES["text"], "app/providers/foundry_provider.py")
@@ -313,6 +332,7 @@ def report(start: Path | None = None) -> dict[str, object]:
     pipeline = find_text_pipeline(roots)
     hybrid = find_text_hybrid(roots)
     pyproject = find_text_pyproject(roots)
+    providers_init = find_providers_init(roots)
     modus = text_verbessern_modus(desktop)
     start_modus = text_startskript_modus(startskript)
     cmd_modus = text_cmd_modus(cmd)
@@ -323,6 +343,7 @@ def report(start: Path | None = None) -> dict[str, object]:
     pipeline_mode = pipeline_modus(pipeline)
     hybrid_mode = hybrid_modus(hybrid)
     pyproject_mode = pyproject_modus(pyproject)
+    providers_init_mode = providers_init_modus(providers_init)
     return {
         "foundry": describe_status(),
         "anhang": find_anhang(roots),
@@ -349,6 +370,8 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_hybrid_modus": hybrid_mode,
         "text_pyproject": pyproject,
         "text_pyproject_modus": pyproject_mode,
+        "text_providers_init": providers_init,
+        "text_providers_init_modus": providers_init_mode,
         "pseudokrat": find_pseudokrat(roots),
     }
 
@@ -382,6 +405,7 @@ def format_report(data: dict[str, object]) -> str:
         "  Text-Pipeline:   " + str(data["text_pipeline_modus"]),
         "  Hybrid-Weg:      " + str(data["text_hybrid_modus"]),
         "  Paketdatei:      " + str(data["text_pyproject_modus"]),
+        "  Provider-Export: " + str(data["text_providers_init_modus"]),
         "  Original-Start:  "
         + ("noch da – Anwenden.bat" if data["text_original_cmd"] else "beiseite"),
         "  Alte EXE:        "
@@ -453,6 +477,11 @@ def format_report(data: dict[str, object]) -> str:
             "  TEXT VERBESSERN.original.cmd startet noch den alten Weg."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_providers_init_modus"] in {"noch Mistral", "nicht erkannt"}:
+        lines.append(
+            "  app/providers/__init__.py exportiert noch Mistral."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     lines.append("  Keine Schluessel in dieser Anzeige.")
     lines.append("  Anleitung: ANLEITUNG.txt in diesem Ordner.")
     return "\n".join(lines)
@@ -494,6 +523,9 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
     pyproject = tool_root / "pyproject.toml"
     if pyproject.is_file() and pyproject_modus(pyproject) != "abgeschaltet":
         reasons.append("Paketdatei")
+    providers_init = tool_root / "app" / "providers" / "__init__.py"
+    if providers_init.is_file() and providers_init_modus(providers_init) != "Foundry":
+        reasons.append("Provider-Export")
     provider = tool_root / "app" / "providers" / "foundry_provider.py"
     if desktop.is_file() and not provider.is_file():
         reasons.append("Foundry-Datei")
@@ -528,6 +560,7 @@ def text_has_leftovers(
         or data["text_pipeline_modus"] in {"noch Mistral", "nicht erkannt"}
         or data["text_hybrid_modus"] in {"noch Mistral", "nicht erkannt"}
         or data["text_pyproject_modus"] in {"noch API", "noch Streamlit", "nicht erkannt"}
+        or data["text_providers_init_modus"] in {"noch Mistral", "nicht erkannt"}
         or (data["text_desktop"] is not None and data["text_provider"] is None)
     )
 
@@ -546,6 +579,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     pipeline_ok = data["text_pipeline_modus"] in {"Foundry", "nicht gefunden"}
     hybrid_ok = data["text_hybrid_modus"] in {"Foundry", "nicht gefunden"}
     pyproject_ok = data["text_pyproject_modus"] in {"abgeschaltet", "nicht gefunden"}
+    init_ok = data["text_providers_init_modus"] in {"Foundry", "nicht gefunden"}
     return (
         data["text_modus"] == "Foundry"
         and start_ok
@@ -560,6 +594,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and pipeline_ok
         and hybrid_ok
         and pyproject_ok
+        and init_ok
     )
 
 

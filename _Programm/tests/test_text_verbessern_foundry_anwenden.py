@@ -554,6 +554,20 @@ def test_anwenden_ohne_tool_gibt_hinweis(tmp_path: Path) -> None:
     assert module.find_tool_root(leer) is None
 
 
+def test_anwenden_scheitert_wenn_mistral_export_bleibt(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    init = tool / "app" / "providers" / "__init__.py"
+    init.write_text(
+        "from app.providers.mistral_provider import LocalMistralProvider as LocalMistralProvider\n"
+        "NAMES = ('LocalMistralProvider',)\n",
+        encoding="utf-8",
+    )
+    ok, msg = module.apply_foundry(tool)
+    assert ok is False
+    assert "LocalMistralProvider" in msg or "exportiert" in msg
+
+
 def test_anwenden_legt_original_cmd_beiseite(tmp_path: Path) -> None:
     module = _load_anwenden()
     tool = _fake_rephraser(tmp_path)

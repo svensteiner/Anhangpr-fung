@@ -117,6 +117,7 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert "Hybrid-Weg:" in blob
     assert "Paketdatei:" in blob
     assert "Original-Start:" in blob
+    assert "Provider-Export:" in blob
     assert module.text_foundry_ok(gemeinsam) is True
 
 
@@ -450,6 +451,27 @@ def test_report_foundry_desktop_aber_pyproject_ist_nicht_ok(tmp_path: Path) -> N
     assert "pyproject.toml" in blob
     assert module.text_foundry_ok(gemeinsam) is False
     assert module.text_has_leftovers(data) is True
+
+
+def test_report_foundry_aber_mistral_export_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    init = tools / "rephraser" / "app" / "providers" / "__init__.py"
+    init.write_text(
+        "from .mistral_provider import LocalMistralProvider\n"
+        '__all__ = ["LocalMistralProvider"]\n',
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_providers_init_modus"] == "noch Mistral"
+    blob = module.format_report(data)
+    assert "__init__.py" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Provider-Export" in module.leftovers_in_tool(tools / "rephraser")
 
 
 def test_report_foundry_aber_original_cmd_ist_nicht_ok(tmp_path: Path) -> None:
