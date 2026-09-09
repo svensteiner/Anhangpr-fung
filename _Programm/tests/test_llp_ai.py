@@ -106,6 +106,44 @@ def test_chat_sends_store_false_and_no_other_provider(monkeypatch):
     assert captured["url"].endswith("/openai/v1/chat/completions")
 
 
+def test_describe_status_has_no_secrets_when_off(monkeypatch):
+    _reset(monkeypatch, COMPANY_AI_ENABLED="false", COMPANY_AI_PROVIDER="foundry")
+    status = layer.describe_status()
+    blob = json.dumps(status)
+    assert "api_key" not in blob
+    assert "FOUNDRY" not in blob
+    assert status["bereit"] is False
+    assert "ohne Modell" in status["hinweis"]
+
+
+def test_describe_status_names_missing_parts(monkeypatch):
+    _reset(
+        monkeypatch,
+        COMPANY_AI_ENABLED="true",
+        COMPANY_AI_PROVIDER="foundry",
+        FOUNDRY_ENDPOINT="https://example.openai.azure.com",
+    )
+    status = layer.describe_status()
+    assert status["endpoint_gesetzt"] is True
+    assert status["schluessel_gesetzt"] is False
+    assert "Schlüssel" in status["hinweis"]
+    assert "https://" not in json.dumps(status)
+
+
+def test_healthz_foundry_status_has_no_secrets():
+    root = Path(__file__).resolve().parents[2]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    import app as webapp
+
+    data = webapp.app.test_client().get("/healthz").get_json()
+    assert data["foundry_bereit"] is False
+    assert "ohne Modell" in data["foundry"]["hinweis"] or "nicht erreichbar" in data["foundry"]["hinweis"]
+    blob = json.dumps(data)
+    assert "api_key" not in blob
+    assert "FOUNDRY_API_KEY" not in blob
+
+
 def test_wrapper_stays_isolated_in_default_tests():
     from anhangspruefer.services import company_ai
 

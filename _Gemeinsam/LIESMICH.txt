@@ -17,6 +17,7 @@ auf Ollama, OpenAI oder Anthropic.
 2. COMPANY_AI_ENABLED=true setzen.
 3. Endpoint, Deployment und Schlüssel eintragen.
 4. Tools starten wie gewohnt (Starten.bat).
+5. Status ohne Schlüssel: llp_ai\Pruefen.bat doppelklicken.
 
 Ist Foundry aus oder nicht erreichbar, arbeiten die Tools
 ohne Modell weiter (Heuristik / Regeln).

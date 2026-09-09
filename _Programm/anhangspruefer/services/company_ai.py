@@ -47,6 +47,7 @@ def _load():
             active_provider,
             ask_ai,
             ask_json,
+            describe_status,
             get_config,
             is_ai_enabled,
             is_ai_ready,
@@ -56,6 +57,7 @@ def _load():
     return {
         "ask_ai": ask_ai,
         "ask_json": ask_json,
+        "describe_status": describe_status,
         "get_config": get_config,
         "is_ai_enabled": is_ai_enabled,
         "is_ai_ready": is_ai_ready,
@@ -69,6 +71,42 @@ _LAYER = _load()
 def _reload() -> None:
     global _LAYER
     _LAYER = _load()
+
+
+def describe_status() -> dict:
+    if _LAYER is None:
+        return {
+            "enabled": False,
+            "provider_ok": False,
+            "endpoint_gesetzt": False,
+            "deployment_gesetzt": False,
+            "schluessel_gesetzt": False,
+            "bereit": False,
+            "hinweis": "Der zentrale Foundry-Layer ist nicht erreichbar. Prüfung ohne Modell.",
+        }
+    try:
+        data = _LAYER["describe_status"]()
+    except Exception:
+        return {
+            "enabled": False,
+            "provider_ok": False,
+            "endpoint_gesetzt": False,
+            "deployment_gesetzt": False,
+            "schluessel_gesetzt": False,
+            "bereit": False,
+            "hinweis": "Foundry-Status konnte nicht gelesen werden. Prüfung ohne Modell.",
+        }
+    if not isinstance(data, dict):
+        return {
+            "enabled": False,
+            "provider_ok": False,
+            "endpoint_gesetzt": False,
+            "deployment_gesetzt": False,
+            "schluessel_gesetzt": False,
+            "bereit": False,
+            "hinweis": "Foundry-Status war ungültig. Prüfung ohne Modell.",
+        }
+    return data
 
 
 def is_ai_ready() -> bool:
@@ -127,6 +165,7 @@ __all__ = [
     "active_provider",
     "ask_ai",
     "ask_json",
+    "describe_status",
     "get_config",
     "is_ai_enabled",
     "is_ai_ready",

@@ -84,7 +84,7 @@ from anhangspruefer.compliance.knowledge.relevance import (
 )
 from anhangspruefer.compliance.reporting.checklist_excel import generate_checklist_xlsx
 from anhangspruefer.compliance.ugb_pipeline import review_checklist
-from anhangspruefer.services.company_ai import is_ai_ready
+from anhangspruefer.services.company_ai import describe_status, is_ai_ready
 from anhangspruefer.utils.logging_config import get_logger
 
 logger = get_logger("app")
@@ -1090,9 +1090,10 @@ async function quitApp() {
   } catch (e) {}
   loadStatus().then(checkFolderFiles);
   fetch('/healthz').then(r => r.json()).then(d => {
+    const st = d.foundry || {};
     const txt = d.foundry_bereit
       ? 'KI: Microsoft Foundry (zentral)'
-      : 'KI: aus – Prüfung läuft mit Heuristik';
+      : (st.hinweis || 'KI: aus – Prüfung läuft mit Heuristik');
     const badge = document.getElementById('ki-badge');
     const hint = document.getElementById('ug-ki-hint');
     if (badge) badge.textContent = txt;
@@ -1121,6 +1122,7 @@ def healthz():
         "pipelines": available_pipelines(),
         "plugin_fehler": plugin_errors(),
         "foundry_bereit": is_ai_ready(),
+        "foundry": describe_status(),
     })
 
 

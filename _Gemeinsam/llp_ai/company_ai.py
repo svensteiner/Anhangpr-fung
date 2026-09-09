@@ -91,6 +91,40 @@ def is_ai_ready() -> bool:
     return bool(cfg.endpoint and cfg.deployment and cfg.api_key)
 
 
+def describe_status() -> dict[str, Any]:
+    """Status ohne Schlüssel, Endpunkt oder Prompt-Inhalt."""
+    cfg = get_config()
+    provider_ok = cfg.provider == _ALLOWED_PROVIDER
+    endpoint_ok = bool(cfg.endpoint)
+    deployment_ok = bool(cfg.deployment)
+    key_ok = bool(cfg.api_key)
+    bereit = is_ai_ready()
+    if not cfg.enabled:
+        hinweis = "Foundry ist aus. Die Tools arbeiten ohne Modell (Heuristik/Regeln)."
+    elif not provider_ok:
+        hinweis = "Anbieter ist nicht Foundry. Es findet kein stiller Wechsel statt."
+    elif not (endpoint_ok and deployment_ok and key_ok):
+        fehlend = [
+            name for name, ok in (
+                ("Endpoint", endpoint_ok),
+                ("Deployment", deployment_ok),
+                ("Schlüssel", key_ok),
+            ) if not ok
+        ]
+        hinweis = "Foundry ist unvollständig eingerichtet (" + ", ".join(fehlend) + ")."
+    else:
+        hinweis = "Foundry ist eingerichtet. Die Tools können den zentralen Layer nutzen."
+    return {
+        "enabled": cfg.enabled,
+        "provider_ok": provider_ok,
+        "endpoint_gesetzt": endpoint_ok,
+        "deployment_gesetzt": deployment_ok,
+        "schluessel_gesetzt": key_ok,
+        "bereit": bereit,
+        "hinweis": hinweis,
+    }
+
+
 def active_provider() -> ProviderInfo:
     if is_ai_ready():
         return ProviderInfo("foundry", "Microsoft Foundry")
