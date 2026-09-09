@@ -510,7 +510,7 @@ def desktop_window_live(path: Path | None) -> bool:
 
 
 def desktop_self_test_live_text(text: str) -> bool:
-    return "--self-test" in text and "run_self_test()" in text
+    return "--self-test" in text and "report = run_self_test()" in text
 
 
 def desktop_self_test_live(path: Path | None) -> bool:

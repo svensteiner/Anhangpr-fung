@@ -418,7 +418,7 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert '"mistral" in provider' not in desktop
     assert '"foundry" in provider' in desktop
     assert "rules+mistral-local" not in desktop
-    assert "run_self_test()" not in desktop
+    assert "report = run_self_test()" not in desktop
     assert "Kein Selbsttest mit Regeln oder Modellwahl" in desktop
     assert "LLP-FOUNDRY-TOR: kein Selbsttest" in desktop
 
@@ -638,12 +638,12 @@ def test_anwenden_stellt_desktop_selbsttest_ab(tmp_path: Path) -> None:
     tool = _fake_rephraser(tmp_path)
     desktop = tool / "app" / "desktop.py"
     raw = desktop.read_text(encoding="utf-8")
-    assert "run_self_test()" in raw
+    assert "report = run_self_test()" in raw
     assert "Selbsttest" in module.leftovers_in_tool(tool)
     ok, msg = module.apply_foundry(tool)
     assert ok, msg
     text = desktop.read_text(encoding="utf-8")
-    assert "run_self_test()" not in text
+    assert "report = run_self_test()" not in text
     assert "Kein Selbsttest mit Regeln oder Modellwahl" in text
     assert "return 2  # LLP-FOUNDRY-TOR" in text
     text = text.replace(module.SELF_TEST_STUB, module.SELF_TEST_OLD, 1)
