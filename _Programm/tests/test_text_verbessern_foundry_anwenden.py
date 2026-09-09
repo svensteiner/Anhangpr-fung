@@ -352,7 +352,8 @@ def _fake_rephraser(tmp_path: Path) -> Path:
     (tool / "app" / "providers" / "mistral_provider.py").write_text(
         "class LocalMistralProvider:\n"
         "    def __init__(self, base_url: str | None = None, model: str | None = None) -> None:\n"
-        "        self.base_url = 'http://127.0.0.1:11434'\n"
+        "        self.base_url = os.getenv('MISTRAL_BASE_URL', 'http://127.0.0.1:11434')\n"
+        "        self.model = os.getenv('MISTRAL_MODEL', 'mistral')\n"
         "    def rewrite(self, text: str, constraints: SemanticConstraints, "
         "options: TransformOptions) -> str:\n"
         "        request = self.base_url + '/api/generate'\n"
@@ -454,6 +455,7 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "Nur Foundry" in mistral
     assert "/api/generate" not in mistral
     assert "11434" not in mistral
+    assert "MISTRAL_BASE_URL" not in mistral
     assert "MISTRAL_MODEL" not in mistral
     lines = [ln.rstrip() for ln in mistral.splitlines()]
     init_idx = next(i for i, ln in enumerate(lines) if "def __init__" in ln)
@@ -765,6 +767,32 @@ def test_anwenden_entfernt_ollama_generate(tmp_path: Path) -> None:
     assert ok, msg
     assert "/api/generate" not in path.read_text(encoding="utf-8")
     assert "11434" not in path.read_text(encoding="utf-8")
+    assert "MISTRAL_BASE_URL" not in path.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_entfernt_mistral_base_url(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    assert "MISTRAL_BASE_URL" in (tool / "app" / "providers" / "mistral_provider.py").read_text(
+        encoding="utf-8"
+    )
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    path = tool / "app" / "providers" / "mistral_provider.py"
+    text = path.read_text(encoding="utf-8")
+    assert "MISTRAL_BASE_URL" not in text
+    assert "FOUNDRY_OFF_BASE_URL" in text
+    assert module.leftovers_in_tool(tool) == []
+    path.write_text(
+        text + "\n        self.base_url = os.getenv('MISTRAL_BASE_URL', 'http://127.0.0.1:0')\n",
+        encoding="utf-8",
+    )
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    assert "MISTRAL_BASE_URL" not in path.read_text(encoding="utf-8")
     assert module.leftovers_in_tool(tool) == []
 
 

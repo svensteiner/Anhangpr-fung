@@ -718,6 +718,7 @@ def _patch_mistral_provider(path: Path) -> None:
     if "/api/generate" in text:
         text = text.replace("/api/generate", "/api/abgeschaltet")
     text = text.replace("http://127.0.0.1:11434", "http://127.0.0.1:0")
+    text = text.replace("MISTRAL_BASE_URL", "FOUNDRY_OFF_BASE_URL")
     text = text.replace("MISTRAL_MODEL", "FOUNDRY_OFF_MODEL")
     path.write_text(text, encoding="utf-8")
 
