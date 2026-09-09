@@ -200,6 +200,17 @@ def require_company_profile(
 #: Größenklasse-Bezeichnungen der KPMG-Spalte -> normierter Schlüssel.
 _SIZE_LABEL = {"groß": "gross", "gross": "gross", "mittel": "mittel", "klein": "klein"}
 _SIZE_ENTRY_RE = re.compile(r"\b(gmbh|ag)\b\s+(groß|gross|mittel|klein)", re.IGNORECASE)
+_APPLICABLE_SIZE = {
+    "klein": "klein",
+    "kleine": "klein",
+    "mittel": "mittel",
+    "mittelgroß": "mittel",
+    "mittelgross": "mittel",
+    "groß": "gross",
+    "gross": "gross",
+    "große": "gross",
+    "grosse": "gross",
+}
 
 #: Anzeigetexte für Meldungen (nicht für den internen Vergleich).
 _SIZE_DISPLAY = {"gross": "groß", "mittel": "mittel", "klein": "klein"}
@@ -265,25 +276,38 @@ def _parse_size_classes(entries: list[str]) -> set[tuple[str, str]]:
     return out
 
 
+def _applicable_to_allows(item: ChecklistItem, size_class: str | None) -> bool:
+    """Standardliste: 'anwendbar auf' ohne KPMG-Größenklasse-Spalte."""
+    raw = [(a or "").strip().lower() for a in (item.applicable_to or [])]
+    raw = [a for a in raw if a]
+    if not raw or any(a in {"alle", "all", "*"} for a in raw):
+        return True
+    allowed = {_APPLICABLE_SIZE[a] for a in raw if a in _APPLICABLE_SIZE}
+    if not allowed:
+        return True
+    size = (size_class or "").strip().lower() or None
+    if size is None:
+        return False
+    return size in allowed
+
+
 def _size_class_applicable(
     item: ChecklistItem, legal_form: str | None, size_class: str | None
 ) -> bool:
     """True = Punkt ist anwendbar (nicht filtern).
 
     Ohne Rechtsform und Größenklasse gilt ein größengebundener Punkt nicht
-    als anwendbar (kein stilles „unbekannt“ = alles prüfen). Punkte ohne
-    auswertbare Größenklasse-Spalte bleiben anwendbar.
+    als anwendbar (kein stilles „unbekannt“ = alles prüfen).
     """
-    if not item.size_classes:
-        return True
     form = (legal_form or "").strip().lower() or None
     size = (size_class or "").strip().lower() or None
-    if form is None or size is None:
-        return False
-    parsed = _parse_size_classes(item.size_classes)
-    if not parsed:
-        return True
-    return (form, size) in parsed
+    if item.size_classes:
+        if form is None or size is None:
+            return False
+        parsed = _parse_size_classes(item.size_classes)
+        if parsed:
+            return (form, size) in parsed
+    return _applicable_to_allows(item, size)
 
 
 def _item_applicable_ex(

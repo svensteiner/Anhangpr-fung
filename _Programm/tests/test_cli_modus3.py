@@ -50,6 +50,24 @@ def test_run_gui_is_disabled():
     assert "unbekannt" in out
 
 
+def test_gui_module_is_disabled():
+    text = (PROG / "anhangspruefer" / "gui.py").read_text(encoding="utf-8")
+    assert "ReviewEngine" not in text
+    assert "tkinter" not in text
+    assert "Starten.bat" in text
+    proc = subprocess.run(
+        [sys.executable, str(PROG / "anhangspruefer" / "gui.py")],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=str(PROG),
+    )
+    assert proc.returncode == 2
+    out = (proc.stdout + proc.stderr).lower()
+    assert "starten.bat" in out
+    assert "unbekannt" in out
+
+
 def test_cli_review_requires_company_profile():
     proc = subprocess.run(
         [sys.executable, "-m", "anhangspruefer", "review", "anhang.pdf"],

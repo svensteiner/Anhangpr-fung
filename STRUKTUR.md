@@ -45,7 +45,7 @@ Diese Datei dokumentiert, was wohin gehört. Bitte halten, nicht zumüllen.
 | `vorjahresvergleich/` | Vergleich Anhang Vorjahr ↔ Berichtsjahr (Modus 1). |
 | `pruefung/` | Detailzahlenvergleich (Belegprüfung): Extractor, Comparator, Excel-Report (Modus 2). |
 | `pipelines/` | **Dokumenten-Pipelines je Mandant** – ein gemeinsames „Hirn" (Vergleichslogik), austauschbare Extraktion. `base.py` = Standard und Hook-Fläche, `loader.py` = lädt Mandanten-Plugins aus `Klienten/<Mandant>/pipeline.py`, `__init__.py` = Registry `get_pipeline(mandant)`. Auswahl EXPLIZIT über das „Mandant"-Feld. **Mandantenprofile liegen nicht hier**, sondern als Plugin neben dem Programm — sie sind vertraulich. |
-| `gui.py` | Tkinter-GUI (alternativer Anwender-Einstieg). |
+| `gui.py` | Alte Desktop-GUI, abgeschaltet. Start: `Starten.bat`. |
 | `cli.py` | CLI-Einstiegspunkt. |
 | `config.py` | Konfiguration / Konstanten. |
 

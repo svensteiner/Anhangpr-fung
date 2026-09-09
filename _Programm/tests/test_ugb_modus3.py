@@ -121,6 +121,14 @@ def test_size_class_excludes_ag_only_items_for_gmbh():
     assert _size_class_applicable(unrestricted, "gmbh", "gross") is True
     assert _size_class_applicable(ag_only, None, "gross") is False     # kein stilles unbekannt
     assert _size_class_applicable(ag_only, "gmbh", None) is False      # kein stilles unbekannt
+    nur_mittel_gross = ChecklistItem(
+        item_id="chk_010", category="Anlagevermögen",
+        description="Anlagenspiegel",
+        applicable_to=["mittelgroß", "groß"],
+    )
+    assert _size_class_applicable(nur_mittel_gross, "gmbh", "klein") is False
+    assert _size_class_applicable(nur_mittel_gross, "gmbh", "mittel") is True
+    assert _size_class_applicable(nur_mittel_gross, "ag", "gross") is True
 
 
 def test_apply_company_scope_ohne_profil_wirft():
@@ -465,6 +473,8 @@ def test_mode3_ui_uses_excel_labels_and_confirm():
     assert "Offen – Angabe gefunden" in html
     assert "Offen – kein Hinweis" in html
     assert "ug-bestaetigt" in html
+    assert "ug-eingrenzung" in html
+    assert "/ugb_eingrenzung" in html
     assert "bestaetigt" in html
     assert "ug-pp-warn" in html
     assert "fd.append('bestaetigt'" in html or 'fd.append("bestaetigt"' in html or "fd.append('bestaetigt', 'ja')" in html
@@ -501,6 +511,21 @@ def test_ugb_web_e2e_docx_gmbh_klein(tmp_path):
     assert vorschlag["rechtsform"] == "gmbh"
     assert vorschlag["groessenklasse"] == "klein"
     assert "unbekannt" not in (vorschlag.get("hinweis") or "").lower()
+
+    scope = client.post(
+        "/ugb_eingrenzung",
+        data={"rechtsform": "gmbh", "groessenklasse": "klein"},
+    )
+    assert scope.status_code == 200, scope.get_json()
+    eingrenzung = scope.get_json()
+    assert "unbekannt" not in (eingrenzung.get("hinweis") or "").lower()
+    assert "teil 1" in eingrenzung["hinweis"].lower()
+    assert "n. a. (rechtsgrund)" in eingrenzung["hinweis"].lower()
+    assert eingrenzung["zu_pruefen"] < eingrenzung["gesamt"]
+    assert eingrenzung["rechtsgrund"] >= 1
+
+    missing_scope = client.post("/ugb_eingrenzung", data={"rechtsform": "", "groessenklasse": ""})
+    assert missing_scope.status_code == 400
 
     with p.open("rb") as fh:
         review = client.post(

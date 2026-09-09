@@ -79,11 +79,12 @@ from anhangspruefer.compliance.knowledge.checklist_loader import ChecklistLoader
 from anhangspruefer.compliance.knowledge.relevance import (
     LEGAL_FORMS,
     SIZE_CLASSES,
+    apply_company_scope,
     detect_company_profile,
     profile_hint,
 )
 from anhangspruefer.compliance.reporting.checklist_excel import generate_checklist_xlsx
-from anhangspruefer.compliance.ugb_pipeline import review_checklist
+from anhangspruefer.compliance.ugb_pipeline import blank_review_result, review_checklist
 from anhangspruefer.services.company_ai import describe_status, is_ai_ready
 from anhangspruefer.utils.logging_config import get_logger
 
@@ -614,6 +615,7 @@ HTML = r"""<!DOCTYPE html>
         </select>
       </div>
       <div class="result-note" id="ug-profil-hint">Bitte GmbH oder AG und klein / mittel / groß wählen. Ohne Auswahl startet die Prüfung nicht.</div>
+      <div class="result-note" id="ug-eingrenzung">Teil 1 erscheint hier, sobald Rechtsform und Größe gewählt sind.</div>
       <label class="result-note" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
         <input type="checkbox" id="ug-bestaetigt" onchange="ugRefreshStart()">
         Rechtsform und Größe habe ich geprüft.
@@ -956,6 +958,31 @@ function ugRefreshStart() {
   const size = document.getElementById('ug-groessenklasse').value;
   const ok = document.getElementById('ug-bestaetigt').checked;
   document.getElementById('ug-btn').disabled = !(ugFile && form && size && ok);
+  ugShowEingrenzung();
+}
+async function ugShowEingrenzung() {
+  const form = document.getElementById('ug-rechtsform').value;
+  const size = document.getElementById('ug-groessenklasse').value;
+  const box = document.getElementById('ug-eingrenzung');
+  if (!box) return;
+  if (!form || !size) {
+    box.textContent = 'Teil 1 erscheint hier, sobald Rechtsform und Größe gewählt sind.';
+    return;
+  }
+  const fd = new FormData();
+  fd.append('rechtsform', form);
+  fd.append('groessenklasse', size);
+  try {
+    const resp = await fetch('/ugb_eingrenzung', { method:'POST', body:fd });
+    const data = await resp.json();
+    if (!resp.ok) {
+      box.textContent = data.error || 'Teil 1 konnte nicht berechnet werden.';
+      return;
+    }
+    box.textContent = data.hinweis || '';
+  } catch (e) {
+    box.textContent = 'Teil 1 konnte nicht gelesen werden. Bitte Auswahl prüfen.';
+  }
 }
 async function ugSelect() {
   const f = document.getElementById('ug-file').files[0];
@@ -1501,6 +1528,20 @@ def _profil_bestaetigt() -> bool:
     return raw in {"1", "true", "yes", "on", "ja"}
 
 
+def _ugb_checklist():
+    loader = ChecklistLoader()
+    pp = _find_pruefprogramm()
+    if pp is not None:
+        return loader.load_from_xlsx(pp), False
+    return loader.load_default_checklist(), True
+
+
+def _profil_anzeige(legal_form: str, size_class: str) -> tuple[str, str]:
+    form_txt = "GmbH" if legal_form == "gmbh" else "AG"
+    size_txt = {"klein": "klein", "mittel": "mittel", "gross": "groß"}[size_class]
+    return form_txt, size_txt
+
+
 # ---------- Modus 3: UGB-Inhaltsprüfung ----------
 @app.route("/ugb_profil", methods=["POST"])
 def ugb_profil_route():
@@ -1524,6 +1565,42 @@ def ugb_profil_route():
             "groessenklasse": profil["groessenklasse"],
             "hinweis": profile_hint(profil),
         })
+
+
+@app.route("/ugb_eingrenzung", methods=["POST"])
+def ugb_eingrenzung_route():
+    """Teil 1 sichtbar: wie viele Fragen nach Gesellschaft übrig bleiben."""
+    profil = _pflicht_profil()
+    if profil is None:
+        return jsonify({
+            "error": "Bitte Rechtsform (GmbH oder AG) und Größenklasse (klein, mittel oder groß) wählen.",
+        }), 400
+    legal_form, size_class = profil
+    try:
+        checklist, default_used = _ugb_checklist()
+    except Exception:
+        logger.exception("Prüfprogramm konnte nicht gelesen werden")
+        return jsonify({
+            "error": "Das Prüfprogramm konnte nicht gelesen werden.",
+        }), 500
+    result = blank_review_result(checklist, "eingrenzung")
+    teil1 = apply_company_scope(result, checklist, legal_form, size_class)
+    form_txt, size_txt = _profil_anzeige(legal_form, size_class)
+    hinweis = (
+        f"Teil 1: Für {form_txt} {size_txt} gelten "
+        f"{teil1['zu_pruefen']} von {teil1['gesamt']} Fragen. "
+        f"Der Rest ist n. a. (Rechtsgrund). Danach wird nur der Rest geprüft."
+    )
+    if default_used:
+        hinweis += " (kurze Standardliste, nicht das Excel-Prüfprogramm)"
+    return jsonify({
+        "zu_pruefen": teil1["zu_pruefen"],
+        "gesamt": teil1["gesamt"],
+        "rechtsgrund": teil1["umgestellt"],
+        "rechtsform": legal_form,
+        "groessenklasse": size_class,
+        "hinweis": hinweis,
+    })
 
 
 @app.route("/ugb_review", methods=["POST"])
@@ -1559,15 +1636,9 @@ def ugb_review_route():
         except LeereUnterlage as e:
             return jsonify({"error": str(e)}), 400
 
-        loader = ChecklistLoader()
         default_used = False
         try:
-            pp = _find_pruefprogramm()
-            if pp is not None:
-                checklist = loader.load_from_xlsx(pp)
-            else:
-                checklist = loader.load_default_checklist()
-                default_used = True
+            checklist, default_used = _ugb_checklist()
         except Exception:
             logger.exception("Prüfprogramm konnte nicht gelesen werden")
             return jsonify({
@@ -1617,8 +1688,7 @@ def ugb_review_route():
             and (getattr(f, "technical_reasoning", "") or "").startswith(praefix)
         )
 
-    form_txt = "GmbH" if legal_form == "gmbh" else "AG"
-    size_txt = {"klein": "klein", "mittel": "mittel", "gross": "groß"}[size_class]
+    form_txt, size_txt = _profil_anzeige(legal_form, size_class)
     ki_info = info.get("ki")
     summary = {
         "zu_bestaetigen": _offen_mit("Angabe gefunden"),

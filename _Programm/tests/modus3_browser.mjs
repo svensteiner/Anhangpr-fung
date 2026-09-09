@@ -69,6 +69,17 @@ try {
   if (form !== "gmbh" || size !== "klein") {
     throw new Error(`Vorschlag falsch: ${form}/${size}`);
   }
+  await page.waitForFunction(
+    () => /Teil 1:.*gelten/i.test(document.getElementById("ug-eingrenzung")?.textContent || ""),
+    {timeout: 15000},
+  );
+  const scope = await page.$eval("#ug-eingrenzung", (el) => el.textContent);
+  if (/unbekannt/i.test(scope)) {
+    throw new Error(`Teil 1 enthält unbekannt: ${scope}`);
+  }
+  if (!/gmbh/i.test(scope) || !/klein/i.test(scope)) {
+    throw new Error(`Teil 1 ohne Gesellschaft: ${scope}`);
+  }
   let stillDisabled = await page.$eval("#ug-btn", (el) => el.disabled);
   if (!stillDisabled) {
     throw new Error("Start war ohne Bestätigung aktiv");

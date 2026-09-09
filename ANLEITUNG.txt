@@ -74,6 +74,9 @@ MODUS 3 - UGB-INHALTSPRUEFUNG (zwei Schritte)
     Fachliche Unterlagen\UGB-Inhaltspruefung
   Fehlt die Datei, warnt das Tool vor dem Start.
 
+  Nach der Auswahl zeigt das Tool Teil 1:
+  wie viele Fragen fuer diese Gesellschaft gelten.
+
   Schritt 2: "Inhaltspruefung starten".
              Zuerst fallen Fragen weg, die fuer diese
              Gesellschaft nicht gelten (n. a. Rechtsgrund).
