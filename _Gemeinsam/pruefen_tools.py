@@ -71,13 +71,25 @@ def text_cmd_modus(path: Path | None) -> str:
     return "noch alt"
 
 
+EXE_REL_DIRS = (
+    Path("."),
+    Path("dist"),
+    Path("dist") / "TextVerbessern",
+    Path("packaging") / "output",
+    Path("release"),
+)
+
+
 def find_live_text_exe(roots: list[Path]) -> Path | None:
     for root in roots:
         for name in TOOL_NAMES["text"]:
-            for exe_name in ("TextVerbessern.exe", "TEXT VERBESSERN.exe", "rephraser.exe"):
-                candidate = root / name / exe_name
-                if candidate.is_file():
-                    return candidate
+            base = root / name
+            for rel in EXE_REL_DIRS:
+                folder = base / rel
+                for exe_name in ("TextVerbessern.exe", "TEXT VERBESSERN.exe", "rephraser.exe"):
+                    candidate = folder / exe_name
+                    if candidate.is_file():
+                        return candidate
     return None
 
 
@@ -125,6 +137,29 @@ def find_foundry_provider(roots: list[Path]) -> Path | None:
         if found is not None:
             return found
     return None
+
+
+def find_streamlit_app(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "app/ui/streamlit_app.py")
+        if found is not None:
+            return found
+    return None
+
+
+def streamlit_app_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if (
+        "LLP-FOUNDRY-TOR" in text
+        and "Streamlit-Oberflaeche startet nicht" in text
+        and "import streamlit" not in text
+    ):
+        return "abgeschaltet"
+    if "import streamlit" in text:
+        return "noch Streamlit"
+    return "nicht erkannt"
 
 
 def find_text_startskript(roots: list[Path]) -> Path | None:
@@ -176,11 +211,13 @@ def report(start: Path | None = None) -> dict[str, object]:
     provider = find_foundry_provider(roots)
     runtime = find_local_runtime(roots)
     mistral_provider = find_mistral_provider(roots)
+    streamlit_app = find_streamlit_app(roots)
     modus = text_verbessern_modus(desktop)
     start_modus = text_startskript_modus(startskript)
     cmd_modus = text_cmd_modus(cmd)
     runtime_modus = local_runtime_modus(runtime)
     mistral_modus = mistral_provider_modus(mistral_provider)
+    streamlit_modus = streamlit_app_modus(streamlit_app)
     return {
         "foundry": describe_status(),
         "anhang": find_anhang(roots),
@@ -196,6 +233,8 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_runtime_modus": runtime_modus,
         "text_mistral_provider": mistral_provider,
         "text_mistral_modus": mistral_modus,
+        "text_streamlit": streamlit_app,
+        "text_streamlit_modus": streamlit_modus,
         "pseudokrat": find_pseudokrat(roots),
     }
 
@@ -224,6 +263,7 @@ def format_report(data: dict[str, object]) -> str:
         + ("vorhanden" if data["text_provider"] else "fehlt"),
         "  Ollama-Rest:     " + str(data["text_runtime_modus"]),
         "  Mistral-Client:  " + str(data["text_mistral_modus"]),
+        "  Streamlit-Datei: " + str(data["text_streamlit_modus"]),
         "  Alte EXE:        "
         + ("noch da – Anwenden.bat" if data["text_exe"] else "beiseite"),
         "  Pseudokrat:      "
@@ -263,6 +303,11 @@ def format_report(data: dict[str, object]) -> str:
             "  mistral_provider.py kann noch Ollama aufrufen."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_streamlit_modus"] == "noch Streamlit":
+        lines.append(
+            "  streamlit_app.py ist noch die alte Oberflaeche."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     lines.append("  Keine Schluessel in dieser Anzeige.")
     lines.append("  Anleitung: ANLEITUNG.txt in diesem Ordner.")
     return "\n".join(lines)
@@ -276,6 +321,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     provider_ok = data["text_provider"] is not None or data["text_desktop"] is None
     runtime_ok = data["text_runtime_modus"] in {"kein Ollama", "nicht gefunden"}
     mistral_ok = data["text_mistral_modus"] in {"abgeschaltet", "nicht gefunden"}
+    streamlit_ok = data["text_streamlit_modus"] in {"abgeschaltet", "nicht gefunden"}
     return (
         data["text_modus"] == "Foundry"
         and start_ok
@@ -284,6 +330,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and provider_ok
         and runtime_ok
         and mistral_ok
+        and streamlit_ok
     )
 
 
@@ -305,6 +352,7 @@ def main(argv: list[str] | None = None) -> int:
         or data["text_exe"] is not None
         or data["text_runtime_modus"] == "noch Ollama"
         or data["text_mistral_modus"] == "noch Ollama"
+        or data["text_streamlit_modus"] == "noch Streamlit"
         or (data["text_desktop"] is not None and data["text_provider"] is None)
     )
     if leftover:

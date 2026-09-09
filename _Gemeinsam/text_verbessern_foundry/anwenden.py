@@ -97,10 +97,14 @@ def apply(tool_root: Path) -> list[str]:
         _patch_desktop(desktop)
         done.append(str(desktop))
 
-    streamlit = tool_root / "app" / "ui" / "streamlit_app.py"
+    streamlit = tool_root / STREAMLIT_REL
     if streamlit.is_file():
-        _patch_streamlit(streamlit)
+        _disable_streamlit(streamlit)
         done.append(str(streamlit))
+    pyproject = tool_root / PYPROJECT_REL
+    if pyproject.is_file():
+        _patch_pyproject(pyproject)
+        done.append(str(pyproject))
 
     launcher = _patch_launcher(tool_root)
     if launcher is not None:
@@ -175,6 +179,22 @@ EXE_NAMES = (
 )
 
 SPEC_REL = Path("packaging") / "TextVerbessern.spec"
+EXE_REL_DIRS = (
+    Path("."),
+    Path("dist"),
+    Path("dist") / "TextVerbessern",
+    Path("packaging") / "output",
+    Path("release"),
+)
+STREAMLIT_REL = Path("app") / "ui" / "streamlit_app.py"
+STREAMLIT_STUB = (
+    "raise SystemExit(\n"
+    '    "Bitte Desktop Text verbessern oder '
+    '_Gemeinsam\\\\text_verbessern_foundry\\\\Starten.bat. "\n'
+    '    "Die Streamlit-Oberflaeche startet nicht. Nur Foundry, kein Mistral."\n'
+    ")  # LLP-FOUNDRY-TOR\n"
+)
+PYPROJECT_REL = Path("pyproject.toml")
 
 
 def _patch_launcher(tool_root: Path) -> Path | None:
@@ -336,15 +356,17 @@ def _patch_web_html(tool_root: Path) -> list[str]:
 def _park_exe(tool_root: Path) -> list[str]:
     """Alte Desktop-EXE zur Seite legen, damit Mistral nicht per Doppelklick startet."""
     parked: list[str] = []
-    for name in EXE_NAMES:
-        exe = tool_root / name
-        if not exe.is_file():
-            continue
-        dest = tool_root / (exe.name + ".llp-alt")
-        if dest.exists():
-            continue
-        exe.rename(dest)
-        parked.append(str(dest))
+    for rel in EXE_REL_DIRS:
+        folder = tool_root / rel
+        for name in EXE_NAMES:
+            exe = folder / name
+            if not exe.is_file():
+                continue
+            dest = exe.with_name(exe.name + ".llp-alt")
+            if dest.exists():
+                continue
+            exe.rename(dest)
+            parked.append(str(dest))
     return parked
 
 
@@ -637,117 +659,32 @@ def _replace_desktop_main(desk: str) -> str:
     return desk
 
 
-def _patch_streamlit(path: Path) -> None:
-    st = path.read_text(encoding="utf-8")
-    st = _ensure_line_after(
-        st,
-        "from app.pipeline import run_pipeline",
-        "from app.providers.foundry_provider import foundry_ready",
-    )
-    st = _replace_all(st, MODE_LABEL_OLD, MODE_LABEL_NEW)
-    st = _replace_once(
-        st,
-        "mistral_ready = cached_local_mistral_ready()",
-        "mistral_ready = foundry_ready()",
-    )
-    st = _replace_all_if_present(
-        st,
-        "    return local_mistral_ready()",
-        "    return foundry_ready()",
-    )
+def _disable_streamlit(path: Path) -> None:
+    """Streamlit darf keine Oberfläche mehr starten."""
+    text = path.read_text(encoding="utf-8")
     if (
-        'st.set_page_config(page_title="Text verbessern"' in st
-        and "Die Streamlit-Oberflaeche startet nicht" not in st
+        "LLP-FOUNDRY-TOR" in text
+        and "Streamlit-Oberflaeche startet nicht" in text
+        and "import streamlit" not in text
     ):
-        st = _ensure_line_after(
-            st,
-            'st.set_page_config(page_title="Text verbessern", page_icon="✍️", layout="centered")',
-            'st.warning("Bitte Desktop Text verbessern oder '
-            "_Gemeinsam\\\\text_verbessern_foundry\\\\Starten.bat. "
-            'Die Streamlit-Oberflaeche startet nicht. Nur Foundry, kein Mistral.")\n'
-            "st.stop()",
-        )
-    st = _replace_all(
-        st,
-        "Sofortige Textverbesserung bereit; Mistral ist zusätzlich verfügbar.",
-        "Sofortige Textverbesserung bereit; Foundry (Büro-KI) ist verfügbar.",
+        return
+    bak = path.with_name(path.name + ".llp-alt")
+    if not bak.is_file():
+        bak.write_text(text, encoding="utf-8")
+    path.write_text(STREAMLIT_STUB, encoding="utf-8")
+
+
+def _patch_pyproject(path: Path) -> None:
+    """pip install -e .[ui] darf Streamlit nicht nachziehen."""
+    text = path.read_text(encoding="utf-8")
+    if "LLP-FOUNDRY-TOR" in text and "kein Streamlit" in text:
+        return
+    text = _replace_all_if_present(
+        text,
+        'ui = ["streamlit>=1.37"]',
+        'ui = []  # LLP-FOUNDRY-TOR: kein Streamlit',
     )
-    st = _replace_all(
-        st,
-        "Sofortige lokale Textverbesserung bereit. Die optionale Mistral-Variante ist nicht verfügbar.",
-        "Sofortige lokale Textverbesserung bereit. Gründlich nur mit Foundry (llp_ai).",
-    )
-    st = _replace_once(
-        st,
-        "    mistral_for_text = local_model_eligible(st.session_state.source_text, mistral_ready)\n"
-        "    mode_choices = (\n"
-        f'        ["Schnell verbessern (empfohlen)", "Nur Format bereinigen", "{MODE_LABEL_NEW}"]\n'
-        "        if mistral_for_text\n"
-        '        else ["Schnell verbessern (empfohlen)", "Nur Format bereinigen"]\n'
-        "    )",
-        "    mistral_for_text = foundry_ready()\n"
-        "    mode_choices = (\n"
-        f'        ["Schnell verbessern (empfohlen)", "Nur Format bereinigen", "{MODE_LABEL_NEW}"]\n'
-        "        if mistral_for_text\n"
-        '        else ["Schnell verbessern (empfohlen)", "Nur Format bereinigen"]\n'
-        "    )",
-    )
-    st = _replace_once(
-        st,
-        "        with st.spinner(\"Lokales Mistral wird kurz geprüft …\"):\n"
-        "            mistral_preflight_failed = not preflight_local_mistral()",
-        "        with st.spinner(\"Foundry wird kurz geprüft …\"):\n"
-        "            mistral_preflight_failed = not foundry_ready()",
-    )
-    st = _replace_all(st, 'provider = "rules+mistral-local"', 'provider = "rules+foundry"')
-    st = _replace_all(st, '"rules+mistral-local"', '"rules+foundry"')
-    st = _replace_all(st, '"mistral" in provider', '"foundry" in provider')
-    st = _replace_all(
-        st,
-        "Gründliche lokale Mistral-Überarbeitung läuft – höchstens 45 Sekunden.",
-        "Gründliche Foundry-Überarbeitung läuft.",
-    )
-    st = _replace_all(
-        st,
-        "Mistral derzeit nicht erreichbar – sichere lokale Fassung wird sofort erstellt.",
-        "Foundry derzeit nicht erreichbar – sichere lokale Fassung wird sofort erstellt.",
-    )
-    st = _replace_all(
-        st,
-        "Stiloptionen gelten nur für die optionale gründliche Mistral-Bearbeitung.",
-        "Stiloptionen gelten nur für die gründliche Foundry-Bearbeitung.",
-    )
-    st = _replace_all_if_present(
-        st,
-        "Mistral hat die Zeitgrenze erreicht. Das sicher bereinigte Ergebnis wird angezeigt.",
-        "Foundry hat die Zeitgrenze erreicht. Das sicher bereinigte Ergebnis wird angezeigt.",
-    )
-    st = _replace_all_if_present(
-        st,
-        "Mistral war nicht verfügbar. Die sichere lokale Grundbereinigung wird angezeigt.",
-        "Foundry war nicht verfügbar. Die sichere lokale Grundbereinigung wird angezeigt.",
-    )
-    st = _replace_all_if_present(
-        st,
-        "Das lokale Mistral war vor der Bearbeitung nicht erreichbar; ",
-        "Foundry war vor der Bearbeitung nicht erreichbar; ",
-    )
-    st = _replace_all_if_present(
-        st,
-        "Text war für Mistral zu lang; vollständig lokal schnell bearbeitet.",
-        "Text war für Foundry zu lang; vollständig lokal schnell bearbeitet.",
-    )
-    st = _replace_all_if_present(
-        st,
-        "Mistral war nicht verfügbar; sichere lokale Grundbereinigung angezeigt.",
-        "Foundry war nicht verfügbar; sichere lokale Grundbereinigung angezeigt.",
-    )
-    st = _replace_all_if_present(
-        st,
-        "Lokal mit Regeln und Mistral verarbeitet.",
-        "Lokal mit Regeln und Foundry verarbeitet.",
-    )
-    path.write_text(st, encoding="utf-8")
+    path.write_text(text, encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:

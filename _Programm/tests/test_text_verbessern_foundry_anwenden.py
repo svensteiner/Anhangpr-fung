@@ -254,6 +254,13 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         'name="TextVerbessern"\nanalysis = Analysis(["app/desktop.py"])\n',
         encoding="utf-8",
     )
+    (tool / "pyproject.toml").write_text(
+        "[project.optional-dependencies]\nui = [\"streamlit>=1.37\"]\n",
+        encoding="utf-8",
+    )
+    dist = tool / "dist" / "TextVerbessern"
+    dist.mkdir(parents=True, exist_ok=True)
+    (dist / "TextVerbessern.exe").write_bytes(b"mz-dist")
     (tool / "app" / "main.py").write_text(
         'parser.add_argument("--provider", choices=["fast-editor", "rules", "mistral-local"])\n',
         encoding="utf-8",
@@ -358,25 +365,19 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "rules+mistral-local" not in desktop
 
     streamlit = (tool / "app" / "ui" / "streamlit_app.py").read_text(encoding="utf-8")
-    assert "Gründlich mit Foundry (Büro-KI)" in streamlit
-    assert "Gründlich mit Mistral" not in streamlit
-    assert "mistral_ready = foundry_ready()" in streamlit
-    assert "mistral_for_text = foundry_ready()" in streamlit
-    assert "local_model_eligible(st.session_state.source_text, mistral_ready)" not in streamlit
-    assert "preflight_local_mistral()" not in streamlit
-    assert "mistral_preflight_failed = not foundry_ready()" in streamlit
-    assert "rules+foundry" in streamlit
-    assert "rules+mistral-local" not in streamlit
-    assert '"foundry" in provider' in streamlit
-    assert '"mistral" in provider' not in streamlit
-    assert "Foundry hat die Zeitgrenze erreicht" in streamlit
-    assert "Foundry war nicht verfügbar" in streamlit
-    assert "Mistral hat die Zeitgrenze" not in streamlit
-    assert "Mistral war nicht verfügbar" not in streamlit
-    assert "return foundry_ready()" in streamlit
-    assert "return local_mistral_ready()" not in streamlit
-    assert "st.stop()" in streamlit
+    ast.parse(streamlit)
+    assert "LLP-FOUNDRY-TOR" in streamlit
     assert "Streamlit-Oberflaeche startet nicht" in streamlit
+    assert "import streamlit" not in streamlit
+    assert "Gründlich mit Mistral" not in streamlit
+    stub_bak = (tool / "app" / "ui" / "streamlit_app.py.llp-alt").read_text(encoding="utf-8")
+    assert "import streamlit" in stub_bak
+    pyproject = (tool / "pyproject.toml").read_text(encoding="utf-8")
+    assert "LLP-FOUNDRY-TOR" in pyproject
+    assert "kein Streamlit" in pyproject
+    assert "streamlit>=" not in pyproject
+    assert not (tool / "dist" / "TextVerbessern" / "TextVerbessern.exe").is_file()
+    assert (tool / "dist" / "TextVerbessern" / "TextVerbessern.exe.llp-alt").is_file()
 
     launcher = (tool / "TEXT VERBESSERN.cmd").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" in launcher

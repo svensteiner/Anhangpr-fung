@@ -18,7 +18,8 @@ EINMALIG
   um (Anwenden.bat). Starten.bat und das Startmenue
   tun dasselbe leise bei jedem Start, falls jemand
   rephraser neu kopiert. Danach Pruefen.bat: kein
-  Streamlit, keine alte EXE, kein Ollama-Rest.
+  Streamlit, keine Streamlit-Datei, keine alte EXE,
+  kein Ollama-Rest.
 
 TAEGLICH
 --------
