@@ -16,7 +16,7 @@ if not defined PY (
 
 echo  Text verbessern startet. Der Browser oeffnet sich.
 echo  Nur Foundry, kein Mistral/Ollama.
-echo  Zum Beenden dieses Fenster schliessen.
+echo  Zum Beenden: Knopf Beenden in der Oberflaeche.
 echo.
 %PY% server.py
 if errorlevel 1 (

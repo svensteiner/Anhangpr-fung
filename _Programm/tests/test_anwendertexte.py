@@ -27,6 +27,9 @@ def test_installieren_kopiert_keine_exe():
     assert "starten.bat" in text
     assert "tools_starten.bat" in text
     assert "llp ai tools" in text
+    assert "text verbessern" in text
+    assert "foundry" in text
+    assert "mistral" in text
 
 
 def test_struktur_start_ist_server_nicht_exe():

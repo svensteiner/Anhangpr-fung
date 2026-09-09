@@ -6,6 +6,7 @@ import importlib.util
 import json
 import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -69,6 +70,8 @@ def test_seite_nennt_nur_foundry() -> None:
     assert "ollama" in low and "kein ollama" in low
     assert "api-key" not in low
     assert "FOUNDRY_API_KEY" not in html
+    assert "Beenden" in html
+    assert "/beenden" in html
 
 
 def test_umschreiben_ohne_foundry_ohne_stillen_wechsel(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -119,3 +122,23 @@ def test_leerer_text_wird_abgelehnt(monkeypatch: pytest.MonkeyPatch) -> None:
         server.shutdown()
     assert code == 400
     assert "Text" in payload["fehler"]
+
+
+def test_beenden_haelt_den_server_an() -> None:
+    module = _load()
+    server, base = _serve(module)
+    code, payload = _json(base + "/beenden", {})
+    assert code == 200
+    assert payload == {"ok": True}
+    deadline = time.time() + 3
+    stopped = False
+    while time.time() < deadline:
+        try:
+            urllib.request.urlopen(base + "/", timeout=0.3)
+        except (urllib.error.URLError, ConnectionError, TimeoutError, OSError):
+            stopped = True
+            break
+        time.sleep(0.05)
+    if not stopped:
+        server.shutdown()
+    assert stopped

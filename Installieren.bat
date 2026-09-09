@@ -10,7 +10,7 @@ echo.
 echo   Das Programm bleibt auf dem Server.
 echo   Es wird NICHT auf den PC kopiert.
 echo.
-echo   Es wird nur eine Desktop-Verknuepfung angelegt.
+echo   Es werden nur Desktop-Verknuepfungen angelegt.
 echo.
 
 set "START=%~dp0Starten.bat"
@@ -30,6 +30,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
+set "TEXTKI=%~dp0_Gemeinsam\text_verbessern_foundry\Starten.bat"
+if exist "%TEXTKI%" (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+      "$d=[Environment]::GetFolderPath('Desktop'); $w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut(\"$d\Text verbessern.lnk\"); $s.TargetPath='%TEXTKI%'; $s.WorkingDirectory='%~dp0_Gemeinsam\text_verbessern_foundry'; $s.Description='Text verbessern (Foundry)'; $s.Save()"
+)
+
 set "TOOLS=%~dp0Tools_starten.bat"
 if exist "%TOOLS%" (
     powershell -NoProfile -ExecutionPolicy Bypass -Command ^
@@ -43,6 +49,7 @@ echo.
 echo   Auf dem Desktop liegt die Verknuepfung "Anhangspruefer".
 echo   Doppelklick startet das Tool. Der Browser oeffnet sich.
 echo   "LLP AI Tools" oeffnet das gemeinsame Startmenue.
+echo   "Text verbessern" startet nur Foundry, nicht Mistral.
 echo ============================================================
 echo.
 pause

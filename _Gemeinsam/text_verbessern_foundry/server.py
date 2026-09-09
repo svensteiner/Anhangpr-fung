@@ -36,12 +36,14 @@ PAGE = """<!DOCTYPE html>
     textarea { width: 100%; min-height: 180px; font: 1rem/1.5 system-ui; padding: 10px; }
     button { margin-top: 12px; min-height: 2.8rem; padding: 0 18px; font-weight: 650; }
     button:disabled { opacity: .55; }
+    .quit { float: right; margin-top: 0; }
     .hint { color: #4a6a5c; margin: 8px 0 18px; }
     .err { color: #8a1f1f; margin-top: 12px; }
     label { display: block; margin-top: 16px; font-weight: 650; }
   </style>
 </head>
 <body>
+  <button class="quit" id="quit" type="button">Beenden</button>
   <h1>Text verbessern</h1>
   <p class="hint" id="status">KI wird geprüft…</p>
   <p class="hint">Nur Microsoft Foundry (llp_ai). Kein Mistral, kein Ollama.</p>
@@ -57,6 +59,10 @@ PAGE = """<!DOCTYPE html>
     }).catch(() => {
       document.getElementById('status').textContent = 'KI: Status nicht lesbar';
     });
+    document.getElementById('quit').onclick = async () => {
+      try { await fetch('/beenden', {method: 'POST'}); } catch (e) {}
+      document.body.innerHTML = '<p>Text verbessern ist beendet. Dieses Fenster können Sie schließen.</p>';
+    };
     document.getElementById('run').onclick = async () => {
       const text = document.getElementById('quelle').value;
       const btn = document.getElementById('run');
@@ -138,6 +144,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
+        if path == "/beenden":
+            payload = json.dumps({"ok": True})
+            self._send(200, payload.encode("utf-8"), "application/json")
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
+            return
         if path != "/umschreiben":
             self._send(404, b"nicht gefunden", "text/plain; charset=utf-8")
             return
@@ -176,7 +187,7 @@ def main() -> int:
     host, port = server.server_address
     print("Text verbessern (nur Foundry). Browser: "
           f"http://{host}:{port}/")
-    print("Zum Beenden dieses Fenster schließen.")
+    print("Zum Beenden: Knopf Beenden in der Oberflaeche.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
