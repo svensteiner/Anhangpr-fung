@@ -122,7 +122,17 @@ class App:
         diagnostics = {"mistral_available": local_mistral_ready()}
 
 
+def run_self_test() -> dict[str, object]:
+    result = run_pipeline("Gruesse", TransformOptions(provider="rules", rewrite_strength="light"))
+    return {"ok": True, "text": result.rewritten_text}
+
+
 def main(argv=None):
+    arguments = argv if argv is not None else []
+    if "--self-test" in arguments:
+        report = run_self_test()
+        print(json.dumps(report, ensure_ascii=False))
+        return 0 if report["ok"] else 1
     try:
         DesktopApp().run()
     except Exception as error:
@@ -408,6 +418,9 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert '"mistral" in provider' not in desktop
     assert '"foundry" in provider' in desktop
     assert "rules+mistral-local" not in desktop
+    assert "run_self_test()" not in desktop
+    assert "Kein Selbsttest mit Regeln oder Modellwahl" in desktop
+    assert "LLP-FOUNDRY-TOR: kein Selbsttest" in desktop
 
     streamlit = (tool / "app" / "ui" / "streamlit_app.py").read_text(encoding="utf-8")
     ast.parse(streamlit)
@@ -618,6 +631,24 @@ def test_anwenden_scheitert_wenn_mistral_export_bleibt(tmp_path: Path) -> None:
     ok, msg = module.apply_foundry(tool)
     assert ok is False
     assert "LocalMistralProvider" in msg or "exportiert" in msg
+
+
+def test_anwenden_stellt_desktop_selbsttest_ab(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    desktop = tool / "app" / "desktop.py"
+    raw = desktop.read_text(encoding="utf-8")
+    assert "run_self_test()" in raw
+    assert "Selbsttest" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    text = desktop.read_text(encoding="utf-8")
+    assert "run_self_test()" not in text
+    assert "Kein Selbsttest mit Regeln oder Modellwahl" in text
+    assert "return 2  # LLP-FOUNDRY-TOR" in text
+    text = text.replace(module.SELF_TEST_STUB, module.SELF_TEST_OLD, 1)
+    desktop.write_text(text, encoding="utf-8")
+    assert "Selbsttest" in module.leftovers_in_tool(tool)
 
 
 def test_anwenden_stellt_desktop_run_ab(tmp_path: Path) -> None:

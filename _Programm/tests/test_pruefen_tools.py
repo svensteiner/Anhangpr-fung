@@ -116,6 +116,7 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert "Alte CLI:" in blob
     assert "Sicherung:" in blob
     assert "Desktop-Fenster:" in blob
+    assert "Selbsttest:" in blob
     assert "Text-Pipeline:" in blob
     assert "Hybrid-Weg:" in blob
     assert "Paketdatei:" in blob
@@ -538,6 +539,30 @@ def test_report_foundry_aber_alte_cli_ist_nicht_ok(tmp_path: Path) -> None:
     assert module.text_foundry_ok(gemeinsam) is False
     assert module.text_has_leftovers(data) is True
     assert "CLI" in module.leftovers_in_tool(tools / "rephraser")
+
+
+def test_report_foundry_aber_desktop_selbsttest_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    desktop = tools / "rephraser" / "app" / "desktop.py"
+    desktop.write_text(
+        desktop.read_text(encoding="utf-8")
+        + '\ndef main(argv=None):\n    if "--self-test" in arguments:\n'
+        "        report = run_self_test()\n"
+        "        return 0\n",
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_self_test"] is not None
+    blob = module.format_report(data)
+    assert "Selbsttest" in blob
+    assert "Regeln" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Selbsttest" in module.leftovers_in_tool(tools / "rephraser")
 
 
 def test_report_foundry_aber_alte_desktop_run_ist_nicht_ok(tmp_path: Path) -> None:

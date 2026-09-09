@@ -20,6 +20,7 @@ if str(SHARED) not in sys.path:
 from pruefen_tools import (
     BACKUP_NOTE_MARK,
     PARK_DIR_NAME,
+    desktop_self_test_live_text,
     is_launchable_backup,
     leftovers_in_tool,
 )
@@ -81,6 +82,7 @@ def apply_foundry(tool_root: Path) -> tuple[bool, str]:
             MODE_STRONG_NEW in current
             and "rules+foundry" in current
             and "if foundry_ready():" in current
+            and not desktop_self_test_live_text(current)
         )
     try:
         apply(tool_root)
@@ -833,7 +835,33 @@ def _patch_desktop(path: Path) -> None:
     )
     desk = _replace_desktop_main(desk)
     desk = _replace_all_if_present(desk, DESKTOP_RUN_OLD, DESKTOP_RUN_STUB)
+    desk = _disable_self_test(desk)
     path.write_text(desk, encoding="utf-8")
+
+
+SELF_TEST_OLD = (
+    '    if "--self-test" in arguments:\n'
+    "        report = run_self_test()\n"
+    "        print(json.dumps(report, ensure_ascii=False))\n"
+    '        return 0 if report["ok"] else 1\n'
+)
+SELF_TEST_STUB = (
+    '    if "--self-test" in arguments:\n'
+    '        print("Text verbessern laeuft nur ueber die Foundry-Seite. '
+    'Kein Selbsttest mit Regeln oder Modellwahl.")\n'
+    "        return 2  # LLP-FOUNDRY-TOR\n"
+)
+SELF_TEST_FN_OLD = "def run_self_test() -> dict[str, object]:\n"
+SELF_TEST_FN_STUB = (
+    "def run_self_test() -> dict[str, object]:\n"
+    '    return {"ok": False, "grund": "foundry"}  # LLP-FOUNDRY-TOR: kein Selbsttest\n'
+)
+
+
+def _disable_self_test(desk: str) -> str:
+    """Kein python -m app.desktop --self-test mehr über Regeln oder fast-editor."""
+    desk = _replace_all_if_present(desk, SELF_TEST_OLD, SELF_TEST_STUB)
+    return _replace_all_if_present(desk, SELF_TEST_FN_OLD, SELF_TEST_FN_STUB)
 
 
 DESKTOP_MAIN_HINT = (
