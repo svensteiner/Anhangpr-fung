@@ -65,6 +65,9 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "offen – angabe gefunden" in low or "offen - angabe gefunden" in low
     assert "nicht mistral" in low
     assert "teil 1" in low
+    assert "teil 2" in low
+    assert "rest prüfen" in low or "rest pruefen" in low
+    assert "dann starten" not in low
     assert "text verbessern" in low
     assert "anleitung.txt" in low
     assert "foundry-tor" in low or "foundry tor" in low
@@ -161,6 +164,8 @@ def test_text_verbessern_foundry_kit_liegt_bereit():
     assert "foundry" in lies
     assert "mistral" in lies
     assert "ollama" in lies
+    assert "start_windows.ps1" in lies
+    assert "streamlit" in lies
     start = (ROOT / "_Gemeinsam" / "llp_start" / "Start.bat").read_text(encoding="utf-8")
     low = start.lower()
     assert "anwenden.py" in low

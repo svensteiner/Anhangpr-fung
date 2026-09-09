@@ -28,9 +28,10 @@ TAEGLICH
      Desktop „Text verbessern“ oder LLP AI Tools, Punkt 2
      (Foundry-Seite, nicht das alte rephraser)
      oder text_verbessern_foundry\Starten.bat
-     TEXT VERBESSERN.cmd im Tool-Ordner oeffnet
-     nur die Foundry-Seite, nicht Mistral. Eine
-     alte EXE wird zur Seite gelegt.
+     TEXT VERBESSERN.cmd und start_windows.ps1
+     im Tool-Ordner oeffnen nur die Foundry-Seite,
+     nicht Mistral. Eine alte EXE wird zur Seite
+     gelegt.
 
   3  Pseudokrat
      START.bat im Ordner Pseudokrat

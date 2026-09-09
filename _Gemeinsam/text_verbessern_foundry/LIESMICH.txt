@@ -18,10 +18,11 @@ Wenn daneben noch der Ordner rephraser liegt und
    Wechsel auf Ollama oder ein anderes Modell.
 4. Danach Text verbessern wie gewohnt starten
    (Tools_starten.bat Punkt 2 oder Desktop
-   "Text verbessern"). TEXT VERBESSERN.cmd im
-   Tool-Ordner oeffnet nur die Foundry-Seite,
-   nicht die Rephraser-Oberflaeche. Eine alte
-   Desktop-EXE wird zur Seite gelegt (.llp-alt).
+   "Text verbessern"). TEXT VERBESSERN.cmd und
+   scripts\\start_windows.ps1 im Tool-Ordner
+   oeffnen nur die Foundry-Seite, nicht Streamlit
+   und nicht Mistral. Eine alte Desktop-EXE wird
+   zur Seite gelegt (.llp-alt).
 
 Nicht nötig, wenn das Tool bereits „Gründlich mit Foundry“
 zeigt. Ein zweiter Lauf ändert nichts.

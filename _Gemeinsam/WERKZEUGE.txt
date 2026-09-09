@@ -24,8 +24,9 @@ Start:  Tools_starten.bat, Punkt 2
         (immer die Foundry-Seite, nicht rephraser)
         oder Desktop "Text verbessern"
         oder text_verbessern_foundry\Starten.bat
-        TEXT VERBESSERN.cmd im Tool-Ordner oeffnet
-        dasselbe Foundry-Tor, nicht Mistral.
+        TEXT VERBESSERN.cmd und start_windows.ps1
+        im Tool-Ordner oeffnen dasselbe Foundry-Tor,
+        nicht Mistral und nicht Streamlit.
 KI:     gruendliche Fassung ueber Foundry (llp_ai),
         sonst die sichere lokale Regelfassung
         bzw. die Foundry-Seite sagt klar Bescheid.

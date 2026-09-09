@@ -185,6 +185,13 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         "@echo off\r\nstart TextVerbessern.exe\r\n",
         encoding="utf-8",
     )
+    scripts = tool / "scripts"
+    scripts.mkdir(parents=True, exist_ok=True)
+    (scripts / "start_windows.ps1").write_text(
+        'Write-Host "Text verbessern wird gestartet ..."\n'
+        '& $venvPython -m streamlit run "app/ui/streamlit_app.py"\n',
+        encoding="utf-8",
+    )
     return tool
 
 
@@ -244,11 +251,33 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "TextVerbessern.exe" in backup
     assert "LLP-FOUNDRY-TOR" not in backup
 
+    ps1 = (tool / "scripts" / "start_windows.ps1").read_text(encoding="utf-8")
+    assert "LLP-FOUNDRY-TOR" in ps1
+    assert "streamlit" not in ps1.lower()
+    assert "mistral" not in ps1.lower()
+    assert "text_verbessern_foundry" in ps1.lower()
+    assert "foundry-seite" in ps1.lower()
+    ps1_bak = (tool / "scripts" / "start_windows.ps1.llp-alt").read_text(encoding="utf-8")
+    assert "streamlit" in ps1_bak.lower()
+    assert "LLP-FOUNDRY-TOR" not in ps1_bak
+
     ok2, msg2 = module.apply_foundry(tool)
     assert ok2, msg2
     assert "bereits auf Foundry" in msg2
     backup2 = (tool / "TEXT VERBESSERN.original.cmd").read_text(encoding="utf-8")
     assert backup2 == backup
+    ps1_again = (tool / "scripts" / "start_windows.ps1").read_text(encoding="utf-8")
+    assert ps1_again == ps1
+    assert (tool / "scripts" / "start_windows.ps1.llp-alt").read_text(encoding="utf-8") == ps1_bak
+
+
+def test_anwenden_ohne_windows_startskript_bleibt_ok(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    (tool / "scripts" / "start_windows.ps1").unlink()
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    assert not (tool / "scripts" / "start_windows.ps1").is_file()
 
 
 def test_anwenden_legt_alte_exe_beiseite(tmp_path: Path) -> None:

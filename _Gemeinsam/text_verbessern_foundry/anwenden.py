@@ -106,6 +106,9 @@ def apply(tool_root: Path) -> list[str]:
         done.append(str(launcher))
 
     done.extend(_park_exe(tool_root))
+    ps1 = _patch_windows_start(tool_root)
+    if ps1 is not None:
+        done.append(str(ps1))
 
     return done
 
@@ -165,6 +168,40 @@ def _patch_launcher(tool_root: Path) -> Path | None:
             backup.write_text(current, encoding="utf-8")
     cmd.write_text(LAUNCHER_CMD, encoding="utf-8")
     return cmd
+
+
+PS1_NAME = Path("scripts") / "start_windows.ps1"
+PS1_MARK = "LLP-FOUNDRY-TOR"
+PS1_CMD = r"""# LLP-FOUNDRY-TOR
+$ErrorActionPreference = "Stop"
+$tool = Split-Path -Parent $PSScriptRoot
+$aiTools = Split-Path -Parent $tool
+$shared = Join-Path $aiTools "_Gemeinsam"
+if (-not (Test-Path -LiteralPath (Join-Path $shared "llp_ai"))) {
+    $shared = Join-Path $tool "_Gemeinsam"
+}
+$start = Join-Path $shared "text_verbessern_foundry\Starten.bat"
+Write-Host "Oeffne Foundry-Seite. Ein Mistral-rephraser wird nicht gestartet."
+if (Test-Path -LiteralPath $start) {
+    Start-Process -FilePath $start
+    exit 0
+}
+Write-Host "Bitte _Gemeinsam\text_verbessern_foundry\Starten.bat doppelklicken."
+exit 1
+"""
+
+
+def _patch_windows_start(tool_root: Path) -> Path | None:
+    """Streamlit/Mistral-Start über start_windows.ps1 unterbinden."""
+    path = tool_root / PS1_NAME
+    if not path.is_file():
+        return None
+    current = path.read_text(encoding="utf-8", errors="replace")
+    backup = path.with_name(path.name + ".llp-alt")
+    if PS1_MARK not in current and not backup.is_file():
+        backup.write_text(current, encoding="utf-8")
+    path.write_text(PS1_CMD, encoding="utf-8")
+    return path
 
 
 def _park_exe(tool_root: Path) -> list[str]:
