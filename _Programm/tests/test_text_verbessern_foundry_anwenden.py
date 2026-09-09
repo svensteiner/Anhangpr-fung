@@ -468,12 +468,14 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "LLP-FOUNDRY-TOR" not in readme_bak
     html = (tool / "web" / "TextVerbessern-Browser.html").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" in html
-    assert "Kanzlei-Weg" in html
+    assert "Offline-Datei startet nicht" in html
+    assert "<script" not in html.lower()
     assert "text_verbessern_foundry" in html
     html_bak = (tool / "web" / "TextVerbessern-Browser.html.llp-alt").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" not in html_bak
     index = (tool / "web" / "index.html").read_text(encoding="utf-8")
-    assert "LLP-FOUNDRY-TOR" in index
+    assert "Offline-Datei startet nicht" in index
+    assert "<script" not in index.lower()
     cli = (tool / "app" / "main.py").read_text(encoding="utf-8")
     assert 'choices=["fast-editor", "rules", "foundry"]' in cli
     assert "mistral-local" not in cli
@@ -566,6 +568,24 @@ def test_anwenden_scheitert_wenn_mistral_export_bleibt(tmp_path: Path) -> None:
     ok, msg = module.apply_foundry(tool)
     assert ok is False
     assert "LocalMistralProvider" in msg or "exportiert" in msg
+
+
+def test_anwenden_ersetzt_banner_html_durch_stub(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    html = tool / "web" / "index.html"
+    html.write_text(
+        "<html><body>\n<!-- LLP-FOUNDRY-TOR -->\n"
+        "<p>Kanzlei-Weg text_verbessern_foundry</p>\n"
+        '<script src="./app.js"></script>\n</body></html>\n',
+        encoding="utf-8",
+    )
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    text = html.read_text(encoding="utf-8")
+    assert "Offline-Datei startet nicht" in text
+    assert "<script" not in text.lower()
+    assert module.leftovers_in_tool(tool) == []
 
 
 def test_anwenden_stellt_liesmich_im_tool_um(tmp_path: Path) -> None:

@@ -251,6 +251,7 @@ def test_text_verbessern_foundry_kit_liegt_bereit():
     assert "liesmich-foundry.txt" in lies
     assert "wie gewohnt" not in lies
     assert "foundry-seite" in lies
+    assert "startet nicht" in lies
     kit_start = (kit / "Starten.bat").read_text(encoding="utf-8").lower()
     assert "anwenden.py" in kit_start
     assert "--leise" in kit_start

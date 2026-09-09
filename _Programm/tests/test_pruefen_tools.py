@@ -464,7 +464,12 @@ def test_report_foundry_aber_offline_html_ist_nicht_ok(tmp_path: Path) -> None:
     _foundry_desktop(tools)
     html = tools / "rephraser" / "web" / "index.html"
     html.parent.mkdir(parents=True)
-    html.write_text("<html><body><p>Offline, kein Mistral-Modell.</p></body></html>\n", encoding="utf-8")
+    html.write_text(
+        "<html><body><!-- LLP-FOUNDRY-TOR -->"
+        "<p>Kanzlei-Weg text_verbessern_foundry</p>"
+        '<script src="./app.js"></script></body></html>\n',
+        encoding="utf-8",
+    )
     data = module.report(gemeinsam)
     assert data["text_web_html"] is not None
     blob = module.format_report(data)

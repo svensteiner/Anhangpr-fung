@@ -400,11 +400,16 @@ WEB_HTML_NAMES = (
     Path("web") / "TextVerbessern-Browser.html",
     Path("web") / "index.html",
 )
-WEB_BANNER = (
+WEB_STUB = (
+    "<!doctype html>\n"
+    '<html lang="de"><head><meta charset="utf-8">'
+    "<title>Text verbessern – Foundry</title></head>\n"
+    "<body>\n"
     "<!-- LLP-FOUNDRY-TOR -->\n"
-    "<p><strong>Kanzlei-Weg:</strong> Desktop „Text verbessern“ oder "
-    "_Gemeinsam\\text_verbessern_foundry\\Starten.bat. "
-    "Nur Foundry, kein Mistral. Diese Datei ist nicht der Start.</p>\n"
+    "<p>Bitte Desktop „Text verbessern“ oder "
+    "_Gemeinsam\\text_verbessern_foundry\\Starten.bat.</p>\n"
+    "<p>Die Offline-Datei startet nicht. Nur Foundry, kein Mistral.</p>\n"
+    "</body></html>\n"
 )
 
 
@@ -415,18 +420,16 @@ def _patch_web_html(tool_root: Path) -> list[str]:
         if not path.is_file():
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
-        if NOTE_MARK in text:
-            continue
-        start = text.lower().find("<body")
-        if start < 0:
-            continue
-        end = text.find(">", start)
-        if end < 0:
+        if (
+            NOTE_MARK in text
+            and "Offline-Datei startet nicht" in text
+            and "<script" not in text.lower()
+        ):
             continue
         bak = path.with_name(path.name + ".llp-alt")
         if not bak.is_file():
             bak.write_text(text, encoding="utf-8")
-        path.write_text(text[: end + 1] + "\n" + WEB_BANNER + text[end + 1 :], encoding="utf-8")
+        path.write_text(WEB_STUB, encoding="utf-8")
         written.append(str(path))
     return written
 

@@ -271,8 +271,12 @@ def web_html_modus(path: Path | None) -> str:
     if path is None:
         return "nicht gefunden"
     text = path.read_text(encoding="utf-8", errors="replace")
-    if "LLP-FOUNDRY-TOR" in text and "text_verbessern_foundry" in text:
-        return "Foundry-Hinweis"
+    if (
+        "LLP-FOUNDRY-TOR" in text
+        and "Offline-Datei startet nicht" in text
+        and "<script" not in text.lower()
+    ):
+        return "abgeschaltet"
     return "noch alt"
 
 
@@ -658,7 +662,7 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
         reasons.append("Anleitung")
     for rel in WEB_HTML_RELS:
         html = tool_root / rel
-        if html.is_file() and web_html_modus(html) != "Foundry-Hinweis":
+        if html.is_file() and web_html_modus(html) != "abgeschaltet":
             reasons.append("Offline-HTML")
             break
     if (tool_root / SPEC_REL).is_file():
