@@ -391,6 +391,15 @@ def test_report_erkennt_gepatchten_local_runtime(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     data = module.report(gemeinsam)
+    assert data["text_runtime_modus"] == "noch Ollama"
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert "Ollama" in module.leftovers_in_tool(tools / "rephraser")
+    (tools / "rephraser" / "app" / "local_runtime.py").write_text(
+        "def local_mistral_ready(timeout: float = 0.8) -> bool:\n"
+        "    return False  # LLP-FOUNDRY-TOR: kein Ollama\n",
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
     assert data["text_runtime_modus"] == "kein Ollama"
     blob = module.format_report(data)
     assert "Ollama-Rest:     kein Ollama" in blob

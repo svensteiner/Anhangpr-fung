@@ -435,6 +435,8 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     runtime = (tool / "app" / "local_runtime.py").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" in runtime
     assert "kein Ollama" in runtime
+    assert "11434" not in runtime
+    assert "MISTRAL_BASE_URL" not in runtime
     assert runtime.count("return False") >= 2
     lines = [ln.strip() for ln in runtime.splitlines() if ln.strip()]
     ready_idx = lines.index("def local_mistral_ready(timeout: float = 0.8) -> bool:")
@@ -709,6 +711,28 @@ def test_anwenden_ohne_tool_gibt_hinweis(tmp_path: Path) -> None:
     leer = tmp_path / "_Gemeinsam" / "text_verbessern_foundry"
     leer.mkdir(parents=True)
     assert module.find_tool_root(leer) is None
+
+
+def test_anwenden_entfernt_ollama_probe_url(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    runtime = tool / "app" / "local_runtime.py"
+    assert "11434" in runtime.read_text(encoding="utf-8")
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    text = runtime.read_text(encoding="utf-8")
+    assert "11434" not in text
+    assert "MISTRAL_BASE_URL" not in text
+    assert module.leftovers_in_tool(tool) == []
+    runtime.write_text(
+        text + "\nMISTRAL_BASE_URL = 'http://127.0.0.1:11434'\n",
+        encoding="utf-8",
+    )
+    assert "Ollama" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    assert "11434" not in runtime.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
 
 
 def test_anwenden_entfernt_ollama_generate(tmp_path: Path) -> None:

@@ -623,20 +623,21 @@ def _park_build_scripts(tool_root: Path) -> list[str]:
 def _patch_local_runtime(path: Path) -> None:
     """Übrige Aufrufe dürfen Ollama nicht mehr anpingen."""
     text = path.read_text(encoding="utf-8")
-    if "LLP-FOUNDRY-TOR" in text and "return False" in text:
-        return
-    text = _replace_all_if_present(
-        text,
-        "def local_mistral_ready(timeout: float = 0.8) -> bool:\n",
-        "def local_mistral_ready(timeout: float = 0.8) -> bool:\n"
-        "    return False  # LLP-FOUNDRY-TOR: kein Ollama\n",
-    )
-    text = _replace_all_if_present(
-        text,
-        "def preflight_local_mistral() -> bool:\n",
-        "def preflight_local_mistral() -> bool:\n"
-        "    return False  # LLP-FOUNDRY-TOR: kein Ollama\n",
-    )
+    if "LLP-FOUNDRY-TOR" not in text or "kein Ollama" not in text:
+        text = _replace_all_if_present(
+            text,
+            "def local_mistral_ready(timeout: float = 0.8) -> bool:\n",
+            "def local_mistral_ready(timeout: float = 0.8) -> bool:\n"
+            "    return False  # LLP-FOUNDRY-TOR: kein Ollama\n",
+        )
+        text = _replace_all_if_present(
+            text,
+            "def preflight_local_mistral() -> bool:\n",
+            "def preflight_local_mistral() -> bool:\n"
+            "    return False  # LLP-FOUNDRY-TOR: kein Ollama\n",
+        )
+    text = text.replace("http://127.0.0.1:11434", "http://127.0.0.1:0")
+    text = text.replace("MISTRAL_BASE_URL", "FOUNDRY_OFF_BASE_URL")
     path.write_text(text, encoding="utf-8")
 
 

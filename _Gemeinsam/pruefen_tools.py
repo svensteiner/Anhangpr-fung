@@ -139,10 +139,10 @@ def local_runtime_modus(path: Path | None) -> str:
     if path is None:
         return "nicht gefunden"
     text = path.read_text(encoding="utf-8", errors="replace")
-    if "LLP-FOUNDRY-TOR" in text and "kein Ollama" in text:
-        return "kein Ollama"
     if "11434" in text or "MISTRAL_BASE_URL" in text:
         return "noch Ollama"
+    if "LLP-FOUNDRY-TOR" in text and "kein Ollama" in text:
+        return "kein Ollama"
     return "nicht erkannt"
 
 
