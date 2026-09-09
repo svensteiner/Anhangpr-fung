@@ -316,6 +316,9 @@ def _write_start_notes(tool_root: Path) -> list[str]:
     if schnell.is_file() or (tool_root / "TEXT VERBESSERN.cmd").is_file():
         written.append(str(_backup_then_write(schnell, START_NOTE)))
     written.append(str(_backup_then_write(tool_root / LIESMICH_NAME, START_NOTE)))
+    lies = tool_root / "LIESMICH.txt"
+    if lies.is_file():
+        written.append(str(_backup_then_write(lies, START_NOTE)))
     return written
 
 

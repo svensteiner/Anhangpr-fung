@@ -23,7 +23,7 @@ EINMALIG
   denselben Stand wie Pruefen.bat: kein Streamlit,
   keine Streamlit-Datei, keine alte EXE, kein Ollama-Rest,
   keine alte API, keine Mistral-Pipeline,
-  kein Mistral-Export.
+  kein Mistral-Export, keine EXE-Anleitung im Tool-Ordner.
   Bleibt ein alter Weg, sagt Installieren das klar.
 
 TAEGLICH

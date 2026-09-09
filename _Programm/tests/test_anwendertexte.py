@@ -111,6 +111,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "keine alte api" in text
     assert "keine mistral-pipeline" in text
     assert "kein mistral-export" in text
+    assert "keine exe-anleitung" in text
     assert "bei jedem start" in text
     assert "bitte pruefen.bat" in text
     assert "sagt installieren das klar" in text

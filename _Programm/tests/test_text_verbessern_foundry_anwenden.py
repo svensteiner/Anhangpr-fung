@@ -568,6 +568,20 @@ def test_anwenden_scheitert_wenn_mistral_export_bleibt(tmp_path: Path) -> None:
     assert "LocalMistralProvider" in msg or "exportiert" in msg
 
 
+def test_anwenden_stellt_liesmich_im_tool_um(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    lies = tool / "LIESMICH.txt"
+    lies.write_text("Doppelklick auf TextVerbessern.exe. Gründlich mit Mistral.\n", encoding="utf-8")
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    text = lies.read_text(encoding="utf-8")
+    assert "LLP-FOUNDRY-TOR" in text
+    assert "TextVerbessern.exe" not in text
+    assert (tool / "LIESMICH.txt.llp-alt").is_file()
+    assert module.leftovers_in_tool(tool) == []
+
+
 def test_anwenden_legt_original_cmd_beiseite(tmp_path: Path) -> None:
     module = _load_anwenden()
     tool = _fake_rephraser(tmp_path)

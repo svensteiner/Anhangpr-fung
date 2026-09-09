@@ -257,6 +257,54 @@ def hybrid_modus(path: Path | None) -> str:
     return "nicht erkannt"
 
 
+START_DOC_RELS = ("README.md", "SCHNELLSTART.md", "LIESMICH.txt")
+
+
+def leftover_start_doc_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "LLP-FOUNDRY-TOR" in text:
+        return "Foundry"
+    low = text.lower()
+    if any(
+        marker in low
+        for marker in (
+            "textverbessern.exe",
+            "gründlich mit mistral",
+            "mistral-bearbeitung",
+            "portable windows",
+            "streamlit",
+            "ollama",
+        )
+    ):
+        return "noch alt"
+    return "nicht erkannt"
+
+
+def start_docs_modus(roots: list[Path] | None = None, tool_root: Path | None = None) -> str:
+    modes: list[str] = []
+    if tool_root is not None:
+        for name in START_DOC_RELS:
+            path = tool_root / name
+            modes.append(leftover_start_doc_modus(path if path.is_file() else None))
+    elif roots is not None:
+        for name in START_DOC_RELS:
+            found = None
+            for root in roots:
+                found = _first_existing(root, TOOL_NAMES["text"], name)
+                if found is not None:
+                    break
+            modes.append(leftover_start_doc_modus(found))
+    if any(mode == "noch alt" for mode in modes):
+        return "noch alt"
+    if any(mode == "nicht erkannt" for mode in modes):
+        return "nicht erkannt"
+    if any(mode == "Foundry" for mode in modes):
+        return "Foundry"
+    return "nicht gefunden"
+
+
 def find_text_pyproject(roots: list[Path]) -> Path | None:
     for root in roots:
         found = _first_existing(root, TOOL_NAMES["text"], "pyproject.toml")
@@ -344,6 +392,7 @@ def report(start: Path | None = None) -> dict[str, object]:
     hybrid_mode = hybrid_modus(hybrid)
     pyproject_mode = pyproject_modus(pyproject)
     providers_init_mode = providers_init_modus(providers_init)
+    docs_mode = start_docs_modus(roots=roots)
     return {
         "foundry": describe_status(),
         "anhang": find_anhang(roots),
@@ -372,6 +421,7 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_pyproject_modus": pyproject_mode,
         "text_providers_init": providers_init,
         "text_providers_init_modus": providers_init_mode,
+        "text_docs_modus": docs_mode,
         "pseudokrat": find_pseudokrat(roots),
     }
 
@@ -406,6 +456,7 @@ def format_report(data: dict[str, object]) -> str:
         "  Hybrid-Weg:      " + str(data["text_hybrid_modus"]),
         "  Paketdatei:      " + str(data["text_pyproject_modus"]),
         "  Provider-Export: " + str(data["text_providers_init_modus"]),
+        "  Tool-Anleitung:  " + str(data["text_docs_modus"]),
         "  Original-Start:  "
         + ("noch da – Anwenden.bat" if data["text_original_cmd"] else "beiseite"),
         "  Alte EXE:        "
@@ -482,6 +533,11 @@ def format_report(data: dict[str, object]) -> str:
             "  app/providers/__init__.py exportiert noch Mistral."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_docs_modus"] in {"noch alt", "nicht erkannt"}:
+        lines.append(
+            "  README oder SCHNELLSTART zeigt noch EXE oder Mistral."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     lines.append("  Keine Schluessel in dieser Anzeige.")
     lines.append("  Anleitung: ANLEITUNG.txt in diesem Ordner.")
     return "\n".join(lines)
@@ -526,6 +582,8 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
     providers_init = tool_root / "app" / "providers" / "__init__.py"
     if providers_init.is_file() and providers_init_modus(providers_init) != "Foundry":
         reasons.append("Provider-Export")
+    if start_docs_modus(tool_root=tool_root) not in {"Foundry", "nicht gefunden"}:
+        reasons.append("Anleitung")
     provider = tool_root / "app" / "providers" / "foundry_provider.py"
     if desktop.is_file() and not provider.is_file():
         reasons.append("Foundry-Datei")
@@ -561,6 +619,7 @@ def text_has_leftovers(
         or data["text_hybrid_modus"] in {"noch Mistral", "nicht erkannt"}
         or data["text_pyproject_modus"] in {"noch API", "noch Streamlit", "nicht erkannt"}
         or data["text_providers_init_modus"] in {"noch Mistral", "nicht erkannt"}
+        or data["text_docs_modus"] in {"noch alt", "nicht erkannt"}
         or (data["text_desktop"] is not None and data["text_provider"] is None)
     )
 
@@ -580,6 +639,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     hybrid_ok = data["text_hybrid_modus"] in {"Foundry", "nicht gefunden"}
     pyproject_ok = data["text_pyproject_modus"] in {"abgeschaltet", "nicht gefunden"}
     init_ok = data["text_providers_init_modus"] in {"Foundry", "nicht gefunden"}
+    docs_ok = data["text_docs_modus"] in {"Foundry", "nicht gefunden"}
     return (
         data["text_modus"] == "Foundry"
         and start_ok
@@ -595,6 +655,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and hybrid_ok
         and pyproject_ok
         and init_ok
+        and docs_ok
     )
 
 
