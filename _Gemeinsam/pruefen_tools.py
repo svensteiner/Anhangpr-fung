@@ -117,13 +117,20 @@ def format_report(data: dict[str, object]) -> str:
     if data["text_modus"] == "noch Mistral":
         lines.append(
             "  Text verbessern zeigt noch Mistral."
-            " Start.bat Punkt 2 stellt auf Foundry um."
+            " Punkt 2 oeffnet dann die Foundry-Seite, nicht Mistral."
         )
     lines.append("  Keine Schluessel in dieser Anzeige.")
     return "\n".join(lines)
 
 
-def main() -> int:
+def text_foundry_ok(start: Path | None = None) -> bool:
+    return report(start)["text_modus"] == "Foundry"
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    if "--text-foundry" in args:
+        return 0 if text_foundry_ok() else 1
     data = report()
     print(format_report(data))
     foundry = data["foundry"]

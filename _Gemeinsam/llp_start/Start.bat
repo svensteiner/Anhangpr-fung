@@ -53,8 +53,12 @@ exit /b 1
 echo  Text verbessern: gruendlich nur Foundry (llp_ai).
 echo  Nicht Mistral/Ollama, kein stiller Wechsel.
 call :FOUNDRY_TEXT
-call :TRY "%ROOT%\rephraser" "TEXT VERBESSERN.cmd" && exit /b 0
-call :TRY "%ROOT%\paraphraser" "TEXT VERBESSERN.cmd" && exit /b 0
+call :TEXT_IST_FOUNDRY
+if not errorlevel 1 (
+    call :TRY "%ROOT%\rephraser" "TEXT VERBESSERN.cmd" && exit /b 0
+    call :TRY "%ROOT%\paraphraser" "TEXT VERBESSERN.cmd" && exit /b 0
+)
+echo  Oeffne Foundry-Seite. Ein Mistral-rephraser wird nicht gestartet.
 if defined LLP_SHARED_AI_ROOT call :TRY "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry" "Starten.bat" && exit /b 0
 call :TRY "%ROOT%\_Gemeinsam\text_verbessern_foundry" "Starten.bat" && exit /b 0
 echo  Text verbessern nicht gefunden. Bitte
@@ -62,6 +66,18 @@ echo  _Gemeinsam\text_verbessern_foundry\Starten.bat
 echo  doppelklicken.
 pause
 exit /b 1
+
+:TEXT_IST_FOUNDRY
+if not defined LLP_SHARED_AI_ROOT exit /b 1
+if not exist "%LLP_SHARED_AI_ROOT%\pruefen_tools.py" exit /b 1
+set "PY="
+py -3 -c "import sys" >nul 2>&1 && set "PY=py -3"
+if not defined PY python -c "import sys" >nul 2>&1 && set "PY=python"
+if not defined PY python3 -c "import sys" >nul 2>&1 && set "PY=python3"
+if not defined PY exit /b 1
+%PY% "%LLP_SHARED_AI_ROOT%\pruefen_tools.py" --text-foundry
+if errorlevel 1 exit /b 1
+exit /b 0
 
 :FOUNDRY_TEXT
 if not defined LLP_SHARED_AI_ROOT goto :eof

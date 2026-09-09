@@ -113,3 +113,5 @@ def test_text_verbessern_foundry_kit_liegt_bereit():
     assert "llp_shared_ai_root" in low
     assert "text_verbessern_foundry" in low
     assert "text_verbessern_foundry\" \"starten.bat" in low or "text_verbessern_foundry\\starten.bat" in low
+    assert "--text-foundry" in low
+    assert "mistral-rephraser wird nicht gestartet" in low

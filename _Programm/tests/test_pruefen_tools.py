@@ -56,7 +56,8 @@ def test_report_erkennt_mistral_bei_text_verbessern(tmp_path: Path) -> None:
     assert data["pseudokrat"] is not None
     blob = module.format_report(data)
     assert "noch Mistral" in blob
-    assert "Start.bat Punkt 2" in blob
+    assert "Foundry-Seite" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
 
 
 def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
@@ -74,3 +75,4 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     data = module.report(gemeinsam)
     assert data["text_modus"] == "Foundry"
     assert "noch Mistral" not in module.format_report(data)
+    assert module.text_foundry_ok(gemeinsam) is True
