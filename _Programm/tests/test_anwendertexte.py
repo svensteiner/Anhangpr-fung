@@ -15,6 +15,7 @@ def test_anleitung_kein_exe_copy_und_modus3_pflicht():
     assert "foundry" in text
     assert "pseudokrat bleibt lokal" in text
     assert "pruefen.bat" in text
+    assert "bitte pruefen.bat" in text
     assert "fachliche unterlagen" in text
     assert "ohne bestaetigung" in text
     assert "teil 1" in text
@@ -83,6 +84,7 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "kein ollama-rest" in low
     assert "keine streamlit-datei" in low
     assert "bei jedem start" in low
+    assert "bitte pruefen.bat" in low
     assert "sagt installieren das klar" in low
     assert "llp_start" in low
     assert "start_windows.ps1" in low
@@ -108,6 +110,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "keine streamlit-datei" in text
     assert "keine alte api" in text
     assert "bei jedem start" in text
+    assert "bitte pruefen.bat" in text
     assert "sagt installieren das klar" in text
     assert "healthz" not in text
     lies = (ROOT / "_Gemeinsam" / "LIESMICH.txt").read_text(encoding="utf-8").lower()
@@ -135,15 +138,20 @@ def test_klienten_liesmich_ohne_healthz():
 def test_starten_zeigt_foundry_kurz():
     text = (ROOT / "Starten.bat").read_text(encoding="utf-8")
     assert "--kurz" in text
+    assert "--rest" in text
     assert "pruefen_tools.py" in text
+    assert "noch ein alter Weg" in text
+    assert "Anwenden hat nicht geklappt" in text
 
 
 def test_starten_wendet_foundry_an():
     text = (ROOT / "Starten.bat").read_text(encoding="utf-8")
     assert "anwenden.py" in text
     assert "--leise" in text
+    assert "--rest" in text
     assert "text_verbessern_foundry" in text.lower()
     assert text.find("anwenden.py") < text.find("%PY% app.py")
+    assert text.find("--leise") < text.find("--rest")
 
 
 def test_installieren_wendet_foundry_an():
@@ -179,6 +187,7 @@ def test_werkzeuge_pseudokrat_ohne_foundry():
     assert "llp_ai" in text
     assert "anwenden.bat" in text
     assert "pruefen.bat" in text
+    assert "bitte pruefen.bat" in text
     assert "tools_starten.bat" in text
     assert "foundry-tor" in text
     assert "nicht mistral" in text
@@ -225,11 +234,15 @@ def test_text_verbessern_foundry_kit_liegt_bereit():
     kit_start = (kit / "Starten.bat").read_text(encoding="utf-8").lower()
     assert "anwenden.py" in kit_start
     assert "--leise" in kit_start
+    assert "--rest" in kit_start
+    assert "noch ein alter weg" in kit_start
     start = (ROOT / "_Gemeinsam" / "llp_start" / "Start.bat").read_text(encoding="utf-8")
     low = start.lower()
     assert "anwenden.py" in low
     assert "foundry_text" in low
     assert "call :foundry_text leise" in low
+    assert "--rest" in low
+    assert "noch ein alter weg" in low
     start_pos = start.lower().find("call :foundry_text leise")
     wahl_pos = start.lower().find("set /p wahl")
     assert start_pos != -1 and wahl_pos != -1 and start_pos < wahl_pos

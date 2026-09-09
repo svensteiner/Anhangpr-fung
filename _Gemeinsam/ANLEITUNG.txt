@@ -16,8 +16,10 @@ EINMALIG
     Text verbessern   (nur Foundry, nicht Mistral)
   Installieren.bat stellt Text verbessern auf Foundry
   um (Anwenden.bat). Starten.bat und das Startmenue
-  tun dasselbe leise bei jedem Start, falls jemand
-  rephraser neu kopiert. Installieren.bat zeigt danach
+  tun dasselbe bei jedem Start, falls jemand
+  rephraser neu kopiert. Klappt Anwenden nicht oder
+  bleibt ein alter Weg, erscheint eine Zeile
+  („Bitte Pruefen.bat“). Installieren.bat zeigt danach
   denselben Stand wie Pruefen.bat: kein Streamlit,
   keine Streamlit-Datei, keine alte EXE, kein Ollama-Rest,
   keine alte API.

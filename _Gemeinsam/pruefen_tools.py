@@ -346,6 +346,25 @@ def format_report(data: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def text_has_leftovers(
+    data: dict[str, object] | None = None, start: Path | None = None
+) -> bool:
+    """Alter Mistral/Streamlit/EXE-Weg nebenan – unabhängig von Foundry-Status."""
+    if data is None:
+        data = report(start)
+    return (
+        data["text_modus"] == "noch Mistral"
+        or data["text_start"] == "noch Streamlit"
+        or data["text_cmd_modus"] == "noch alt"
+        or data["text_exe"] is not None
+        or data["text_runtime_modus"] == "noch Ollama"
+        or data["text_mistral_modus"] == "noch Ollama"
+        or data["text_streamlit_modus"] == "noch Streamlit"
+        or data["text_api_modus"] == "noch API"
+        or (data["text_desktop"] is not None and data["text_provider"] is None)
+    )
+
+
 def text_foundry_ok(start: Path | None = None) -> bool:
     data = report(start)
     start_ok = data["text_start"] in {"Foundry-Tor", "nicht gefunden"}
@@ -374,24 +393,15 @@ def main(argv: list[str] | None = None) -> int:
     if "--kurz" in args:
         print(describe_status()["kurz"])
         return 0
+    if "--rest" in args:
+        return 2 if text_has_leftovers() else 0
     if "--text-foundry" in args:
         return 0 if text_foundry_ok() else 1
     data = report()
     print(format_report(data))
     foundry = data["foundry"]
     assert isinstance(foundry, dict)
-    leftover = (
-        data["text_modus"] == "noch Mistral"
-        or data["text_start"] == "noch Streamlit"
-        or data["text_cmd_modus"] == "noch alt"
-        or data["text_exe"] is not None
-        or data["text_runtime_modus"] == "noch Ollama"
-        or data["text_mistral_modus"] == "noch Ollama"
-        or data["text_streamlit_modus"] == "noch Streamlit"
-        or data["text_api_modus"] == "noch API"
-        or (data["text_desktop"] is not None and data["text_provider"] is None)
-    )
-    if leftover:
+    if text_has_leftovers(data):
         return 2
     return 0 if foundry["bereit"] else 1
 

@@ -19,6 +19,11 @@ echo  Nur Foundry, kein Mistral/Ollama.
 echo  Zum Beenden: Knopf Beenden in der Oberflaeche.
 echo.
 if exist "%~dp0anwenden.py" %PY% "%~dp0anwenden.py" --leise
+if errorlevel 2 echo  Text verbessern: Anwenden hat nicht geklappt. Bitte Pruefen.bat.
+if exist "%~dp0..\pruefen_tools.py" (
+    %PY% "%~dp0..\pruefen_tools.py" --rest
+    if errorlevel 2 echo  Text verbessern: noch ein alter Weg. Bitte Pruefen.bat.
+)
 %PY% server.py
 if errorlevel 1 (
     echo  Start fehlgeschlagen. Bitte die IT rufen.

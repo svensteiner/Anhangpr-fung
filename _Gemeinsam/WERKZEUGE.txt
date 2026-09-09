@@ -33,8 +33,9 @@ KI:     gruendliche Fassung ueber Foundry (llp_ai),
         Nicht Ollama als Kanzlei-Standard.
 Zeigt das Tool noch Mistral:
         Starten.bat und llp_start stellen das
-        leise bei jedem Start um. Oder einmal
-        text_verbessern_foundry\Anwenden.bat
+        bei jedem Start um. Bleibt ein alter Weg,
+        erscheint eine Zeile („Bitte Pruefen.bat“).
+        Oder einmal text_verbessern_foundry\Anwenden.bat
         Danach ist auch TEXT VERBESSERN.cmd ein Tor.
 
 

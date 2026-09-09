@@ -558,3 +558,25 @@ def test_main_leise_ohne_tool_bleibt_still(monkeypatch, capsys) -> None:
     assert capsys.readouterr().out == ""
     assert module.main([]) == 2
     assert "nicht gefunden" in capsys.readouterr().out
+
+
+def test_main_leise_bei_anwenden_fehler_ist_sichtbar(monkeypatch, capsys) -> None:
+    module = _load_anwenden()
+    monkeypatch.setattr(module, "find_tool_root", lambda start=None: Path("/tmp/rephraser"))
+    monkeypatch.setattr(module, "apply_foundry", lambda root: (False, "kaputt"))
+    assert module.main(["--leise"]) == 2
+    assert capsys.readouterr().out == ""
+
+
+def test_main_leise_bei_ausnahme_ist_sichtbar(monkeypatch, capsys) -> None:
+    module = _load_anwenden()
+    monkeypatch.setattr(module, "find_tool_root", lambda start=None: Path("/tmp/rephraser"))
+
+    def _boom(root: Path) -> tuple[bool, str]:
+        raise ValueError("kaputt")
+
+    monkeypatch.setattr(module, "apply_foundry", _boom)
+    assert module.main(["--leise"]) == 2
+    assert capsys.readouterr().out == ""
+    assert module.main([]) == 2
+    assert "kaputt" in capsys.readouterr().out

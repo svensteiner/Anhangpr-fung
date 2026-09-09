@@ -11,8 +11,9 @@ Wenn daneben noch der Ordner rephraser liegt und
 „Gründlich mit Mistral“ zeigt:
 
 1. Doppelklick auf  Anwenden.bat  in diesem Ordner
-   (Starten.bat und das Startmenue tun das leise
-   von selbst).
+   (Starten.bat und das Startmenue tun das
+   von selbst. Bleibt ein alter Weg, erscheint
+   eine Zeile „Bitte Pruefen.bat“).
 2. Das Programm findet den Nachbarordner rephraser
    oder paraphraser und stellt die gründliche Fassung
    auf Microsoft Foundry (llp_ai) um.

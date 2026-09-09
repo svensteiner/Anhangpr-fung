@@ -75,6 +75,11 @@ if not defined PY python3 -c "import sys" >nul 2>&1 && set "PY=python3"
 if not defined PY goto :eof
 if /I "%~1"=="leise" (
     %PY% "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\anwenden.py" --leise
+    if errorlevel 2 echo  Text verbessern: Anwenden hat nicht geklappt. Bitte Pruefen.bat.
+    if exist "%LLP_SHARED_AI_ROOT%\pruefen_tools.py" (
+        %PY% "%LLP_SHARED_AI_ROOT%\pruefen_tools.py" --rest
+        if errorlevel 2 echo  Text verbessern: noch ein alter Weg. Bitte Pruefen.bat.
+    )
     goto :eof
 )
 echo  Foundry-Anbindung pruefen ...

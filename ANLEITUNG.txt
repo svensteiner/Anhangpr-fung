@@ -104,6 +104,8 @@ KI (MICROSOFT FOUNDRY):
 
   Status ohne Schluessel: _Gemeinsam\Pruefen.bat
   (zeigt Foundry und ob Text verbessern noch Mistral oder Ollama nutzt)
+  Starten.bat zeigt eine Zeile, wenn Anwenden nicht klappt
+  oder ein alter Weg bleibt („Bitte Pruefen.bat“).
   In der Oberflaeche unten kurz "KI: bereit" oder "KI: aus".
 
 

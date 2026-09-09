@@ -817,13 +817,12 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 2
         ok, msg = apply_foundry(root)
-    except (FileNotFoundError, ValueError) as exc:
-        if leise:
-            return 0
-        print(str(exc))
+    except (FileNotFoundError, ValueError, OSError) as exc:
+        if not leise:
+            print(str(exc))
         return 2
     if leise:
-        return 0
+        return 0 if ok else 2
     print(msg)
     print("Kein stiller Wechsel auf Mistral/Ollama.")
     print("Ordner:", root)

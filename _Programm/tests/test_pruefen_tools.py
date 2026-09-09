@@ -357,3 +357,37 @@ def test_report_erkennt_gepatchten_local_runtime(tmp_path: Path) -> None:
 def test_kurz_gibt_nur_statuszeile() -> None:
     module = _load()
     assert module.main(["--kurz"]) == 0
+
+
+def test_rest_ohne_nachbar_ist_ok(tmp_path: Path) -> None:
+    module = _load()
+    gemeinsam = tmp_path / "_Gemeinsam"
+    gemeinsam.mkdir()
+    assert module.text_has_leftovers(start=gemeinsam) is False
+
+
+def test_rest_mit_mistral_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    desktop = tools / "rephraser" / "app" / "desktop.py"
+    desktop.parent.mkdir(parents=True)
+    desktop.write_text(
+        'MODE_STRONG = "Gründlich mit Mistral (bis 45 s)"\n'
+        'return "rules+mistral-local", "substantial"\n',
+        encoding="utf-8",
+    )
+    assert module.text_has_leftovers(start=gemeinsam) is True
+
+
+def test_main_rest_ohne_leftover(monkeypatch) -> None:
+    module = _load()
+    monkeypatch.setattr(module, "text_has_leftovers", lambda data=None, start=None: False)
+    assert module.main(["--rest"]) == 0
+
+
+def test_main_rest_mit_leftover(monkeypatch) -> None:
+    module = _load()
+    monkeypatch.setattr(module, "text_has_leftovers", lambda data=None, start=None: True)
+    assert module.main(["--rest"]) == 2
