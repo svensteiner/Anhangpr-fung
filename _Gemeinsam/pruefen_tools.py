@@ -189,6 +189,71 @@ def find_text_api(roots: list[Path]) -> Path | None:
     return None
 
 
+def find_text_pipeline(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "app/pipeline.py")
+        if found is not None:
+            return found
+    return None
+
+
+def pipeline_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    still_mistral = "return LocalMistralProvider()" in text
+    still_hybrid = "return HybridLocalProvider()" in text
+    foundry = "FoundryEditorialProvider" in text and "HybridFoundryProvider" in text
+    if still_mistral or still_hybrid:
+        return "noch Mistral"
+    if foundry:
+        return "Foundry"
+    return "nicht erkannt"
+
+
+def find_text_hybrid(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "app/providers/hybrid.py")
+        if found is not None:
+            return found
+    return None
+
+
+def hybrid_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "LocalMistralProvider()" in text:
+        return "noch Mistral"
+    if "FoundryEditorialProvider" in text:
+        return "Foundry"
+    return "nicht erkannt"
+
+
+def find_text_pyproject(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "pyproject.toml")
+        if found is not None:
+            return found
+    return None
+
+
+def pyproject_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    raw_uvicorn = "uvicorn>=" in text or '"uvicorn' in text
+    raw_streamlit = "streamlit>=" in text or '"streamlit' in text
+    marked = "LLP-FOUNDRY-TOR" in text and "kein uvicorn" in text
+    if raw_uvicorn:
+        return "noch API"
+    if raw_streamlit:
+        return "noch Streamlit"
+    if marked:
+        return "abgeschaltet"
+    return "nicht erkannt"
+
+
 def text_api_modus(path: Path | None) -> str:
     if path is None:
         return "nicht gefunden"
@@ -236,6 +301,9 @@ def report(start: Path | None = None) -> dict[str, object]:
     mistral_provider = find_mistral_provider(roots)
     streamlit_app = find_streamlit_app(roots)
     api = find_text_api(roots)
+    pipeline = find_text_pipeline(roots)
+    hybrid = find_text_hybrid(roots)
+    pyproject = find_text_pyproject(roots)
     modus = text_verbessern_modus(desktop)
     start_modus = text_startskript_modus(startskript)
     cmd_modus = text_cmd_modus(cmd)
@@ -243,6 +311,9 @@ def report(start: Path | None = None) -> dict[str, object]:
     mistral_modus = mistral_provider_modus(mistral_provider)
     streamlit_modus = streamlit_app_modus(streamlit_app)
     api_modus = text_api_modus(api)
+    pipeline_mode = pipeline_modus(pipeline)
+    hybrid_mode = hybrid_modus(hybrid)
+    pyproject_mode = pyproject_modus(pyproject)
     return {
         "foundry": describe_status(),
         "anhang": find_anhang(roots),
@@ -262,6 +333,12 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_streamlit_modus": streamlit_modus,
         "text_api": api,
         "text_api_modus": api_modus,
+        "text_pipeline": pipeline,
+        "text_pipeline_modus": pipeline_mode,
+        "text_hybrid": hybrid,
+        "text_hybrid_modus": hybrid_mode,
+        "text_pyproject": pyproject,
+        "text_pyproject_modus": pyproject_mode,
         "pseudokrat": find_pseudokrat(roots),
     }
 
@@ -292,6 +369,9 @@ def format_report(data: dict[str, object]) -> str:
         "  Mistral-Client:  " + str(data["text_mistral_modus"]),
         "  Streamlit-Datei: " + str(data["text_streamlit_modus"]),
         "  Alte API:        " + str(data["text_api_modus"]),
+        "  Text-Pipeline:   " + str(data["text_pipeline_modus"]),
+        "  Hybrid-Weg:      " + str(data["text_hybrid_modus"]),
+        "  Paketdatei:      " + str(data["text_pyproject_modus"]),
         "  Alte EXE:        "
         + ("noch da – Anwenden.bat" if data["text_exe"] else "beiseite"),
         "  Pseudokrat:      "
@@ -341,6 +421,21 @@ def format_report(data: dict[str, object]) -> str:
             "  app/main.py bietet noch eine FastAPI/uvicorn-Route."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_pipeline_modus"] in {"noch Mistral", "nicht erkannt"}:
+        lines.append(
+            "  app/pipeline.py leitet noch auf Mistral."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
+    if data["text_hybrid_modus"] in {"noch Mistral", "nicht erkannt"}:
+        lines.append(
+            "  hybrid.py ruft noch Mistral auf."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
+    if data["text_pyproject_modus"] in {"noch API", "noch Streamlit", "nicht erkannt"}:
+        lines.append(
+            "  pyproject.toml zieht noch Streamlit oder uvicorn nach."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     lines.append("  Keine Schluessel in dieser Anzeige.")
     lines.append("  Anleitung: ANLEITUNG.txt in diesem Ordner.")
     return "\n".join(lines)
@@ -361,6 +456,9 @@ def text_has_leftovers(
         or data["text_mistral_modus"] == "noch Ollama"
         or data["text_streamlit_modus"] == "noch Streamlit"
         or data["text_api_modus"] == "noch API"
+        or data["text_pipeline_modus"] in {"noch Mistral", "nicht erkannt"}
+        or data["text_hybrid_modus"] in {"noch Mistral", "nicht erkannt"}
+        or data["text_pyproject_modus"] in {"noch API", "noch Streamlit", "nicht erkannt"}
         or (data["text_desktop"] is not None and data["text_provider"] is None)
     )
 
@@ -375,6 +473,9 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     mistral_ok = data["text_mistral_modus"] in {"abgeschaltet", "nicht gefunden"}
     streamlit_ok = data["text_streamlit_modus"] in {"abgeschaltet", "nicht gefunden"}
     api_ok = data["text_api_modus"] in {"abgeschaltet", "nicht gefunden"}
+    pipeline_ok = data["text_pipeline_modus"] in {"Foundry", "nicht gefunden"}
+    hybrid_ok = data["text_hybrid_modus"] in {"Foundry", "nicht gefunden"}
+    pyproject_ok = data["text_pyproject_modus"] in {"abgeschaltet", "nicht gefunden"}
     return (
         data["text_modus"] == "Foundry"
         and start_ok
@@ -385,6 +486,9 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and mistral_ok
         and streamlit_ok
         and api_ok
+        and pipeline_ok
+        and hybrid_ok
+        and pyproject_ok
     )
 
 

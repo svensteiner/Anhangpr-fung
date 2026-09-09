@@ -109,6 +109,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "kein ollama-rest" in text
     assert "keine streamlit-datei" in text
     assert "keine alte api" in text
+    assert "keine mistral-pipeline" in text
     assert "bei jedem start" in text
     assert "bitte pruefen.bat" in text
     assert "sagt installieren das klar" in text
@@ -160,7 +161,9 @@ def test_installieren_wendet_foundry_an():
     assert "text verbessern auf foundry" in text
     assert "pruefen_tools.py" in text
     assert "if errorlevel 2" in text
+    assert "--rest" in text
     assert "noch einen alten weg" in text
+    assert text.find("anwenden.py") < text.find("--rest")
     assert text.find("pruefen_tools.py") < text.find("fertig!")
     share = text.find("..\\_gemeinsam\\llp_ai")
     lokal = text.find("%~dp0_gemeinsam\\llp_ai")

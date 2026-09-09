@@ -57,6 +57,12 @@ if defined SHARED set "ANWENDEN=%SHARED%\text_verbessern_foundry\anwenden.py"
 if exist "%ANWENDEN%" if defined PY (
     echo   Stelle Text verbessern auf Foundry um ...
     %PY% "%ANWENDEN%"
+    if errorlevel 2 (
+        if exist "%SHARED%\pruefen_tools.py" (
+            %PY% "%SHARED%\pruefen_tools.py" --rest
+            if errorlevel 2 goto REST
+        )
+    )
 )
 
 if defined SHARED if exist "%SHARED%\pruefen_tools.py" if defined PY (

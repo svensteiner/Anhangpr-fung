@@ -102,6 +102,9 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert data["text_mistral_modus"] == "nicht gefunden"
     assert data["text_streamlit_modus"] == "nicht gefunden"
     assert data["text_api_modus"] == "nicht gefunden"
+    assert data["text_pipeline_modus"] == "nicht gefunden"
+    assert data["text_hybrid_modus"] == "nicht gefunden"
+    assert data["text_pyproject_modus"] == "nicht gefunden"
     blob = module.format_report(data)
     assert "noch Mistral" not in blob
     assert "Foundry-Tor" in blob
@@ -110,6 +113,9 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert "Mistral-Client:" in blob
     assert "Streamlit-Datei:" in blob
     assert "Alte API:" in blob
+    assert "Text-Pipeline:" in blob
+    assert "Hybrid-Weg:" in blob
+    assert "Paketdatei:" in blob
     assert module.text_foundry_ok(gemeinsam) is True
 
 
@@ -357,6 +363,92 @@ def test_report_erkennt_gepatchten_local_runtime(tmp_path: Path) -> None:
 def test_kurz_gibt_nur_statuszeile() -> None:
     module = _load()
     assert module.main(["--kurz"]) == 0
+
+
+def _foundry_desktop(tools: Path) -> None:
+    desktop = tools / "rephraser" / "app" / "desktop.py"
+    desktop.parent.mkdir(parents=True, exist_ok=True)
+    desktop.write_text(
+        'MODE_STRONG = "Gründlich mit Foundry (Büro-KI)"\n'
+        'return "rules+foundry", "substantial"\n',
+        encoding="utf-8",
+    )
+    provider = tools / "rephraser" / "app" / "providers" / "foundry_provider.py"
+    provider.parent.mkdir(parents=True, exist_ok=True)
+    provider.write_text("def foundry_ready():\n    return True\n", encoding="utf-8")
+    (tools / "rephraser" / "TEXT VERBESSERN.cmd").write_text(
+        "rem LLP-FOUNDRY-TOR\n", encoding="utf-8"
+    )
+    ps1 = tools / "rephraser" / "scripts" / "start_windows.ps1"
+    ps1.parent.mkdir(parents=True, exist_ok=True)
+    ps1.write_text(
+        "# LLP-FOUNDRY-TOR\nStart-Process text_verbessern_foundry\\Starten.bat\n",
+        encoding="utf-8",
+    )
+
+
+def test_report_foundry_desktop_aber_mistral_pipeline_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    (tools / "rephraser" / "app" / "pipeline.py").write_text(
+        "def get_provider(name):\n"
+        "    if name == 'mistral':\n"
+        "        return LocalMistralProvider()\n"
+        "    if name == 'auto':\n"
+        "        return HybridLocalProvider()\n",
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_modus"] == "Foundry"
+    assert data["text_pipeline_modus"] == "noch Mistral"
+    blob = module.format_report(data)
+    assert "pipeline.py" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+
+
+def test_report_foundry_desktop_aber_hybrid_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    hybrid = tools / "rephraser" / "app" / "providers" / "hybrid.py"
+    hybrid.write_text(
+        "from app.providers.mistral_provider import LocalMistralProvider\n"
+        "class HybridLocalProvider:\n"
+        "    def __init__(self):\n"
+        "        self.mistral = LocalMistralProvider()\n",
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_hybrid_modus"] == "noch Mistral"
+    blob = module.format_report(data)
+    assert "hybrid.py" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+
+
+def test_report_foundry_desktop_aber_pyproject_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    (tools / "rephraser" / "pyproject.toml").write_text(
+        'dependencies = ["fastapi>=0.115", "pydantic>=2.8", "uvicorn>=0.30"]\n'
+        'ui = ["streamlit>=1.37"]\n',
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_pyproject_modus"] == "noch API"
+    blob = module.format_report(data)
+    assert "pyproject.toml" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
 
 
 def test_rest_ohne_nachbar_ist_ok(tmp_path: Path) -> None:
