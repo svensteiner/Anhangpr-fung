@@ -259,6 +259,12 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         "[project.optional-dependencies]\nui = [\"streamlit>=1.37\"]\n",
         encoding="utf-8",
     )
+    wf = tool / ".github" / "workflows"
+    wf.mkdir(parents=True, exist_ok=True)
+    (wf / "windows-portable.yml").write_text(
+        "name: portable\n  TextVerbessern.exe\n",
+        encoding="utf-8",
+    )
     dist = tool / "dist" / "TextVerbessern"
     dist.mkdir(parents=True, exist_ok=True)
     (dist / "TextVerbessern.exe").write_bytes(b"mz-dist")
@@ -379,6 +385,8 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "streamlit>=" not in pyproject
     assert not (tool / "dist" / "TextVerbessern" / "TextVerbessern.exe").is_file()
     assert (tool / "dist" / "TextVerbessern" / "TextVerbessern.exe.llp-alt").is_file()
+    assert not (tool / ".github" / "workflows" / "windows-portable.yml").is_file()
+    assert (tool / ".github" / "workflows" / "windows-portable.yml.llp-alt").is_file()
 
     launcher = (tool / "TEXT VERBESSERN.cmd").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" in launcher

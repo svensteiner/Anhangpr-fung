@@ -112,6 +112,7 @@ def apply(tool_root: Path) -> list[str]:
 
     done.extend(_park_exe(tool_root))
     done.extend(_park_packaging(tool_root))
+    done.extend(_park_portable_workflow(tool_root))
     ps1 = _patch_windows_start(tool_root)
     if ps1 is not None:
         done.append(str(ps1))
@@ -179,6 +180,7 @@ EXE_NAMES = (
 )
 
 SPEC_REL = Path("packaging") / "TextVerbessern.spec"
+WORKFLOW_REL = Path(".github") / "workflows" / "windows-portable.yml"
 EXE_REL_DIRS = (
     Path("."),
     Path("dist"),
@@ -379,6 +381,18 @@ def _park_packaging(tool_root: Path) -> list[str]:
     if dest.exists():
         return []
     spec.rename(dest)
+    return [str(dest)]
+
+
+def _park_portable_workflow(tool_root: Path) -> list[str]:
+    """CI-Rezept darf keine neue Mistral-EXE bauen."""
+    workflow = tool_root / WORKFLOW_REL
+    if not workflow.is_file():
+        return []
+    dest = workflow.with_name(workflow.name + ".llp-alt")
+    if dest.exists():
+        return []
+    workflow.rename(dest)
     return [str(dest)]
 
 

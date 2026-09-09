@@ -17,9 +17,10 @@ EINMALIG
   Installieren.bat stellt Text verbessern auf Foundry
   um (Anwenden.bat). Starten.bat und das Startmenue
   tun dasselbe leise bei jedem Start, falls jemand
-  rephraser neu kopiert. Danach Pruefen.bat: kein
-  Streamlit, keine Streamlit-Datei, keine alte EXE,
-  kein Ollama-Rest.
+  rephraser neu kopiert. Installieren.bat zeigt danach
+  denselben Stand wie Pruefen.bat: kein Streamlit,
+  keine Streamlit-Datei, keine alte EXE, kein Ollama-Rest.
+  Bleibt ein alter Weg, sagt Installieren das klar.
 
 TAEGLICH
 --------

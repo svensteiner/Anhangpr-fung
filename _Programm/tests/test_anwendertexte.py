@@ -98,6 +98,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "kein ollama-rest" in text
     assert "keine streamlit-datei" in text
     assert "bei jedem start" in text
+    assert "sagt installieren das klar" in text
     assert "healthz" not in text
     lies = (ROOT / "_Gemeinsam" / "LIESMICH.txt").read_text(encoding="utf-8").lower()
     assert "anleitung.txt" in lies
@@ -139,6 +140,10 @@ def test_installieren_wendet_foundry_an():
     text = (ROOT / "Installieren.bat").read_text(encoding="utf-8", errors="replace").lower()
     assert "anwenden.py" in text
     assert "text verbessern auf foundry" in text
+    assert "pruefen_tools.py" in text
+    assert "if errorlevel 2" in text
+    assert "noch einen alten weg" in text
+    assert text.find("pruefen_tools.py") < text.find("fertig!")
     share = text.find("..\\_gemeinsam\\llp_ai")
     lokal = text.find("%~dp0_gemeinsam\\llp_ai")
     assert share != -1 and lokal != -1

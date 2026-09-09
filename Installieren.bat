@@ -59,6 +59,13 @@ if exist "%ANWENDEN%" if defined PY (
     %PY% "%ANWENDEN%"
 )
 
+if defined SHARED if exist "%SHARED%\pruefen_tools.py" if defined PY (
+    echo.
+    echo   Pruefe Foundry und Nachbar-Tools ...
+    %PY% "%SHARED%\pruefen_tools.py"
+    if errorlevel 2 goto REST
+)
+
 echo.
 echo ============================================================
 echo   FERTIG!
@@ -70,3 +77,17 @@ echo   "Text verbessern" startet nur Foundry, nicht Mistral.
 echo ============================================================
 echo.
 pause
+exit /b 0
+
+:REST
+echo.
+echo ============================================================
+echo   Verknuepfungen liegen auf dem Desktop.
+echo   Text verbessern zeigt noch einen alten Weg.
+echo   Bitte die Zeilen oben lesen oder die IT rufen.
+echo   Dann noch einmal Installieren.bat oder
+echo   _Gemeinsam\text_verbessern_foundry\Anwenden.bat.
+echo ============================================================
+echo.
+pause
+exit /b 2
