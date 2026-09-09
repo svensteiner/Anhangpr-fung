@@ -54,6 +54,41 @@ def find_text_desktop(roots: list[Path]) -> Path | None:
     return None
 
 
+def find_text_cmd(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "TEXT VERBESSERN.cmd")
+        if found is not None:
+            return found
+    return None
+
+
+def text_cmd_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "LLP-FOUNDRY-TOR" in text:
+        return "Foundry-Tor"
+    return "noch alt"
+
+
+def find_live_text_exe(roots: list[Path]) -> Path | None:
+    for root in roots:
+        for name in TOOL_NAMES["text"]:
+            for exe_name in ("TextVerbessern.exe", "TEXT VERBESSERN.exe", "rephraser.exe"):
+                candidate = root / name / exe_name
+                if candidate.is_file():
+                    return candidate
+    return None
+
+
+def find_foundry_provider(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "app/providers/foundry_provider.py")
+        if found is not None:
+            return found
+    return None
+
+
 def find_text_startskript(roots: list[Path]) -> Path | None:
     for root in roots:
         found = _first_existing(root, TOOL_NAMES["text"], "scripts/start_windows.ps1")
@@ -98,8 +133,12 @@ def report(start: Path | None = None) -> dict[str, object]:
     roots = search_roots(start)
     desktop = find_text_desktop(roots)
     startskript = find_text_startskript(roots)
+    cmd = find_text_cmd(roots)
+    exe = find_live_text_exe(roots)
+    provider = find_foundry_provider(roots)
     modus = text_verbessern_modus(desktop)
     start_modus = text_startskript_modus(startskript)
+    cmd_modus = text_cmd_modus(cmd)
     return {
         "foundry": describe_status(),
         "anhang": find_anhang(roots),
@@ -107,6 +146,10 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_modus": modus,
         "text_startskript": startskript,
         "text_start": start_modus,
+        "text_cmd": cmd,
+        "text_cmd_modus": cmd_modus,
+        "text_exe": exe,
+        "text_provider": provider,
         "pseudokrat": find_pseudokrat(roots),
     }
 
@@ -130,6 +173,11 @@ def format_report(data: dict[str, object]) -> str:
             else "nicht gefunden"
         ),
         "  Startskript:     " + str(data["text_start"]),
+        "  Startbefehl:     " + str(data["text_cmd_modus"]),
+        "  Foundry-Datei:   "
+        + ("vorhanden" if data["text_provider"] else "fehlt"),
+        "  Alte EXE:        "
+        + ("noch da – Anwenden.bat" if data["text_exe"] else "beiseite"),
         "  Pseudokrat:      "
         + (
             "gefunden (lokal, ohne Foundry)"
@@ -148,6 +196,15 @@ def format_report(data: dict[str, object]) -> str:
             "  start_windows.ps1 startet noch Streamlit."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_cmd_modus"] == "noch alt":
+        lines.append(
+            "  TEXT VERBESSERN.cmd ist noch das alte Skript."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
+    if data["text_exe"] is not None:
+        lines.append("  Eine alte TextVerbessern.exe liegt noch im Tool-Ordner.")
+    if data["text_desktop"] is not None and data["text_provider"] is None:
+        lines.append("  foundry_provider.py fehlt im Tool-Ordner.")
     lines.append("  Keine Schluessel in dieser Anzeige.")
     lines.append("  Anleitung: ANLEITUNG.txt in diesem Ordner.")
     return "\n".join(lines)
@@ -156,7 +213,16 @@ def format_report(data: dict[str, object]) -> str:
 def text_foundry_ok(start: Path | None = None) -> bool:
     data = report(start)
     start_ok = data["text_start"] in {"Foundry-Tor", "nicht gefunden"}
-    return data["text_modus"] == "Foundry" and start_ok
+    cmd_ok = data["text_cmd_modus"] in {"Foundry-Tor", "nicht gefunden"}
+    exe_ok = data["text_exe"] is None
+    provider_ok = data["text_provider"] is not None or data["text_desktop"] is None
+    return (
+        data["text_modus"] == "Foundry"
+        and start_ok
+        and cmd_ok
+        and exe_ok
+        and provider_ok
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -170,7 +236,14 @@ def main(argv: list[str] | None = None) -> int:
     print(format_report(data))
     foundry = data["foundry"]
     assert isinstance(foundry, dict)
-    if data["text_modus"] == "noch Mistral" or data["text_start"] == "noch Streamlit":
+    leftover = (
+        data["text_modus"] == "noch Mistral"
+        or data["text_start"] == "noch Streamlit"
+        or data["text_cmd_modus"] == "noch alt"
+        or data["text_exe"] is not None
+        or (data["text_desktop"] is not None and data["text_provider"] is None)
+    )
+    if leftover:
         return 2
     return 0 if foundry["bereit"] else 1
 

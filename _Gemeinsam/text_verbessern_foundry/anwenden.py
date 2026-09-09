@@ -110,6 +110,8 @@ def apply(tool_root: Path) -> list[str]:
     if ps1 is not None:
         done.append(str(ps1))
     done.extend(_write_start_notes(tool_root))
+    extra = _patch_leftover_docs(tool_root)
+    done.extend(extra)
 
     return done
 
@@ -248,6 +250,48 @@ def _write_start_notes(tool_root: Path) -> list[str]:
     return written
 
 
+ENV_EXAMPLE = """# LLP-FOUNDRY-TOR
+# Schluessel nur in ..\\_Gemeinsam\\llp_ai\\.env (Microsoft Foundry).
+# Kein Ollama, kein Mistral, keine eigenen Cloud-Schluessel hier.
+"""
+
+README_BANNER = """<!-- LLP-FOUNDRY-TOR -->
+# Text verbessern – nur Foundry
+
+Nicht TextVerbessern.exe, nicht Streamlit, nicht Mistral.
+Start: Desktop „Text verbessern“ oder _Gemeinsam\\text_verbessern_foundry\\Starten.bat.
+
+"""
+
+
+def _patch_leftover_docs(tool_root: Path) -> list[str]:
+    """README, .env.example und CLI zeigen sonst noch Mistral/Ollama."""
+    written: list[str] = []
+    env = tool_root / ".env.example"
+    if env.is_file():
+        written.append(str(_backup_then_write(env, ENV_EXAMPLE)))
+    readme = tool_root / "README.md"
+    if readme.is_file():
+        current = readme.read_text(encoding="utf-8", errors="replace")
+        if NOTE_MARK not in current:
+            written.append(str(_backup_then_write(readme, README_BANNER + current)))
+    cli = tool_root / "app" / "main.py"
+    if cli.is_file():
+        text = cli.read_text(encoding="utf-8", errors="replace")
+        updated = _replace_all_if_present(
+            text,
+            'choices=["fast-editor", "rules", "mistral-local"]',
+            'choices=["fast-editor", "rules", "foundry"]',
+        )
+        if updated != text:
+            bak = cli.with_name(cli.name + ".llp-alt")
+            if not bak.is_file():
+                bak.write_text(text, encoding="utf-8")
+            cli.write_text(updated, encoding="utf-8")
+            written.append(str(cli))
+    return written
+
+
 def _park_exe(tool_root: Path) -> list[str]:
     """Alte Desktop-EXE zur Seite legen, damit Mistral nicht per Doppelklick startet."""
     parked: list[str] = []
@@ -381,6 +425,16 @@ def _patch_desktop(path: Path) -> None:
     desk = _replace_all(desk, '"rules+mistral-local"', '"rules+foundry"')
     desk = _replace_all_if_present(
         desk,
+        "self.mistral_ready = local_mistral_ready()",
+        "self.mistral_ready = foundry_ready()",
+    )
+    desk = _replace_all_if_present(
+        desk,
+        '"mistral_available": local_mistral_ready()',
+        '"mistral_available": foundry_ready()',
+    )
+    desk = _replace_all_if_present(
+        desk,
         "Mistral derzeit nicht erreichbar – sichere lokale Fassung wird sofort erstellt",
         "Foundry derzeit nicht erreichbar – sichere lokale Fassung wird sofort erstellt",
     )
@@ -388,6 +442,31 @@ def _patch_desktop(path: Path) -> None:
         desk,
         "Das lokale Mistral war vor der Bearbeitung nicht erreichbar",
         "Foundry war vor der Bearbeitung nicht erreichbar",
+    )
+    desk = _replace_all_if_present(
+        desk,
+        "Text war für Mistral zu lang; vollständig lokal schnell bearbeitet.",
+        "Text war für Foundry zu lang; vollständig lokal schnell bearbeitet.",
+    )
+    desk = _replace_all_if_present(
+        desk,
+        "Mistral hat die Zeitgrenze erreicht; sichere lokale Fassung angezeigt.",
+        "Foundry hat die Zeitgrenze erreicht; sichere lokale Fassung angezeigt.",
+    )
+    desk = _replace_all_if_present(
+        desk,
+        "Mistral war nicht verfügbar; sichere lokale Grundbereinigung angezeigt.",
+        "Foundry war nicht verfügbar; sichere lokale Grundbereinigung angezeigt.",
+    )
+    desk = _replace_all_if_present(
+        desk,
+        "✓ Lokales Mistral ist verfügbar.",
+        "✓ Foundry (Büro-KI) ist verfügbar.",
+    )
+    desk = _replace_all_if_present(
+        desk,
+        "Schnelle lokale Bearbeitung ist verfügbar; Mistral ist optional.",
+        "Schnelle lokale Bearbeitung ist verfügbar; gründlich nur mit Foundry.",
     )
     path.write_text(desk, encoding="utf-8")
 
@@ -454,6 +533,36 @@ def _patch_streamlit(path: Path) -> None:
         st,
         "Stiloptionen gelten nur für die optionale gründliche Mistral-Bearbeitung.",
         "Stiloptionen gelten nur für die gründliche Foundry-Bearbeitung.",
+    )
+    st = _replace_all_if_present(
+        st,
+        "Mistral hat die Zeitgrenze erreicht. Das sicher bereinigte Ergebnis wird angezeigt.",
+        "Foundry hat die Zeitgrenze erreicht. Das sicher bereinigte Ergebnis wird angezeigt.",
+    )
+    st = _replace_all_if_present(
+        st,
+        "Mistral war nicht verfügbar. Die sichere lokale Grundbereinigung wird angezeigt.",
+        "Foundry war nicht verfügbar. Die sichere lokale Grundbereinigung wird angezeigt.",
+    )
+    st = _replace_all_if_present(
+        st,
+        "Das lokale Mistral war vor der Bearbeitung nicht erreichbar; ",
+        "Foundry war vor der Bearbeitung nicht erreichbar; ",
+    )
+    st = _replace_all_if_present(
+        st,
+        "Text war für Mistral zu lang; vollständig lokal schnell bearbeitet.",
+        "Text war für Foundry zu lang; vollständig lokal schnell bearbeitet.",
+    )
+    st = _replace_all_if_present(
+        st,
+        "Mistral war nicht verfügbar; sichere lokale Grundbereinigung angezeigt.",
+        "Foundry war nicht verfügbar; sichere lokale Grundbereinigung angezeigt.",
+    )
+    st = _replace_all_if_present(
+        st,
+        "Lokal mit Regeln und Mistral verarbeitet.",
+        "Lokal mit Regeln und Foundry verarbeitet.",
     )
     path.write_text(st, encoding="utf-8")
 

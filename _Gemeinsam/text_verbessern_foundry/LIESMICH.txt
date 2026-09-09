@@ -16,9 +16,9 @@ Wenn daneben noch der Ordner rephraser liegt und
    auf Microsoft Foundry (llp_ai) um.
 3. Schnell bleibt lokal (Regeln). Es gibt keinen stillen
    Wechsel auf Ollama oder ein anderes Modell.
-4. Danach Text verbessern wie gewohnt starten
-   (Tools_starten.bat Punkt 2 oder Desktop
-   "Text verbessern"). TEXT VERBESSERN.cmd und
+4. Danach Desktop „Text verbessern“ oder
+   text_verbessern_foundry\\Starten.bat
+   (Foundry-Seite im Browser). TEXT VERBESSERN.cmd und
    scripts\\start_windows.ps1 im Tool-Ordner
    oeffnen nur die Foundry-Seite, nicht Streamlit
    und nicht Mistral. Eine alte Desktop-EXE wird

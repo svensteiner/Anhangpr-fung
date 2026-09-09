@@ -259,7 +259,10 @@ def profile_hint(profil: dict[str, str | None]) -> str:
     form_txt = _FORM_DISPLAY.get(profil.get("rechtsform") or "")
     size_txt = _SIZE_DISPLAY.get(profil.get("groessenklasse") or "")
     if form_txt and size_txt:
-        return (f"Erkannt: {form_txt} {size_txt}. Bitte prüfen, dann starten.")
+        return (
+            f"Erkannt: {form_txt} {size_txt}. "
+            "Bitte prüfen, dann „Teil 2: Rest prüfen“."
+        )
     if form_txt:
         return f"Rechtsform erkannt ({form_txt}). Bitte noch klein / mittel / groß wählen."
     if size_txt:

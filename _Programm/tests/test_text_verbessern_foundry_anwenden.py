@@ -73,6 +73,9 @@ def system_status_text(mistral_ready: bool, model_request_inflight: bool = False
 
 
 class App:
+    def __init__(self) -> None:
+        self.mistral_ready = local_mistral_ready()
+
     def _refresh_mistral_controls(self, source: str | None = None) -> None:
         current_source = source if source is not None else ""
         mistral_for_text = local_model_eligible(current_source, self._mistral_can_start())
@@ -104,6 +107,7 @@ class App:
                 text="Mistral derzeit nicht erreichbar – sichere lokale Fassung wird sofort erstellt …"
             )
         unused = model_request
+        diagnostics = {"mistral_available": local_mistral_ready()}
 '''
 
 STREAMLIT_MAIN = '''from app.local_runtime import (
@@ -165,6 +169,8 @@ if run:
     )
     if mistral_preflight_failed:
         st.session_state.result.audit.requested_provider = "rules+mistral-local"
+    st.warning("Mistral hat die Zeitgrenze erreicht. Das sicher bereinigte Ergebnis wird angezeigt.")
+    st.warning("Mistral war nicht verfügbar. Die sichere lokale Grundbereinigung wird angezeigt.")
 '''
 
 
@@ -200,6 +206,18 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         "Gründlich mit Mistral ist optional.\n",
         encoding="utf-8",
     )
+    (tool / ".env.example").write_text(
+        "MISTRAL_BASE_URL=http://127.0.0.1:11434\nMISTRAL_MODEL=mistral\n",
+        encoding="utf-8",
+    )
+    (tool / "README.md").write_text(
+        "# Text verbessern\n\nDoppelklick auf TextVerbessern.exe. Ollama/Mistral.\n",
+        encoding="utf-8",
+    )
+    (tool / "app" / "main.py").write_text(
+        'parser.add_argument("--provider", choices=["fast-editor", "rules", "mistral-local"])\n',
+        encoding="utf-8",
+    )
     return tool
 
 
@@ -233,6 +251,10 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "if foundry_ready():" in desktop
     assert "if not mistral_ready:" not in desktop
     assert "thorough_ready = foundry_ready()" in desktop
+    assert "self.mistral_ready = foundry_ready()" in desktop
+    assert "self.mistral_ready = local_mistral_ready()" not in desktop
+    assert '"mistral_available": foundry_ready()' in desktop
+    assert "local_mistral_ready()" not in desktop
     assert "local_model_eligible(current_source, self._mistral_can_start())" not in desktop
     assert "preflight_local_mistral()" not in desktop
     assert "if not foundry_ready():" in desktop
@@ -252,6 +274,10 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "rules+mistral-local" not in streamlit
     assert '"foundry" in provider' in streamlit
     assert '"mistral" in provider' not in streamlit
+    assert "Foundry hat die Zeitgrenze erreicht" in streamlit
+    assert "Foundry war nicht verfügbar" in streamlit
+    assert "Mistral hat die Zeitgrenze" not in streamlit
+    assert "Mistral war nicht verfügbar" not in streamlit
 
     launcher = (tool / "TEXT VERBESSERN.cmd").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" in launcher
@@ -285,6 +311,22 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     schnell_bak = (tool / "SCHNELLSTART.md.llp-alt").read_text(encoding="utf-8")
     assert "Gründlich mit Mistral" in schnell_bak
     assert "LLP-FOUNDRY-TOR" not in schnell_bak
+
+    env = (tool / ".env.example").read_text(encoding="utf-8")
+    assert "LLP-FOUNDRY-TOR" in env
+    assert "MISTRAL_BASE_URL" not in env
+    assert "llp_ai" in env
+    env_bak = (tool / ".env.example.llp-alt").read_text(encoding="utf-8")
+    assert "MISTRAL_BASE_URL" in env_bak
+    readme = (tool / "README.md").read_text(encoding="utf-8")
+    assert "LLP-FOUNDRY-TOR" in readme
+    assert "nicht Mistral" in readme
+    assert "TextVerbessern.exe" in readme
+    readme_bak = (tool / "README.md.llp-alt").read_text(encoding="utf-8")
+    assert "LLP-FOUNDRY-TOR" not in readme_bak
+    cli = (tool / "app" / "main.py").read_text(encoding="utf-8")
+    assert 'choices=["fast-editor", "rules", "foundry"]' in cli
+    assert "mistral-local" not in cli
 
     ok2, msg2 = module.apply_foundry(tool)
     assert ok2, msg2

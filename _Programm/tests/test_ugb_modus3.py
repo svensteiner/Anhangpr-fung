@@ -107,6 +107,8 @@ def test_detect_company_profile_and_hint():
     assert profil["rechtsform"] == "gmbh"
     assert profil["groessenklasse"] == "klein"
     assert "GmbH" in profile_hint(profil) and "klein" in profile_hint(profil)
+    assert "Teil 2: Rest prüfen" in profile_hint(profil)
+    assert "starten" not in profile_hint(profil).lower()
     assert "Bitte" in profile_hint({"rechtsform": None, "groessenklasse": None})
 
 
@@ -476,6 +478,7 @@ def test_mode3_ui_uses_excel_labels_and_confirm():
     assert "ug-eingrenzung" in html
     assert "/ugb_eingrenzung" in html
     assert "Teil 2: Rest prüfen" in html
+    assert "Teil 2: Rest prüfen…" in html
     assert "Zuerst Gesellschaft wählen" in html
     assert "Teil 2: offene Punkte in Excel" in html
     assert "bestaetigt" in html

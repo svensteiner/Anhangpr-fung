@@ -80,6 +80,12 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
         'return "rules+foundry", "substantial"\n',
         encoding="utf-8",
     )
+    provider = tools / "rephraser" / "app" / "providers" / "foundry_provider.py"
+    provider.parent.mkdir(parents=True, exist_ok=True)
+    provider.write_text("def foundry_ready():\n    return True\n", encoding="utf-8")
+    (tools / "rephraser" / "TEXT VERBESSERN.cmd").write_text(
+        "rem LLP-FOUNDRY-TOR\n", encoding="utf-8"
+    )
     ps1 = tools / "rephraser" / "scripts" / "start_windows.ps1"
     ps1.parent.mkdir(parents=True)
     ps1.write_text(
@@ -89,9 +95,13 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     data = module.report(gemeinsam)
     assert data["text_modus"] == "Foundry"
     assert data["text_start"] == "Foundry-Tor"
+    assert data["text_cmd_modus"] == "Foundry-Tor"
+    assert data["text_provider"] is not None
+    assert data["text_exe"] is None
     blob = module.format_report(data)
     assert "noch Mistral" not in blob
     assert "Foundry-Tor" in blob
+    assert "vorhanden" in blob
     assert module.text_foundry_ok(gemeinsam) is True
 
 

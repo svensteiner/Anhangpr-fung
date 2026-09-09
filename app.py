@@ -583,7 +583,7 @@ HTML = r"""<!DOCTYPE html>
   <section id="mode-ugb" class="hidden">
     <div class="steps">
       <div class="step active" id="ug-step1"><div class="step-num">1</div><div class="step-label">Anhang und Gesellschaft</div></div>
-      <div class="step"        id="ug-step2"><div class="step-num">2</div><div class="step-label">Prüfung läuft</div></div>
+      <div class="step"        id="ug-step2"><div class="step-num">2</div><div class="step-label">Teil 2: Rest prüfen</div></div>
       <div class="step"        id="ug-step3"><div class="step-num">3</div><div class="step-label">Checkliste laden</div></div>
     </div>
     <div class="card" id="ug-upload">
@@ -625,7 +625,7 @@ HTML = r"""<!DOCTYPE html>
       <button class="btn-run" id="ug-btn" disabled onclick="ugRun()">▶ Zuerst Gesellschaft wählen</button>
     </div>
     <div class="card hidden" id="ug-progress">
-      <h2><span class="num">2</span>Prüfung läuft…</h2>
+      <h2><span class="num">2</span>Teil 2: Rest prüfen…</h2>
       <div class="progress-bar-wrap"><div class="progress-bar" id="ug-bar"></div></div>
       <div class="progress-text" id="ug-text">Anhang wird eingelesen…</div>
     </div>
