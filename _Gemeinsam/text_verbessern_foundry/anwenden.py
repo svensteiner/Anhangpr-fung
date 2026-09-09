@@ -121,6 +121,10 @@ def apply(tool_root: Path) -> list[str]:
     if runtime.is_file():
         _patch_local_runtime(runtime)
         done.append(str(runtime))
+    mistral = tool_root / "app" / "providers" / "mistral_provider.py"
+    if mistral.is_file():
+        _patch_mistral_provider(mistral)
+        done.append(str(mistral))
 
     return done
 
@@ -371,6 +375,22 @@ def _patch_local_runtime(path: Path) -> None:
         "def preflight_local_mistral() -> bool:\n",
         "def preflight_local_mistral() -> bool:\n"
         "    return False  # LLP-FOUNDRY-TOR: kein Ollama\n",
+    )
+    path.write_text(text, encoding="utf-8")
+
+
+def _patch_mistral_provider(path: Path) -> None:
+    """Direktaufruf darf Ollama nicht mehr erreichen."""
+    text = path.read_text(encoding="utf-8")
+    if "LLP-FOUNDRY-TOR" in text and "LocalMistralProvider ist abgeschaltet" in text:
+        return
+    text = _replace_all_if_present(
+        text,
+        "    def __init__(self, base_url: str | None = None, model: str | None = None) -> None:\n",
+        "    def __init__(self, base_url: str | None = None, model: str | None = None) -> None:\n"
+        '        raise RuntimeError(\n'
+        '            "LocalMistralProvider ist abgeschaltet. Nur Foundry (llp_ai)."\n'
+        "        )  # LLP-FOUNDRY-TOR\n",
     )
     path.write_text(text, encoding="utf-8")
 

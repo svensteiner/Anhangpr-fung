@@ -100,6 +100,25 @@ def local_runtime_modus(path: Path | None) -> str:
     return "nicht erkannt"
 
 
+def find_mistral_provider(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "app/providers/mistral_provider.py")
+        if found is not None:
+            return found
+    return None
+
+
+def mistral_provider_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "LLP-FOUNDRY-TOR" in text and "LocalMistralProvider ist abgeschaltet" in text:
+        return "abgeschaltet"
+    if "11434" in text or "/api/generate" in text:
+        return "noch Ollama"
+    return "nicht erkannt"
+
+
 def find_foundry_provider(roots: list[Path]) -> Path | None:
     for root in roots:
         found = _first_existing(root, TOOL_NAMES["text"], "app/providers/foundry_provider.py")
@@ -156,10 +175,12 @@ def report(start: Path | None = None) -> dict[str, object]:
     exe = find_live_text_exe(roots)
     provider = find_foundry_provider(roots)
     runtime = find_local_runtime(roots)
+    mistral_provider = find_mistral_provider(roots)
     modus = text_verbessern_modus(desktop)
     start_modus = text_startskript_modus(startskript)
     cmd_modus = text_cmd_modus(cmd)
     runtime_modus = local_runtime_modus(runtime)
+    mistral_modus = mistral_provider_modus(mistral_provider)
     return {
         "foundry": describe_status(),
         "anhang": find_anhang(roots),
@@ -173,6 +194,8 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_provider": provider,
         "text_runtime": runtime,
         "text_runtime_modus": runtime_modus,
+        "text_mistral_provider": mistral_provider,
+        "text_mistral_modus": mistral_modus,
         "pseudokrat": find_pseudokrat(roots),
     }
 
@@ -200,6 +223,7 @@ def format_report(data: dict[str, object]) -> str:
         "  Foundry-Datei:   "
         + ("vorhanden" if data["text_provider"] else "fehlt"),
         "  Ollama-Rest:     " + str(data["text_runtime_modus"]),
+        "  Mistral-Client:  " + str(data["text_mistral_modus"]),
         "  Alte EXE:        "
         + ("noch da – Anwenden.bat" if data["text_exe"] else "beiseite"),
         "  Pseudokrat:      "
@@ -234,6 +258,11 @@ def format_report(data: dict[str, object]) -> str:
             "  app/local_runtime.py prueft noch Ollama."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_mistral_modus"] == "noch Ollama":
+        lines.append(
+            "  mistral_provider.py kann noch Ollama aufrufen."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     lines.append("  Keine Schluessel in dieser Anzeige.")
     lines.append("  Anleitung: ANLEITUNG.txt in diesem Ordner.")
     return "\n".join(lines)
@@ -246,6 +275,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     exe_ok = data["text_exe"] is None
     provider_ok = data["text_provider"] is not None or data["text_desktop"] is None
     runtime_ok = data["text_runtime_modus"] in {"kein Ollama", "nicht gefunden"}
+    mistral_ok = data["text_mistral_modus"] in {"abgeschaltet", "nicht gefunden"}
     return (
         data["text_modus"] == "Foundry"
         and start_ok
@@ -253,6 +283,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and exe_ok
         and provider_ok
         and runtime_ok
+        and mistral_ok
     )
 
 
@@ -273,6 +304,7 @@ def main(argv: list[str] | None = None) -> int:
         or data["text_cmd_modus"] == "noch alt"
         or data["text_exe"] is not None
         or data["text_runtime_modus"] == "noch Ollama"
+        or data["text_mistral_modus"] == "noch Ollama"
         or (data["text_desktop"] is not None and data["text_provider"] is None)
     )
     if leftover:
