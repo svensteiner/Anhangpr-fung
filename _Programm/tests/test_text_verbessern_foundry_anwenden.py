@@ -237,6 +237,16 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         "# Text verbessern\n\nDoppelklick auf TextVerbessern.exe. Ollama/Mistral.\n",
         encoding="utf-8",
     )
+    web = tool / "web"
+    web.mkdir(parents=True, exist_ok=True)
+    (web / "TextVerbessern-Browser.html").write_text(
+        "<html><body><p>Offline, kein Mistral-Modell.</p></body></html>\n",
+        encoding="utf-8",
+    )
+    (web / "index.html").write_text(
+        "<html><body><p>kein Mistral-Modell</p></body></html>\n",
+        encoding="utf-8",
+    )
     (tool / "app" / "main.py").write_text(
         'parser.add_argument("--provider", choices=["fast-editor", "rules", "mistral-local"])\n',
         encoding="utf-8",
@@ -368,10 +378,21 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "MISTRAL_BASE_URL" in env_bak
     readme = (tool / "README.md").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" in readme
-    assert "nicht Mistral" in readme
-    assert "TextVerbessern.exe" in readme
+    assert "kein Mistral" in readme
+    assert "kein Streamlit" in readme
+    assert "TextVerbessern.exe" not in readme
+    assert "streamlit run" not in readme.lower()
     readme_bak = (tool / "README.md.llp-alt").read_text(encoding="utf-8")
+    assert "TextVerbessern.exe" in readme_bak
     assert "LLP-FOUNDRY-TOR" not in readme_bak
+    html = (tool / "web" / "TextVerbessern-Browser.html").read_text(encoding="utf-8")
+    assert "LLP-FOUNDRY-TOR" in html
+    assert "Kanzlei-Weg" in html
+    assert "text_verbessern_foundry" in html
+    html_bak = (tool / "web" / "TextVerbessern-Browser.html.llp-alt").read_text(encoding="utf-8")
+    assert "LLP-FOUNDRY-TOR" not in html_bak
+    index = (tool / "web" / "index.html").read_text(encoding="utf-8")
+    assert "LLP-FOUNDRY-TOR" in index
     cli = (tool / "app" / "main.py").read_text(encoding="utf-8")
     assert 'choices=["fast-editor", "rules", "foundry"]' in cli
     assert "mistral-local" not in cli

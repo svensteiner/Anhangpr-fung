@@ -259,15 +259,6 @@ ENV_EXAMPLE = """# LLP-FOUNDRY-TOR
 # Kein Ollama, kein Mistral, keine eigenen Cloud-Schluessel hier.
 """
 
-README_BANNER = """<!-- LLP-FOUNDRY-TOR -->
-# Text verbessern – nur Foundry
-
-Nicht TextVerbessern.exe, nicht Streamlit, nicht Mistral.
-Start: Desktop „Text verbessern“ oder _Gemeinsam\\text_verbessern_foundry\\Starten.bat.
-
-"""
-
-
 def _patch_leftover_docs(tool_root: Path) -> list[str]:
     """README, .env.example und CLI zeigen sonst noch Mistral/Ollama."""
     written: list[str] = []
@@ -276,9 +267,8 @@ def _patch_leftover_docs(tool_root: Path) -> list[str]:
         written.append(str(_backup_then_write(env, ENV_EXAMPLE)))
     readme = tool_root / "README.md"
     if readme.is_file():
-        current = readme.read_text(encoding="utf-8", errors="replace")
-        if NOTE_MARK not in current:
-            written.append(str(_backup_then_write(readme, README_BANNER + current)))
+        written.append(str(_backup_then_write(readme, START_NOTE)))
+    written.extend(_patch_web_html(tool_root))
     cli = tool_root / "app" / "main.py"
     if cli.is_file():
         text = cli.read_text(encoding="utf-8", errors="replace")
@@ -293,6 +283,41 @@ def _patch_leftover_docs(tool_root: Path) -> list[str]:
                 bak.write_text(text, encoding="utf-8")
             cli.write_text(updated, encoding="utf-8")
             written.append(str(cli))
+    return written
+
+
+WEB_HTML_NAMES = (
+    Path("web") / "TextVerbessern-Browser.html",
+    Path("web") / "index.html",
+)
+WEB_BANNER = (
+    "<!-- LLP-FOUNDRY-TOR -->\n"
+    "<p><strong>Kanzlei-Weg:</strong> Desktop „Text verbessern“ oder "
+    "_Gemeinsam\\text_verbessern_foundry\\Starten.bat. "
+    "Nur Foundry, kein Mistral. Diese Datei ist nicht der Start.</p>\n"
+)
+
+
+def _patch_web_html(tool_root: Path) -> list[str]:
+    written: list[str] = []
+    for rel in WEB_HTML_NAMES:
+        path = tool_root / rel
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if NOTE_MARK in text:
+            continue
+        start = text.lower().find("<body")
+        if start < 0:
+            continue
+        end = text.find(">", start)
+        if end < 0:
+            continue
+        bak = path.with_name(path.name + ".llp-alt")
+        if not bak.is_file():
+            bak.write_text(text, encoding="utf-8")
+        path.write_text(text[: end + 1] + "\n" + WEB_BANNER + text[end + 1 :], encoding="utf-8")
+        written.append(str(path))
     return written
 
 
