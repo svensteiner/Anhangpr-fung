@@ -279,6 +279,22 @@ def _patch_pipeline(path: Path) -> None:
         "    if normalized in {\"rules+foundry\"}:\n"
         "        return HybridFoundryProvider()",
     )
+    pipe = _replace_once(
+        pipe,
+        '    if normalized in {"mistral", "mistral-local", "ollama"}:\n'
+        "        return LocalMistralProvider()\n"
+        '    if normalized in {"auto", "hybrid", "rules+mistral-local"}:\n'
+        "        return HybridLocalProvider()",
+        '    if normalized in {"mistral", "mistral-local", "ollama"}:\n'
+        "        return FoundryEditorialProvider()\n"
+        '    if normalized in {"auto", "hybrid", "rules+mistral-local"}:\n'
+        "        return HybridFoundryProvider()",
+    )
+    pipe = _replace_all_if_present(
+        pipe,
+        "select fast-editor, rules, or mistral-local.",
+        "select fast-editor, rules, or foundry.",
+    )
     path.write_text(pipe, encoding="utf-8")
 
 

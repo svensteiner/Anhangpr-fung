@@ -28,6 +28,8 @@ def get_provider(name: str):
         return LocalMistralProvider()
     if normalized in {"auto", "hybrid", "rules+mistral-local"}:
         return HybridLocalProvider()
+    if normalized in {"openai", "anthropic"}:
+        raise RuntimeError(f"Remote provider '{name}' is disabled; select fast-editor, rules, or mistral-local.")
     raise RuntimeError(f"Unknown provider: {name}")
 '''
 
@@ -217,6 +219,12 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "from .providers.foundry_provider import FoundryEditorialProvider, HybridFoundryProvider" in pipeline
     assert '"foundry", "company-ai"' in pipeline
     assert '"rules+foundry"' in pipeline
+    assert "return FoundryEditorialProvider()" in pipeline
+    assert "return HybridFoundryProvider()" in pipeline
+    assert "return LocalMistralProvider()" not in pipeline
+    assert "return HybridLocalProvider()" not in pipeline
+    assert "or foundry." in pipeline
+    assert "or mistral-local." not in pipeline
 
     desktop = (tool / "app" / "desktop.py").read_text(encoding="utf-8")
     assert 'MODE_STRONG = "Gründlich mit Foundry (Büro-KI)"' in desktop
