@@ -18,6 +18,8 @@ auf Ollama, OpenAI oder Anthropic.
 2. Nicht neu anlegen, wenn die Datei schon da ist.
 3. Tools starten wie gewohnt (Starten.bat).
 4. Status ohne Schlüssel: llp_ai\Pruefen.bat doppelklicken.
+5. Anderes Tool anbinden: `from llp_ai.company_ai import ask_ai, is_ai_ready`.
+   Kein eigener OpenAI-/Ollama-Client. Ist Foundry aus: Heuristik/Regeln.
 
 Ist Foundry aus oder nicht erreichbar, arbeiten die Tools
 ohne Modell weiter (Heuristik / Regeln).

@@ -6,9 +6,10 @@ from pathlib import Path
 from datetime import datetime
 
 from . import __version__, DISCLAIMER
-from .compliance.engine import ReviewEngine
-from .compliance.reporting.markdown_report import MarkdownReportGenerator
 from .compliance.knowledge.checklist_loader import ChecklistLoader
+from .compliance.knowledge.relevance import require_company_profile
+from .compliance.reporting.checklist_excel import generate_checklist_xlsx
+from .compliance.ugb_pipeline import review_checklist
 from .vorjahresvergleich import (
     extract_label_value_pairs,
     compare_anhaenge,
@@ -48,28 +49,29 @@ und ersetzt NICHT die fachliche Beurteilung durch einen Wirtschaftsprüfer.
     review_parser.add_argument(
         "notes_file",
         type=Path,
-        help="Pfad zum Anhang-Dokument (PDF)",
+        help="Pfad zum Anhang-Dokument (PDF oder Word)",
+    )
+    review_parser.add_argument(
+        "--rechtsform",
+        required=True,
+        choices=["gmbh", "ag"],
+        help="GmbH oder AG (ohne Angabe startet nichts)",
+    )
+    review_parser.add_argument(
+        "--groessenklasse",
+        required=True,
+        choices=["klein", "mittel", "gross"],
+        help="klein, mittel oder groß (ohne Angabe startet nichts)",
     )
     review_parser.add_argument(
         "-c", "--checklist",
         type=Path,
-        help="Pfad zur Checklisten-Datei (JSON)",
-    )
-    review_parser.add_argument(
-        "-u", "--ugb-source",
-        type=Path,
-        help="Pfad zur UGB-Quelldatei (RTF)",
+        help="Pfad zur Checklisten-Datei (Excel oder JSON)",
     )
     review_parser.add_argument(
         "-o", "--output",
         type=Path,
-        help="Ausgabepfad für das Prüfungsprotokoll",
-    )
-    review_parser.add_argument(
-        "--format",
-        choices=["markdown", "html"],
-        default="markdown",
-        help="Ausgabeformat (Standard: markdown)",
+        help="Ausgabepfad für die Excel-Checkliste",
     )
     review_parser.add_argument(
         "-v", "--verbose",
@@ -166,56 +168,49 @@ und ersetzt NICHT die fachliche Beurteilung durch einen Wirtschaftsprüfer.
 
 
 def run_review(args):
-    """Execute the review command."""
+    """Modus 3 zweistufig – ohne Gesellschaft startet nichts."""
     print("=" * 70)
-    print("ANHANGSPRÜFER - Prüfungsunterstützung")
+    print("ANHANGSPRÜFER - UGB-Inhaltsprüfung")
     print("=" * 70)
     print(DISCLAIMER)
 
-    # Validate inputs
     if not args.notes_file.exists():
         raise FileNotFoundError(f"Anhang-Datei nicht gefunden: {args.notes_file}")
 
-    # Initialize engine
-    engine = ReviewEngine()
+    legal_form, size_class = require_company_profile(args.rechtsform, args.groessenklasse)
+    loader = ChecklistLoader()
+    if args.checklist and args.checklist.suffix.lower() in {".xlsx", ".xlsm"}:
+        checklist = loader.load_from_xlsx(args.checklist)
+    elif args.checklist:
+        checklist = loader.load_from_json(args.checklist)
+    else:
+        checklist = loader.load_default_checklist()
 
-    # Run review
     print(f"\nPrüfe: {args.notes_file.name}")
+    print(f"Gesellschaft: {legal_form} {size_class}")
     print("-" * 70)
 
-    result = engine.review(
-        notes_path=args.notes_file,
-        checklist_path=args.checklist,
-        ugb_source_path=args.ugb_source,
-    )
+    result, info = review_checklist(args.notes_file, checklist, legal_form, size_class)
 
-    # Print summary
-    engine.print_summary(result)
-
-    # Generate report
     output_path = args.output
     if output_path is None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = Path(f"pruefungsprotokoll_{timestamp}.md")
+        output_path = Path(f"UGB-Checkliste_{timestamp}.xlsx")
+    elif output_path.suffix.lower() != ".xlsx":
+        output_path = output_path.with_suffix(".xlsx")
 
-    # Load checklist for report
-    if args.checklist:
-        loader = ChecklistLoader()
-        checklist = loader.load_from_json(args.checklist)
-    else:
-        loader = ChecklistLoader()
-        checklist = loader.load_default_checklist()
-
-    # Generate report
-    generator = MarkdownReportGenerator(checklist=checklist)
-
-    if args.format == "html":
-        generator.generate_word_compatible(result, output_path)
-    else:
-        generator.generate(result, output_path)
-
-    print(f"\nPrüfungsprotokoll erstellt: {output_path}")
-    print("\nHINWEIS: Das Protokoll erfordert Prüfervalidierung!")
+    generate_checklist_xlsx(
+        checklist, result, output_path,
+        legal_form=legal_form, size_class=size_class,
+    )
+    form_txt = "GmbH" if legal_form == "gmbh" else "AG"
+    size_txt = {"klein": "klein", "mittel": "mittel", "gross": "groß"}[size_class]
+    print(
+        f"\nFür {form_txt} {size_txt}: "
+        f"{info.get('zu_pruefen', 0)} von {len(result.findings)} Fragen geprüft."
+    )
+    print(f"Checkliste: {output_path}")
+    print("Kein stilles unbekannt. Offene Punkte in Excel bestätigen.")
 
 
 def run_init(args):

@@ -48,6 +48,8 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "foundry" in low
     assert "n. a. (rechtsgrund)" in low
     assert "lokales sprachmodell" not in low
+    assert "unbekannt" in low
+    assert "bestaetig" in low or "bestätig" in low
 
 
 def test_werkzeuge_pseudokrat_ohne_foundry():

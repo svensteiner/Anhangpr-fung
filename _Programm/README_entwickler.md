@@ -76,16 +76,13 @@ python app.py
 
 ### Kommandozeile
 
-```bash
-# Prüfung mit Standardeinstellungen ausführen
-python run_review.py
-```
+`run_review.py` ist abgeschaltet (alte Keyword-Engine). Anwender: `Starten.bat`.
 
 ### CLI-Befehle
 
 ```bash
-# Anhang prüfen
-python -m anhangspruefer review "Anhang 2024.pdf" -o protokoll.md
+# Anhang prüfen (Gesellschaft ist Pflicht)
+python -m anhangspruefer review "Anhang 2024.pdf" --rechtsform gmbh --groessenklasse klein -o checkliste.xlsx
 
 # Standard-Checkliste erstellen
 python -m anhangspruefer init -o meine_checkliste.json
