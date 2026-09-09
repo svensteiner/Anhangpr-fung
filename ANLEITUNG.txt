@@ -107,6 +107,8 @@ KI (MICROSOFT FOUNDRY):
   Starten.bat zeigt eine Zeile, wenn Anwenden nicht klappt
   oder ein alter Weg bleibt („Bitte Pruefen.bat“).
   In der Oberflaeche unten kurz "KI: bereit" oder "KI: aus".
+  In Modus 3 steht vor Teil 2 der gleiche Stand ausfuehrlich
+  (wenn aus: nur Heuristik, bitte Pruefen.bat).
 
 
 ERGEBNISSE:

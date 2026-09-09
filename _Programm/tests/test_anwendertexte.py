@@ -16,6 +16,7 @@ def test_anleitung_kein_exe_copy_und_modus3_pflicht():
     assert "pseudokrat bleibt lokal" in text
     assert "pruefen.bat" in text
     assert "bitte pruefen.bat" in text
+    assert "vor teil 2" in text
     assert "fachliche unterlagen" in text
     assert "ohne bestaetigung" in text
     assert "teil 1" in text
@@ -85,6 +86,7 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "keine streamlit-datei" in low
     assert "bei jedem start" in low
     assert "bitte pruefen.bat" in low
+    assert "vor teil 2" in low
     assert "sagt installieren das klar" in low
     assert "llp_start" in low
     assert "start_windows.ps1" in low
@@ -112,6 +114,8 @@ def test_share_anleitung_fuer_kollegen():
     assert "keine mistral-pipeline" in text
     assert "kein mistral-export" in text
     assert "keine exe-anleitung" in text
+    assert "keine alte offline-html" in text
+    assert "vor teil 2" in text
     assert "bei jedem start" in text
     assert "bitte pruefen.bat" in text
     assert "sagt installieren das klar" in text
@@ -138,7 +142,15 @@ def test_klienten_liesmich_ohne_healthz():
     text = (ROOT / "Klienten" / "_LIESMICH.txt").read_text(encoding="utf-8").lower()
     assert "healthz" not in text
     assert "pruefen.bat" in text
+    assert "_gemeinsam\\pruefen.bat" in text
+    assert "llp_ai\\pruefen.bat" not in text
     assert "startseite" in text
+
+
+def test_llp_ai_pruefen_nutzt_den_gemeinsamen_check():
+    text = (ROOT / "_Gemeinsam" / "llp_ai" / "Pruefen.bat").read_text(encoding="utf-8")
+    assert "pruefen_tools.py" in text
+    assert "llp_ai.pruefen" not in text
 
 
 def test_starten_zeigt_foundry_kurz():

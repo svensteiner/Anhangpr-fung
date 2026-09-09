@@ -84,7 +84,8 @@ WENN EIN PLUGIN NICHT LAEDT
 Das Werkzeug startet trotzdem - aber es verschweigt es nicht:
   * auf der Startseite ein sichtbarer Hinweis,
   * bei JEDEM Prueflauf ein Hinweis in der Ergebniskarte,
-  * KI-Status ohne Schluessel: _Gemeinsam\llp_ai\Pruefen.bat
+  * KI-Status ohne Schluessel: _Gemeinsam\Pruefen.bat
+    (Foundry und ob Text verbessern noch einen alten Weg hat)
 
 Ein Lauf ohne das Mandantenprofil liefert ein anderes Ergebnis.
 Darum bitte nicht ignorieren.

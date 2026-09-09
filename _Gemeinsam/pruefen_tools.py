@@ -258,6 +258,56 @@ def hybrid_modus(path: Path | None) -> str:
 
 
 START_DOC_RELS = ("README.md", "SCHNELLSTART.md", "LIESMICH.txt")
+WEB_HTML_RELS = (
+    Path("web") / "TextVerbessern-Browser.html",
+    Path("web") / "index.html",
+)
+SPEC_REL = Path("packaging") / "TextVerbessern.spec"
+BUILD_REL = Path("scripts") / "build_browser_standalone.py"
+WORKFLOW_REL = Path(".github") / "workflows" / "windows-portable.yml"
+
+
+def web_html_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "LLP-FOUNDRY-TOR" in text and "text_verbessern_foundry" in text:
+        return "Foundry-Hinweis"
+    return "noch alt"
+
+
+def find_live_web_html(roots: list[Path]) -> Path | None:
+    for root in roots:
+        for name in TOOL_NAMES["text"]:
+            for rel in WEB_HTML_RELS:
+                candidate = root / name / rel
+                if candidate.is_file() and web_html_modus(candidate) == "noch alt":
+                    return candidate
+    return None
+
+
+def find_live_spec(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], str(SPEC_REL))
+        if found is not None:
+            return found
+    return None
+
+
+def find_live_build_script(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], str(BUILD_REL))
+        if found is not None:
+            return found
+    return None
+
+
+def find_live_portable_workflow(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], str(WORKFLOW_REL))
+        if found is not None:
+            return found
+    return None
 
 
 def leftover_start_doc_modus(path: Path | None) -> str:
@@ -393,6 +443,10 @@ def report(start: Path | None = None) -> dict[str, object]:
     pyproject_mode = pyproject_modus(pyproject)
     providers_init_mode = providers_init_modus(providers_init)
     docs_mode = start_docs_modus(roots=roots)
+    web_html = find_live_web_html(roots)
+    spec = find_live_spec(roots)
+    build = find_live_build_script(roots)
+    workflow = find_live_portable_workflow(roots)
     return {
         "foundry": describe_status(),
         "anhang": find_anhang(roots),
@@ -422,6 +476,10 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_providers_init": providers_init,
         "text_providers_init_modus": providers_init_mode,
         "text_docs_modus": docs_mode,
+        "text_web_html": web_html,
+        "text_spec": spec,
+        "text_build": build,
+        "text_workflow": workflow,
         "pseudokrat": find_pseudokrat(roots),
     }
 
@@ -457,6 +515,10 @@ def format_report(data: dict[str, object]) -> str:
         "  Paketdatei:      " + str(data["text_pyproject_modus"]),
         "  Provider-Export: " + str(data["text_providers_init_modus"]),
         "  Tool-Anleitung:  " + str(data["text_docs_modus"]),
+        "  Offline-HTML:    "
+        + ("noch alt – Anwenden.bat" if data["text_web_html"] else "ok oder fehlt"),
+        "  Packaging:       "
+        + ("noch da – Anwenden.bat" if data["text_spec"] else "beiseite"),
         "  Original-Start:  "
         + ("noch da – Anwenden.bat" if data["text_original_cmd"] else "beiseite"),
         "  Alte EXE:        "
@@ -538,6 +600,16 @@ def format_report(data: dict[str, object]) -> str:
             "  README oder SCHNELLSTART zeigt noch EXE oder Mistral."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_web_html"] is not None:
+        lines.append(
+            "  web/TextVerbessern-Browser.html ist noch der alte Offline-Start."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
+    if data["text_spec"] is not None or data["text_build"] is not None or data["text_workflow"] is not None:
+        lines.append(
+            "  Ein Packaging- oder Build-Rezept liegt noch im Tool-Ordner."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     lines.append("  Keine Schluessel in dieser Anzeige.")
     lines.append("  Anleitung: ANLEITUNG.txt in diesem Ordner.")
     return "\n".join(lines)
@@ -584,6 +656,17 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
         reasons.append("Provider-Export")
     if start_docs_modus(tool_root=tool_root) not in {"Foundry", "nicht gefunden"}:
         reasons.append("Anleitung")
+    for rel in WEB_HTML_RELS:
+        html = tool_root / rel
+        if html.is_file() and web_html_modus(html) != "Foundry-Hinweis":
+            reasons.append("Offline-HTML")
+            break
+    if (tool_root / SPEC_REL).is_file():
+        reasons.append("Packaging-Spec")
+    if (tool_root / BUILD_REL).is_file():
+        reasons.append("Build-Skript")
+    if (tool_root / WORKFLOW_REL).is_file():
+        reasons.append("Portable-CI")
     provider = tool_root / "app" / "providers" / "foundry_provider.py"
     if desktop.is_file() and not provider.is_file():
         reasons.append("Foundry-Datei")
@@ -620,6 +703,10 @@ def text_has_leftovers(
         or data["text_pyproject_modus"] in {"noch API", "noch Streamlit", "nicht erkannt"}
         or data["text_providers_init_modus"] in {"noch Mistral", "nicht erkannt"}
         or data["text_docs_modus"] in {"noch alt", "nicht erkannt"}
+        or data["text_web_html"] is not None
+        or data["text_spec"] is not None
+        or data["text_build"] is not None
+        or data["text_workflow"] is not None
         or (data["text_desktop"] is not None and data["text_provider"] is None)
     )
 
@@ -640,6 +727,8 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     pyproject_ok = data["text_pyproject_modus"] in {"abgeschaltet", "nicht gefunden"}
     init_ok = data["text_providers_init_modus"] in {"Foundry", "nicht gefunden"}
     docs_ok = data["text_docs_modus"] in {"Foundry", "nicht gefunden"}
+    web_ok = data["text_web_html"] is None
+    pack_ok = data["text_spec"] is None and data["text_build"] is None and data["text_workflow"] is None
     return (
         data["text_modus"] == "Foundry"
         and start_ok
@@ -656,6 +745,8 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and pyproject_ok
         and init_ok
         and docs_ok
+        and web_ok
+        and pack_ok
     )
 
 

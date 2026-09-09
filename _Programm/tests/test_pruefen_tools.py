@@ -119,6 +119,8 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert "Original-Start:" in blob
     assert "Provider-Export:" in blob
     assert "Tool-Anleitung:" in blob
+    assert "Offline-HTML:" in blob
+    assert "Packaging:" in blob
     assert module.text_foundry_ok(gemeinsam) is True
 
 
@@ -452,6 +454,38 @@ def test_report_foundry_desktop_aber_pyproject_ist_nicht_ok(tmp_path: Path) -> N
     assert "pyproject.toml" in blob
     assert module.text_foundry_ok(gemeinsam) is False
     assert module.text_has_leftovers(data) is True
+
+
+def test_report_foundry_aber_offline_html_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    html = tools / "rephraser" / "web" / "index.html"
+    html.parent.mkdir(parents=True)
+    html.write_text("<html><body><p>Offline, kein Mistral-Modell.</p></body></html>\n", encoding="utf-8")
+    data = module.report(gemeinsam)
+    assert data["text_web_html"] is not None
+    blob = module.format_report(data)
+    assert "Offline-HTML" in blob or "index.html" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert "Offline-HTML" in module.leftovers_in_tool(tools / "rephraser")
+
+
+def test_report_foundry_aber_packaging_spec_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    spec = tools / "rephraser" / "packaging" / "TextVerbessern.spec"
+    spec.parent.mkdir(parents=True)
+    spec.write_text('name="TextVerbessern"\n', encoding="utf-8")
+    data = module.report(gemeinsam)
+    assert data["text_spec"] is not None
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert "Packaging-Spec" in module.leftovers_in_tool(tools / "rephraser")
 
 
 def test_report_foundry_aber_alte_readme_ist_nicht_ok(tmp_path: Path) -> None:

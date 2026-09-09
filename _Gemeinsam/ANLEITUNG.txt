@@ -23,7 +23,8 @@ EINMALIG
   denselben Stand wie Pruefen.bat: kein Streamlit,
   keine Streamlit-Datei, keine alte EXE, kein Ollama-Rest,
   keine alte API, keine Mistral-Pipeline,
-  kein Mistral-Export, keine EXE-Anleitung im Tool-Ordner.
+  kein Mistral-Export, keine EXE-Anleitung im Tool-Ordner,
+  keine alte Offline-HTML.
   Bleibt ein alter Weg, sagt Installieren das klar.
 
 TAEGLICH
@@ -34,7 +35,9 @@ TAEGLICH
      Modus 3: GmbH/AG und klein/mittel/gross waehlen
      und bestaetigen. Teil 1 zeigt, wie viele Fragen
      gelten. Ohne Auswahl startet nichts. Kein stilles
-     „unbekannt“. Knopf „Teil 2: Rest pruefen“.
+     „unbekannt“. Vor Teil 2 steht, ob die KI bereit
+     ist; wenn aus, nur Heuristik (Pruefen.bat).
+     Knopf „Teil 2: Rest pruefen“.
      Offene Punkte in Excel abarbeiten.
 
   2  Text verbessern
