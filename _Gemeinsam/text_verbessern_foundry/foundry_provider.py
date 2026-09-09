@@ -8,7 +8,6 @@ from pathlib import Path
 
 from app.models import SemanticConstraints, TransformOptions
 from app.providers.base import EditorialProvider, ProviderError
-from app.providers.local import LocalRuleProvider
 
 
 def _shared_roots() -> list[Path]:
@@ -55,7 +54,8 @@ class FoundryEditorialProvider(EditorialProvider):
     def rewrite(self, text: str, constraints: SemanticConstraints, options: TransformOptions) -> str:
         if _LAYER is None or not foundry_ready():
             raise ProviderError(
-                "Foundry ist nicht eingerichtet. Die sichere lokale Fassung bleibt verfügbar.",
+                "Foundry ist nicht eingerichtet. Der Text bleibt unverändert. "
+                "Kein Wechsel auf Regeln oder ein anderes Modell.",
                 code="provider_unavailable",
             )
         mandatory = list(dict.fromkeys(
@@ -83,9 +83,7 @@ class HybridFoundryProvider(EditorialProvider):
     name = "rules+foundry"
 
     def __init__(self) -> None:
-        self.rules = LocalRuleProvider()
         self.foundry = FoundryEditorialProvider()
 
     def rewrite(self, text: str, constraints: SemanticConstraints, options: TransformOptions) -> str:
-        cleaned = self.rules.rewrite(text, constraints, options)
-        return self.foundry.rewrite(cleaned, constraints, options)
+        return self.foundry.rewrite(text, constraints, options)

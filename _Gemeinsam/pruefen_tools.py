@@ -230,9 +230,14 @@ def pipeline_modus(path: Path | None) -> str:
     text = path.read_text(encoding="utf-8", errors="replace")
     still_mistral = "return LocalMistralProvider()" in text
     still_hybrid = "return HybridLocalProvider()" in text
+    still_rules = (
+        "return LocalRuleProvider()" in text or "return FastEditorialProvider()" in text
+    )
     foundry = "FoundryEditorialProvider" in text and "HybridFoundryProvider" in text
     if still_mistral or still_hybrid:
         return "noch Mistral"
+    if still_rules:
+        return "noch Regeln"
     if foundry:
         return "Foundry"
     return "nicht erkannt"
@@ -252,6 +257,8 @@ def hybrid_modus(path: Path | None) -> str:
     text = path.read_text(encoding="utf-8", errors="replace")
     if "LocalMistralProvider()" in text:
         return "noch Mistral"
+    if "LocalRuleProvider()" in text:
+        return "noch Regeln"
     if "FoundryEditorialProvider" in text:
         return "Foundry"
     return "nicht erkannt"
@@ -775,14 +782,14 @@ def format_report(data: dict[str, object]) -> str:
             "  app/evaluation.py startet noch die lokale Pipeline."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
-    if data["text_pipeline_modus"] in {"noch Mistral", "nicht erkannt"}:
+    if data["text_pipeline_modus"] in {"noch Mistral", "noch Regeln", "nicht erkannt"}:
         lines.append(
-            "  app/pipeline.py leitet noch auf Mistral."
+            "  app/pipeline.py leitet noch auf Mistral oder lokale Regeln."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
-    if data["text_hybrid_modus"] in {"noch Mistral", "nicht erkannt"}:
+    if data["text_hybrid_modus"] in {"noch Mistral", "noch Regeln", "nicht erkannt"}:
         lines.append(
-            "  hybrid.py ruft noch Mistral auf."
+            "  hybrid.py ruft noch Mistral oder lokale Regeln auf."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
     if data["text_pyproject_modus"] in {"noch API", "noch Streamlit", "noch CLI", "nicht erkannt"}:
@@ -923,8 +930,8 @@ def text_has_leftovers(
         or data["text_streamlit_modus"] == "noch Streamlit"
         or data["text_api_modus"] == "noch API"
         or data["text_cli_modus"] == "noch CLI"
-        or data["text_pipeline_modus"] in {"noch Mistral", "nicht erkannt"}
-        or data["text_hybrid_modus"] in {"noch Mistral", "nicht erkannt"}
+        or data["text_pipeline_modus"] in {"noch Mistral", "noch Regeln", "nicht erkannt"}
+        or data["text_hybrid_modus"] in {"noch Mistral", "noch Regeln", "nicht erkannt"}
         or data["text_pyproject_modus"] in {"noch API", "noch Streamlit", "noch CLI", "nicht erkannt"}
         or data["text_providers_init_modus"] in {"noch Mistral", "nicht erkannt"}
         or data["text_docs_modus"] in {"noch alt", "nicht erkannt"}

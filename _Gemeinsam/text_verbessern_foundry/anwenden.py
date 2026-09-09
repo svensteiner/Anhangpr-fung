@@ -634,6 +634,22 @@ def _patch_hybrid(path: Path) -> None:
         "followed by a local Mistral editorial pass.",
         "followed by a Foundry editorial pass.",
     )
+    text = _replace_all_if_present(
+        text,
+        "from app.providers.local import LocalRuleProvider\n",
+        "",
+    )
+    text = _replace_all_if_present(
+        text,
+        "        self.rules = LocalRuleProvider()\n",
+        "",
+    )
+    text = _replace_all_if_present(
+        text,
+        "        cleaned = self.rules.rewrite(text, constraints, options)\n"
+        "        return self.foundry.rewrite(cleaned, constraints, options)",
+        "        return self.foundry.rewrite(text, constraints, options)",
+    )
     path.write_text(text, encoding="utf-8")
 
 
@@ -656,6 +672,16 @@ def _patch_pipeline(path: Path) -> None:
         "        return FoundryEditorialProvider()\n"
         "    if normalized in {\"rules+foundry\"}:\n"
         "        return HybridFoundryProvider()",
+    )
+    pipe = _replace_all_if_present(
+        pipe,
+        "        return LocalRuleProvider()",
+        "        return FoundryEditorialProvider()",
+    )
+    pipe = _replace_all_if_present(
+        pipe,
+        "        return FastEditorialProvider()",
+        "        return FoundryEditorialProvider()",
     )
     pipe = _replace_all_if_present(
         pipe,

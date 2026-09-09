@@ -375,6 +375,10 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "return HybridFoundryProvider()" in pipeline
     assert "return LocalMistralProvider()" not in pipeline
     assert "return HybridLocalProvider()" not in pipeline
+    assert "return LocalRuleProvider()" not in pipeline
+    assert "return FastEditorialProvider()" not in pipeline
+    assert "LocalRuleProvider" not in provider
+    assert "Der Text bleibt unverändert" in provider
     assert "or foundry." in pipeline
     assert "or mistral-local." not in pipeline
     assert 'if "mistral" not in active_provider.name:' not in pipeline
@@ -401,7 +405,9 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "FoundryEditorialProvider" in hybrid
     assert 'name = "rules+foundry"' in hybrid
     assert "LocalMistralProvider" not in hybrid
+    assert "LocalRuleProvider" not in hybrid
     assert "self.foundry" in hybrid
+    assert "self.rules" not in hybrid
 
     desktop = (tool / "app" / "desktop.py").read_text(encoding="utf-8")
     assert 'MODE_STRONG = "Gründlich mit Foundry (Büro-KI)"' in desktop
@@ -809,6 +815,24 @@ def test_anwenden_legt_original_cmd_beiseite(tmp_path: Path) -> None:
         tool / "_llp_parked" / "TEXT VERBESSERN.original.cmd.llp-alt.txt"
     ).read_text(encoding="utf-8")
     assert "TextVerbessern.exe" in original
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_ersetzt_einzelnen_regel_return(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    pipe = tool / "app" / "pipeline.py"
+    text = pipe.read_text(encoding="utf-8")
+    pipe.write_text(
+        text.replace("return FoundryEditorialProvider()", "return LocalRuleProvider()", 1),
+        encoding="utf-8",
+    )
+    assert "Pipeline" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    assert "return LocalRuleProvider()" not in pipe.read_text(encoding="utf-8")
     assert module.leftovers_in_tool(tool) == []
 
 
