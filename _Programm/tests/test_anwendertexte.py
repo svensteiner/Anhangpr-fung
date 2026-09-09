@@ -59,6 +59,18 @@ def test_klienten_liesmich_ohne_healthz():
     assert "startseite" in text
 
 
+def test_llp_start_setzt_foundry_root():
+    text = (ROOT / "_Gemeinsam" / "llp_start" / "Start.bat").read_text(encoding="utf-8")
+    assert "LLP_SHARED_AI_ROOT" in text
+    low = text.lower()
+    assert "foundry" in low
+    assert "mistral" in low
+    assert "ollama" in low
+    lies = (ROOT / "_Gemeinsam" / "llp_start" / "LIESMICH.txt").read_text(encoding="utf-8").lower()
+    assert "llp_shared_ai_root" in lies
+    assert "pseudokrat bleibt lokal" in lies
+
+
 def test_werkzeuge_pseudokrat_ohne_foundry():
     text = (ROOT / "_Gemeinsam" / "WERKZEUGE.txt").read_text(encoding="utf-8").lower()
     assert "pseudokrat" in text

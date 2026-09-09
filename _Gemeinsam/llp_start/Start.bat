@@ -8,6 +8,10 @@ pushd "%ROOT%" >nul 2>&1
 set "ROOT=%CD%"
 popd >nul
 
+rem Derselbe Foundry-Zugang für jedes Tool, das ein Modell braucht.
+if exist "%ROOT%\..\_Gemeinsam\llp_ai" set "LLP_SHARED_AI_ROOT=%ROOT%\..\_Gemeinsam"
+if not defined LLP_SHARED_AI_ROOT if exist "%ROOT%\_Gemeinsam\llp_ai" set "LLP_SHARED_AI_ROOT=%ROOT%\_Gemeinsam"
+
 echo.
 echo  ===============================================
 echo   LLP Wirtschaftspruefung
@@ -46,6 +50,9 @@ pause
 exit /b 1
 
 :TEXT
+echo  Text verbessern: gruendlich nur Foundry (llp_ai).
+echo  Zeigt das Tool noch Mistral, bitte die aktuelle Fassung holen.
+echo  Es gibt keinen stillen Wechsel auf Ollama.
 call :TRY "%ROOT%\rephraser" "TEXT VERBESSERN.cmd" && exit /b 0
 call :TRY "%ROOT%\paraphraser" "TEXT VERBESSERN.cmd" && exit /b 0
 echo  Text verbessern nicht gefunden. Bitte die

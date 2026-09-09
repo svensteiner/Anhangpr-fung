@@ -7,4 +7,7 @@ Das Programm selbst wird nicht kopiert. Jedes Tool bleibt
 in seinem Ordner neben _Gemeinsam.
 
 KI (wenn noetig): nur llp_ai, Microsoft Foundry.
+Start.bat setzt LLP_SHARED_AI_ROOT auf diesen Ordner,
+damit jedes Tool denselben Zugang findet.
 Pseudokrat bleibt lokal ohne Foundry.
+Text verbessern gruendlich: Foundry, nicht Mistral/Ollama.
