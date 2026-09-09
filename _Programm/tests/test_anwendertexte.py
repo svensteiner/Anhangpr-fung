@@ -33,6 +33,7 @@ def test_anleitung_kein_exe_copy_und_modus3_pflicht():
     assert "lokale regelfassung" in text
     assert "ci-rezepte" in text
     assert "anhang-ollama" in text
+    assert "fremd-ki" in text
 
 
 def test_installieren_kopiert_keine_exe():
@@ -101,6 +102,7 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "keine lokale regelfassung" in low
     assert "keine ci-rezepte" in low
     assert "keinen ollama-client im anhangspruefer" in low
+    assert "keine fremd-ki" in low
     assert "bei jedem start" in low
     assert "bitte pruefen.bat" in low
     assert "vor teil 2" in low
@@ -142,6 +144,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "keine lokale regelfassung" in text
     assert "keine ci-rezepte" in text
     assert "keinen ollama-client im anhangspruefer" in text
+    assert "keine fremd-ki" in text
     assert "vor teil 2" in text
     assert "wie viele fragen vom rest" in text
     assert "bei jedem start" in text
@@ -158,6 +161,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "aendert den text nicht" in lies or "ändert den text nicht" in lies
     assert "ci-rezepte" in lies
     assert "anhang-ollama" in lies
+    assert "fremd-ki" in lies
 
 
 def test_entwicklerdoku_verweist_auf_browser_nicht_alte_gui():
@@ -252,6 +256,7 @@ def test_werkzeuge_pseudokrat_ohne_foundry():
     assert "regelfassung" in text
     assert "ci-rezepte" in text or "bewertung/offline-editor" in text
     assert "ollama-client im anhangspruefer" in text
+    assert "fremd-ki" in text
     assert "sonst die sichere lokale" not in text
     assert "keine lokale regelfassung" in text
     assert "unveraendert" in text or "unverändert" in text

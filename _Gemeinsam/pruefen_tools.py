@@ -165,6 +165,39 @@ def mistral_provider_modus(path: Path | None) -> str:
     return "nicht erkannt"
 
 
+CLOUD_PROVIDER_RELS = (
+    Path("app") / "providers" / "openai_provider.py",
+    Path("app") / "providers" / "anthropic_provider.py",
+)
+
+
+def cloud_provider_modus(path: Path | None) -> str:
+    if path is None or not path.is_file():
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "LLP-FOUNDRY-TOR" in text and "Fremd-KI" in text:
+        return "abgeschaltet"
+    return "noch da"
+
+
+def live_cloud_providers(tool_root: Path) -> list[Path]:
+    found: list[Path] = []
+    for rel in CLOUD_PROVIDER_RELS:
+        path = tool_root / rel
+        if cloud_provider_modus(path) == "noch da":
+            found.append(path)
+    return found
+
+
+def find_live_cloud_provider(roots: list[Path]) -> Path | None:
+    for root in roots:
+        for name in TOOL_NAMES["text"]:
+            files = live_cloud_providers(root / name)
+            if files:
+                return files[0]
+    return None
+
+
 def find_providers_init(roots: list[Path]) -> Path | None:
     for root in roots:
         found = _first_existing(root, TOOL_NAMES["text"], "app/providers/__init__.py")
@@ -759,6 +792,7 @@ def report(start: Path | None = None) -> dict[str, object]:
     spec = find_live_spec(roots)
     build = find_live_build_script(roots)
     workflow = find_live_portable_workflow(roots)
+    cloud = find_live_cloud_provider(roots)
     anhang_ollama = find_anhang_ollama(roots)
     return {
         "foundry": describe_status(),
@@ -805,6 +839,7 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_spec": spec,
         "text_build": build,
         "text_workflow": workflow,
+        "text_cloud": cloud,
         "pseudokrat": find_pseudokrat(roots),
     }
 
@@ -835,6 +870,8 @@ def format_report(data: dict[str, object]) -> str:
         + ("vorhanden" if data["text_provider"] else "fehlt"),
         "  Ollama-Rest:     " + str(data["text_runtime_modus"]),
         "  Mistral-Client:  " + str(data["text_mistral_modus"]),
+        "  Fremd-KI:        "
+        + ("noch da – Anwenden.bat" if data["text_cloud"] else "beiseite"),
         "  Streamlit-Datei: " + str(data["text_streamlit_modus"]),
         "  Alte API:        " + str(data["text_api_modus"]),
         "  Alte CLI:        " + str(data["text_cli_modus"]),
@@ -1008,6 +1045,11 @@ def format_report(data: dict[str, object]) -> str:
             "  Ein CI-Rezept (Bewertung oder Offline-Editor) liegt noch im Tool-Ordner."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_cloud"] is not None:
+        lines.append(
+            "  Ein OpenAI- oder Anthropic-Adapter liegt noch im Tool-Ordner."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     if data["text_spec"] is not None or data["text_build"] is not None:
         lines.append(
             "  Ein Packaging- oder Build-Rezept liegt noch im Tool-Ordner."
@@ -1094,6 +1136,8 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
         reasons.append("Build-Skript")
     if live_workflow_files(tool_root):
         reasons.append("CI-Rezept")
+    if live_cloud_providers(tool_root):
+        reasons.append("Fremd-KI")
     provider = tool_root / "app" / "providers" / "foundry_provider.py"
     if desktop.is_file() and not provider.is_file():
         reasons.append("Foundry-Datei")
@@ -1144,6 +1188,7 @@ def text_has_leftovers(
         or data["text_spec"] is not None
         or data["text_build"] is not None
         or data["text_workflow"] is not None
+        or data["text_cloud"] is not None
         or data["anhang_ollama"] is not None
         or (data["text_desktop"] is not None and data["text_provider"] is None)
     )
@@ -1177,6 +1222,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     desktop_pipeline_ok = data["text_desktop_pipeline"] is None
     evaluation_ok = data["text_evaluation_modus"] in {"abgeschaltet", "nicht gefunden"}
     pack_ok = data["text_spec"] is None and data["text_build"] is None and data["text_workflow"] is None
+    cloud_ok = data["text_cloud"] is None
     return (
         data["text_modus"] == "Foundry"
         and start_ok
@@ -1205,6 +1251,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and desktop_pipeline_ok
         and evaluation_ok
         and pack_ok
+        and cloud_ok
     )
 
 

@@ -351,6 +351,20 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         "        self.base_url = 'http://127.0.0.1:11434'\n",
         encoding="utf-8",
     )
+    (tool / "app" / "providers" / "openai_provider.py").write_text(
+        "class OpenAIProvider:\n"
+        "    def rewrite(self, text: str, constraints: SemanticConstraints, "
+        "options: TransformOptions) -> str:\n"
+        '        raise ProviderError("The cloud OpenAI adapter is intentionally disabled.")\n',
+        encoding="utf-8",
+    )
+    (tool / "app" / "providers" / "anthropic_provider.py").write_text(
+        "class AnthropicProvider:\n"
+        "    def rewrite(self, text: str, constraints: SemanticConstraints, "
+        "options: TransformOptions) -> str:\n"
+        '        raise ProviderError("The cloud Anthropic adapter is intentionally disabled.")\n',
+        encoding="utf-8",
+    )
     (tool / "app" / "providers" / "local.py").write_text(
         "class LocalRuleProvider:\n"
         "    def rewrite(self, text: str, constraints: SemanticConstraints, "
@@ -511,6 +525,12 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert (tool / ".github" / "workflows" / "tests.yml.llp-alt").is_file()
     assert not (tool / ".github" / "workflows" / "pages.yml").is_file()
     assert (tool / ".github" / "workflows" / "pages.yml.llp-alt").is_file()
+    openai = (tool / "app" / "providers" / "openai_provider.py").read_text(encoding="utf-8")
+    assert "LLP-FOUNDRY-TOR" in openai
+    assert "Fremd-KI" in openai
+    anthropic = (tool / "app" / "providers" / "anthropic_provider.py").read_text(encoding="utf-8")
+    assert "LLP-FOUNDRY-TOR" in anthropic
+    assert "Fremd-KI" in anthropic
 
     launcher = (tool / "TEXT VERBESSERN.cmd").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" in launcher
@@ -714,6 +734,24 @@ def test_anwenden_stellt_bewertung_ab(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert "Bewertung" in module.leftovers_in_tool(tool)
+
+
+def test_anwenden_stellt_fremd_ki_ab(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    assert "Fremd-KI" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    assert module.leftovers_in_tool(tool) == []
+    openai = tool / "app" / "providers" / "openai_provider.py"
+    openai.write_text(
+        "class OpenAIProvider:\n"
+        "    def rewrite(self, text: str, constraints: SemanticConstraints, "
+        "options: TransformOptions) -> str:\n"
+        "        return text\n",
+        encoding="utf-8",
+    )
+    assert "Fremd-KI" in module.leftovers_in_tool(tool)
 
 
 def test_anwenden_parkt_ci_rezepte(tmp_path: Path) -> None:

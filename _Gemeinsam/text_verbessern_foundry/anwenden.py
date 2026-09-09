@@ -26,6 +26,7 @@ from pruefen_tools import (
     is_launchable_backup,
     leftovers_in_tool,
     live_workflow_files,
+    CLOUD_PROVIDER_RELS,
 )
 
 MODE_STRONG_OLD = 'MODE_STRONG = "Gründlich mit Mistral (bis 45 s)"'
@@ -167,6 +168,11 @@ def apply(tool_root: Path) -> list[str]:
     if mistral.is_file():
         _patch_mistral_provider(mistral)
         done.append(str(mistral))
+    for rel in CLOUD_PROVIDER_RELS:
+        cloud = tool_root / rel
+        if cloud.is_file():
+            _disable_cloud_provider(cloud)
+            done.append(str(cloud))
     local_rules = tool_root / LOCAL_RULES_REL
     if local_rules.is_file():
         _disable_local_rules(local_rules)
@@ -251,6 +257,13 @@ FAST_EDITOR_STUB = (
     REWRITE_SIG
     + "        raise RuntimeError(\n"
     + '            "Schnell-Editor ist abgeschaltet. Nur Foundry. '
+    + 'Der Text bleibt unverändert."\n'
+    + "        )  # LLP-FOUNDRY-TOR\n"
+)
+CLOUD_STUB = (
+    REWRITE_SIG
+    + "        raise RuntimeError(\n"
+    + '            "Fremd-KI ist abgeschaltet. Nur Foundry (llp_ai). '
     + 'Der Text bleibt unverändert."\n'
     + "        )  # LLP-FOUNDRY-TOR\n"
 )
@@ -645,6 +658,16 @@ def _disable_fast_editor(path: Path) -> None:
     if REWRITE_SIG not in text:
         raise ValueError("Erwartete Stelle fehlt: FastEditorialProvider.rewrite")
     path.write_text(text.replace(REWRITE_SIG, FAST_EDITOR_STUB, 1), encoding="utf-8")
+
+
+def _disable_cloud_provider(path: Path) -> None:
+    """OpenAI- und Anthropic-Adapter dürfen den Text nicht mehr ändern."""
+    text = path.read_text(encoding="utf-8")
+    if "LLP-FOUNDRY-TOR" in text and "Fremd-KI" in text:
+        return
+    if REWRITE_SIG not in text:
+        raise ValueError(f"Erwartete Stelle fehlt: {path.name}.rewrite")
+    path.write_text(text.replace(REWRITE_SIG, CLOUD_STUB, 1), encoding="utf-8")
 
 
 def _patch_mistral_provider(path: Path) -> None:

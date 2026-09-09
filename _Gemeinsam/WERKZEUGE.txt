@@ -59,7 +59,8 @@ Text verbessern noch Mistral, Streamlit, Ollama,
 den Offline-Editor (HTML/JS), eine startbare
 Sicherung, die alte Kommandozeile, den Desktop-
 Selbsttest, die lokale Bewertung, eine lokale
-Regelfassung, CI-Rezepte (Bewertung/Offline-Editor)
-oder einen Ollama-Client im Anhangspruefer
+Regelfassung, CI-Rezepte (Bewertung/Offline-Editor),
+einen Ollama-Client im Anhangspruefer
+oder Fremd-KI (OpenAI/Anthropic)
 nutzt.
 Keine Schluessel.

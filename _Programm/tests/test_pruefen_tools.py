@@ -750,6 +750,30 @@ def test_report_foundry_aber_anhang_ollama_ist_nicht_ok(tmp_path: Path) -> None:
     assert module.text_has_leftovers(data) is True
 
 
+def test_report_foundry_aber_fremd_ki_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    openai = tools / "rephraser" / "app" / "providers" / "openai_provider.py"
+    openai.parent.mkdir(parents=True, exist_ok=True)
+    openai.write_text(
+        "class OpenAIProvider:\n"
+        "    def rewrite(self, text, constraints, options):\n"
+        "        return text\n",
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_cloud"] is not None
+    blob = module.format_report(data)
+    assert "Fremd-KI" in blob
+    assert "OpenAI" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Fremd-KI" in module.leftovers_in_tool(tools / "rephraser")
+
+
 def test_report_foundry_aber_tests_ci_ist_nicht_ok(tmp_path: Path) -> None:
     module = _load()
     tools = tmp_path / "AI Tools"
