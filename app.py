@@ -1453,7 +1453,7 @@ def pruefen_route():
         # Beschriftungen kommen von dort – die App kennt die Belegtypen ihrer
         # Mandanten nicht, sie sind Teil des jeweiligen Plugins.
         labels = pipeline.beleg_type_labels
-        erkannte = sorted({labels.get(pipeline.detect_beleg_type(bp), "Unbekannt")
+        erkannte = sorted({labels.get(pipeline.detect_beleg_type(bp), "Belegtyp nicht erkannt")
                            for bp in beleg_paths})
 
         try:

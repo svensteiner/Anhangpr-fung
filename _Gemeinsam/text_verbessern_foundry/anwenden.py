@@ -339,6 +339,15 @@ def _patch_pipeline(path: Path) -> None:
         "select fast-editor, rules, or mistral-local.",
         "select fast-editor, rules, or foundry.",
     )
+    pipe = _replace_all_if_present(
+        pipe,
+        "    except ProviderError as error:\n"
+        '        if "mistral" not in active_provider.name:\n'
+        "            raise\n"
+        "        provider_failure = error\n",
+        "    except ProviderError as error:\n"
+        "        raise\n",
+    )
     path.write_text(pipe, encoding="utf-8")
 
 

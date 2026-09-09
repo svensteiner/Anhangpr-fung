@@ -48,6 +48,7 @@ def test_run_gui_is_disabled():
     out = (proc.stdout + proc.stderr).lower()
     assert "starten.bat" in out
     assert "unbekannt" in out
+    assert "teil 2" in out
 
 
 def test_gui_module_is_disabled():
@@ -66,6 +67,7 @@ def test_gui_module_is_disabled():
     out = (proc.stdout + proc.stderr).lower()
     assert "starten.bat" in out
     assert "unbekannt" in out
+    assert "teil 2" in out
 
 
 def test_cli_review_requires_company_profile():

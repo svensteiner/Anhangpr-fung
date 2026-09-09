@@ -90,3 +90,10 @@ def test_pruefen_route_accepts_docx_and_rejects_other():
     body = data.get_json()
     assert "filename" in body
     assert body["gesamt"] >= 1
+
+
+def test_modus2_belegtyp_nicht_erkannt_statt_unbekannt():
+    root = Path(__file__).resolve().parents[2]
+    text = (root / "app.py").read_text(encoding="utf-8")
+    assert 'labels.get(pipeline.detect_beleg_type(bp), "Belegtyp nicht erkannt")' in text
+    assert 'labels.get(pipeline.detect_beleg_type(bp), "Unbekannt")' not in text

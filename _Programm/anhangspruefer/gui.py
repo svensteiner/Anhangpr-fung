@@ -12,6 +12,7 @@ HINWEIS = """
 
   Bitte Starten.bat doppelklicken.
   Modus 3: GmbH/AG und Groesse waehlen und bestaetigen.
+  Dann Knopf Teil 2: Rest pruefen. Kein stilles unbekannt.
 ============================================================
 """
 
