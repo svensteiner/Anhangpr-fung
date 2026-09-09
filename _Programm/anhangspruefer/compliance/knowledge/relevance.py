@@ -180,6 +180,22 @@ def _position_vorhanden(item: ChecklistItem, document_text_low: str) -> bool:
 
 LEGAL_FORMS = {"gmbh", "ag"}
 SIZE_CLASSES = {"klein", "mittel", "gross"}
+_PROFILE_FEHLER = (
+    "Bitte Rechtsform (GmbH oder AG) und Größenklasse (klein, mittel oder groß) wählen."
+)
+
+
+def require_company_profile(
+    legal_form: str | None, size_class: str | None
+) -> tuple[str, str]:
+    """Modus 3 ohne stilles „unbekannt“: beide Angaben müssen gesetzt sein."""
+    form = (legal_form or "").strip().lower()
+    size = (size_class or "").strip().lower()
+    if form not in LEGAL_FORMS:
+        raise ValueError(_PROFILE_FEHLER)
+    if size not in SIZE_CLASSES:
+        raise ValueError(_PROFILE_FEHLER)
+    return form, size
 
 #: Größenklasse-Bezeichnungen der KPMG-Spalte -> normierter Schlüssel.
 _SIZE_LABEL = {"groß": "gross", "gross": "gross", "mittel": "mittel", "klein": "klein"}
@@ -407,14 +423,13 @@ def apply_relevance(
     size_class: str | None = None,
 ) -> dict:
     """Zuerst Gesellschaft (Teil 1), danach Themen/Positionen (Teil 2a)."""
-    effective_form = legal_form or _detect_legal_form((document_text or "").lower())
-    teil1 = apply_company_scope(result, checklist, effective_form, size_class)
+    teil1 = apply_company_scope(result, checklist, legal_form, size_class)
     teil2 = apply_topic_relevance(result, checklist, document_text)
     return {
         "anwendbar": teil2["anwendbar"],
         "nicht_anwendbar": teil2["nicht_anwendbar"],
         "umgestellt": teil1["umgestellt"] + teil2["umgestellt"],
-        "rechtsform": effective_form,
+        "rechtsform": legal_form,
         "groessenklasse": size_class,
         "rechtsgrund": teil1["umgestellt"],
         "maschinell": teil2["umgestellt"],

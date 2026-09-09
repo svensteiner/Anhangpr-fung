@@ -69,8 +69,9 @@ MODUS 3 - UGB-INHALTSPRUEFUNG (zwei Schritte)
              Gesellschaft nicht gelten (n. a. Rechtsgrund).
              Danach wird nur der Rest geprueft.
 
-  Ergebnis: Excel-Checkliste.
-  Beispiel: "Fuer GmbH klein: 42 von 180 Fragen geprueft."
+  Ergebnis: Excel-Checkliste mit Rechtsform und Groesse
+  (nie "unbekannt"). Beispiel:
+  "Fuer GmbH klein: 42 von 180 Fragen geprueft."
   Offene Punkte in Excel im Dropdown bestaetigen.
 
 

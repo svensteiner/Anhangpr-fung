@@ -18,6 +18,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 from ...models.checklist import Checklist
 from ...models.finding import ReviewResult
+from ..knowledge.relevance import require_company_profile
 
 
 # Klare Verdikte: Ja / Fehlt / n. a. — "Offen" nur, wenn automatisch nicht
@@ -103,6 +104,7 @@ def generate_checklist_xlsx(
     checklist: Checklist, result: ReviewResult, out_path: Path,
     legal_form: str | None = None, size_class: str | None = None,
 ) -> None:
+    legal_form, size_class = require_company_profile(legal_form, size_class)
     by_id = {f.checklist_item_id: f for f in result.findings}
     wb = openpyxl.Workbook()
 
@@ -112,8 +114,8 @@ def generate_checklist_xlsx(
     ov.cell(row=1, column=1, value="UGB-Anhang – ausgefüllte KPMG-Checkliste").font = Font(bold=True, size=14)
     ov.cell(row=2, column=1, value=f"Dokument: {result.document_name}")
     ov.cell(row=3, column=1, value=f"Prüfprogramm: {result.checklist_name}")
-    form_txt = _FORM_LABEL.get(legal_form, "unbekannt")
-    size_txt = _SIZE_LABEL_XLSX.get(size_class, "unbekannt")
+    form_txt = _FORM_LABEL[legal_form]
+    size_txt = _SIZE_LABEL_XLSX[size_class]
     ov.cell(row=4, column=1,
             value=(f"Rechtsform: {form_txt} · Größenklasse § 221 UGB: {size_txt} "
                    "— Grundlage aller n.a.-Beurteilungen")).font = Font(italic=True)

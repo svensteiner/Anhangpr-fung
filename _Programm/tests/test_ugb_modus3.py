@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 
 import openpyxl
+import pytest
 
 from anhangspruefer.models.checklist import Checklist, ChecklistItem
 from anhangspruefer.models.finding import Finding, ReviewResult, EvidenceItem
@@ -204,10 +205,17 @@ def test_generate_checklist_xlsx(tmp_path):
     res.add_finding(f3)
 
     out = tmp_path / "cl.xlsx"
-    generate_checklist_xlsx(cl, res, out)
+    with pytest.raises(ValueError, match="Rechtsform"):
+        generate_checklist_xlsx(cl, res, out)
+    generate_checklist_xlsx(cl, res, out, legal_form="gmbh", size_class="klein")
 
     wb = openpyxl.load_workbook(out)
     assert "KPMG-Checkliste (ausgefüllt)" in wb.sheetnames
+    uebersicht = "\n".join(
+        str(c.value or "") for row in wb["Übersicht"].iter_rows() for c in row
+    )
+    assert "unbekannt" not in uebersicht.lower()
+    assert "GmbH" in uebersicht and "klein" in uebersicht
     ws = wb["KPMG-Checkliste (ausgefüllt)"]
     assert ws.max_row == 4                          # Kopf + 3 Punkte
     row2 = [c.value for c in ws[2]]
@@ -232,7 +240,7 @@ def test_checklist_xlsx_has_pruefer_override(tmp_path):
     res.add_finding(Finding(checklist_item_id="K1",
                             status=ComplianceStatus.NOT_ASSESSABLE, ugb_references=[]))  # Tool: Offen
     out = tmp_path / "cl.xlsx"
-    generate_checklist_xlsx(cl, res, out)
+    generate_checklist_xlsx(cl, res, out, legal_form="gmbh", size_class="klein")
 
     wb = openpyxl.load_workbook(out)                 # ohne data_only -> Formeln sichtbar
     ws = wb["KPMG-Checkliste (ausgefüllt)"]
@@ -455,6 +463,11 @@ def test_review_checklist_two_stage(tmp_path):
         description="Angabe der Aktiengattungen",
         size_classes=["AG groß", "AG mittel"],
     ))
+    with pytest.raises(ValueError, match="Rechtsform"):
+        review_checklist(p, cl, "", "klein")
+    with pytest.raises(ValueError, match="Größenklasse"):
+        review_checklist(p, cl, "gmbh", "unbekannt")
+
     result, info = review_checklist(p, cl, "gmbh", "klein")
     st = {f.checklist_item_id: f.status for f in result.findings}
     assert st["K2"] == ComplianceStatus.NOT_APPLICABLE

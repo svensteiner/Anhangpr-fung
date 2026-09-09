@@ -21,7 +21,7 @@ from .knowledge.llm_matcher import (
     paragraphs_from_pages,
     refine_binaer,
 )
-from .knowledge.relevance import apply_company_scope, apply_topic_relevance
+from .knowledge.relevance import apply_company_scope, apply_topic_relevance, require_company_profile
 
 
 def blank_review_result(checklist: Checklist, document_name: str) -> ReviewResult:
@@ -47,6 +47,7 @@ def review_checklist(
     size_class: str,
     ki_max_seconds: float = 180,
 ) -> tuple[ReviewResult, dict]:
+    legal_form, size_class = require_company_profile(legal_form, size_class)
     anhang_path = Path(anhang_path)
     try:
         pages = load_page_texts(anhang_path)
