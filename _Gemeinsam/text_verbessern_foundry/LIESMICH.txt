@@ -1,8 +1,14 @@
-Text verbessern auf Foundry umstellen
-=====================================
+Text verbessern über Foundry
+============================
 
-Einmal auf dem Server ausführen, wenn „Text verbessern“
-noch „Gründlich mit Mistral“ zeigt.
+Start:  Starten.bat in diesem Ordner
+        (oder llp_start Punkt 2, wenn rephraser fehlt)
+
+Nur Microsoft Foundry (llp_ai). Ist Foundry aus, bleibt
+der Text unverändert – kein Wechsel auf Mistral/Ollama.
+
+Wenn daneben noch der Ordner rephraser liegt und
+„Gründlich mit Mistral“ zeigt:
 
 1. Doppelklick auf  Anwenden.bat  in diesem Ordner.
 2. Das Programm findet den Nachbarordner rephraser

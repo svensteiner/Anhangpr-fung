@@ -55,8 +55,11 @@ echo  Nicht Mistral/Ollama, kein stiller Wechsel.
 call :FOUNDRY_TEXT
 call :TRY "%ROOT%\rephraser" "TEXT VERBESSERN.cmd" && exit /b 0
 call :TRY "%ROOT%\paraphraser" "TEXT VERBESSERN.cmd" && exit /b 0
-echo  Text verbessern nicht gefunden. Bitte die
-echo  Startdatei im Tool-Ordner doppelklicken.
+if defined LLP_SHARED_AI_ROOT call :TRY "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry" "Starten.bat" && exit /b 0
+call :TRY "%ROOT%\_Gemeinsam\text_verbessern_foundry" "Starten.bat" && exit /b 0
+echo  Text verbessern nicht gefunden. Bitte
+echo  _Gemeinsam\text_verbessern_foundry\Starten.bat
+echo  doppelklicken.
 pause
 exit /b 1
 

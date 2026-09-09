@@ -98,7 +98,9 @@ def test_tools_starten_ruft_llp_start_auf():
 def test_text_verbessern_foundry_kit_liegt_bereit():
     kit = ROOT / "_Gemeinsam" / "text_verbessern_foundry"
     assert (kit / "Anwenden.bat").is_file()
+    assert (kit / "Starten.bat").is_file()
     assert (kit / "anwenden.py").is_file()
+    assert (kit / "server.py").is_file()
     assert (kit / "foundry_provider.py").is_file()
     lies = (kit / "LIESMICH.txt").read_text(encoding="utf-8").lower()
     assert "foundry" in lies
@@ -110,3 +112,4 @@ def test_text_verbessern_foundry_kit_liegt_bereit():
     assert "foundry_text" in low
     assert "llp_shared_ai_root" in low
     assert "text_verbessern_foundry" in low
+    assert "text_verbessern_foundry\" \"starten.bat" in low or "text_verbessern_foundry\\starten.bat" in low

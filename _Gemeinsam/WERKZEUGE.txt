@@ -19,8 +19,10 @@ Modus 3: zuerst GmbH/AG und klein/mittel/gross, dann Rest.
 Text verbessern (rephraser / paraphraser)
 -----------------------------------------
 Start:  TEXT VERBESSERN.cmd im jeweiligen Ordner
+        oder text_verbessern_foundry\Starten.bat
 KI:     gruendliche Fassung ueber Foundry (llp_ai),
-        sonst die sichere lokale Regelfassung.
+        sonst die sichere lokale Regelfassung
+        bzw. die Foundry-Seite sagt klar Bescheid.
         Nicht Ollama als Kanzlei-Standard.
 Zeigt das Tool noch Mistral:
         llp_start\Start.bat, Punkt 2, stellt das
