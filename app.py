@@ -622,7 +622,7 @@ HTML = r"""<!DOCTYPE html>
       </label>
       <div class="result-warn hidden" id="ug-pp-warn"></div>
       <div class="result-note" id="ug-ki-hint">KI: wird geprüft…</div>
-      <button class="btn-run" id="ug-btn" disabled onclick="ugRun()">▶ Inhaltsprüfung starten</button>
+      <button class="btn-run" id="ug-btn" disabled onclick="ugRun()">▶ Zuerst Gesellschaft wählen</button>
     </div>
     <div class="card hidden" id="ug-progress">
       <h2><span class="num">2</span>Prüfung läuft…</h2>
@@ -965,8 +965,10 @@ async function ugShowEingrenzung() {
   const size = document.getElementById('ug-groessenklasse').value;
   const box = document.getElementById('ug-eingrenzung');
   if (!box) return;
+  const btn = document.getElementById('ug-btn');
   if (!form || !size) {
     box.textContent = 'Teil 1 erscheint hier, sobald Rechtsform und Größe gewählt sind.';
+    if (btn) btn.textContent = '▶ Zuerst Gesellschaft wählen';
     return;
   }
   const fd = new FormData();
@@ -980,6 +982,7 @@ async function ugShowEingrenzung() {
       return;
     }
     box.textContent = data.hinweis || '';
+    if (btn) btn.textContent = '▶ Teil 2: Rest prüfen';
   } catch (e) {
     box.textContent = 'Teil 1 konnte nicht gelesen werden. Bitte Auswahl prüfen.';
   }
@@ -1053,9 +1056,10 @@ function ugShowResult(data) {
   const note = document.getElementById('ug-hinweis');
   const parts = [];
   if (data.hinweis) parts.push(data.hinweis);
+  parts.push('Teil 2: offene Punkte in Excel abarbeiten.');
   parts.push(data.ki
     ? 'KI: Foundry hat offene Punkte bewertet.'
-    : 'KI war aus – Ergebnis kommt aus der Heuristik. Bitte offene Punkte in Excel bestätigen.');
+    : 'KI war aus – Ergebnis kommt aus der Heuristik.');
   note.textContent = parts.join(' ');
   showWarnungen('ug', data.warnungen);
   resultReady('ug', data.filename);

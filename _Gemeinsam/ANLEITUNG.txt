@@ -21,7 +21,8 @@ TAEGLICH
      Modus 3: GmbH/AG und klein/mittel/gross waehlen
      und bestaetigen. Teil 1 zeigt, wie viele Fragen
      gelten. Ohne Auswahl startet nichts. Kein stilles
-     „unbekannt“. Dann wird nur der Rest geprueft.
+     „unbekannt“. Knopf „Teil 2: Rest pruefen“.
+     Offene Punkte in Excel abarbeiten.
 
   2  Text verbessern
      Desktop „Text verbessern“ oder LLP AI Tools, Punkt 2

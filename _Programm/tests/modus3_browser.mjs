@@ -80,6 +80,10 @@ try {
   if (!/gmbh/i.test(scope) || !/klein/i.test(scope)) {
     throw new Error(`Teil 1 ohne Gesellschaft: ${scope}`);
   }
+  const btnLabel = await page.$eval("#ug-btn", (el) => el.textContent);
+  if (!/Teil 2/i.test(btnLabel)) {
+    throw new Error(`Knopf ohne Teil 2: ${btnLabel}`);
+  }
   let stillDisabled = await page.$eval("#ug-btn", (el) => el.disabled);
   if (!stillDisabled) {
     throw new Error("Start war ohne Bestätigung aktiv");

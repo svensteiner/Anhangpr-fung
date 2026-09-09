@@ -475,6 +475,9 @@ def test_mode3_ui_uses_excel_labels_and_confirm():
     assert "ug-bestaetigt" in html
     assert "ug-eingrenzung" in html
     assert "/ugb_eingrenzung" in html
+    assert "Teil 2: Rest prüfen" in html
+    assert "Zuerst Gesellschaft wählen" in html
+    assert "Teil 2: offene Punkte in Excel" in html
     assert "bestaetigt" in html
     assert "ug-pp-warn" in html
     assert "fd.append('bestaetigt'" in html or 'fd.append("bestaetigt"' in html or "fd.append('bestaetigt', 'ja')" in html

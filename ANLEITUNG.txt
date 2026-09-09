@@ -78,10 +78,11 @@ MODUS 3 - UGB-INHALTSPRUEFUNG (zwei Schritte)
   Nach der Auswahl zeigt das Tool Teil 1:
   wie viele Fragen fuer diese Gesellschaft gelten.
 
-  Schritt 2: "Inhaltspruefung starten".
+  Schritt 2: Knopf "Teil 2: Rest pruefen".
              Zuerst fallen Fragen weg, die fuer diese
              Gesellschaft nicht gelten (n. a. Rechtsgrund).
              Danach wird nur der Rest geprueft.
+             Offene Punkte in Excel abarbeiten.
 
   Ergebnis: Excel-Checkliste mit Rechtsform und Groesse
   (nie "unbekannt"). Beispiel:
