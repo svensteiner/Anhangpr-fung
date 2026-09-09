@@ -540,6 +540,40 @@ def desktop_self_test_live_text(text: str) -> bool:
     return "--self-test" in text and "report = run_self_test()" in text
 
 
+LOCAL_FALLBACK_MARKERS = (
+    "sichere lokale",
+    "lokale textverbesserung",
+    "schnelle lokale bearbeitung",
+    "lokal schnell bearbeitet",
+    "lokale grundbereinigung",
+    "lokale überarbeitung läuft",
+    "lokale sprachmodell",
+    "lokale, sichere textüberarbeitung",
+)
+
+
+def desktop_local_fallback_live_text(text: str) -> bool:
+    low = text.lower()
+    return any(marker in low for marker in LOCAL_FALLBACK_MARKERS)
+
+
+def desktop_local_fallback_live(path: Path | None) -> bool:
+    if path is None or not path.is_file():
+        return False
+    return desktop_local_fallback_live_text(
+        path.read_text(encoding="utf-8", errors="replace")
+    )
+
+
+def find_live_desktop_fallback(roots: list[Path]) -> Path | None:
+    for root in roots:
+        for name in TOOL_NAMES["text"]:
+            desktop = root / name / "app" / "desktop.py"
+            if desktop_local_fallback_live(desktop):
+                return desktop
+    return None
+
+
 def desktop_self_test_live(path: Path | None) -> bool:
     if path is None or not path.is_file():
         return False
@@ -613,6 +647,7 @@ def report(start: Path | None = None) -> dict[str, object]:
     launchable_backup = find_live_launchable_backup(roots)
     desktop_window = find_live_desktop_window(roots)
     desktop_self_test = find_live_desktop_self_test(roots)
+    desktop_fallback = find_live_desktop_fallback(roots)
     evaluation = find_text_evaluation(roots)
     spec = find_live_spec(roots)
     build = find_live_build_script(roots)
@@ -652,6 +687,7 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_launchable_backup": launchable_backup,
         "text_desktop_window": desktop_window,
         "text_self_test": desktop_self_test,
+        "text_local_fallback": desktop_fallback,
         "text_evaluation": evaluation,
         "text_evaluation_modus": evaluation_modus(evaluation),
         "text_spec": spec,
@@ -694,6 +730,8 @@ def format_report(data: dict[str, object]) -> str:
         + ("noch startbar – Anwenden.bat" if data["text_desktop_window"] else "beiseite"),
         "  Selbsttest:      "
         + ("noch Regeln – Anwenden.bat" if data["text_self_test"] else "beiseite"),
+        "  Regelfassung:    "
+        + ("noch lokal – Anwenden.bat" if data["text_local_fallback"] else "beiseite"),
         "  Bewertung:       " + str(data["text_evaluation_modus"]),
         "  Text-Pipeline:   " + str(data["text_pipeline_modus"]),
         "  Hybrid-Weg:      " + str(data["text_hybrid_modus"]),
@@ -777,6 +815,11 @@ def format_report(data: dict[str, object]) -> str:
             "  app/desktop.py hat noch den Selbsttest mit Regeln."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_local_fallback"] is not None:
+        lines.append(
+            "  app/desktop.py verspricht noch eine lokale Fassung."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     if data["text_evaluation_modus"] in {"noch Bewertung", "nicht erkannt"}:
         lines.append(
             "  app/evaluation.py startet noch die lokale Pipeline."
@@ -843,6 +886,8 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
         reasons.append("Oberflaeche")
     if desktop.is_file() and desktop_self_test_live(desktop):
         reasons.append("Selbsttest")
+    if desktop.is_file() and desktop_local_fallback_live(desktop):
+        reasons.append("Regelfassung")
     evaluation = tool_root / "app" / "evaluation.py"
     if evaluation.is_file() and evaluation_modus(evaluation) != "abgeschaltet":
         reasons.append("Bewertung")
@@ -940,6 +985,7 @@ def text_has_leftovers(
         or data["text_launchable_backup"] is not None
         or data["text_desktop_window"] is not None
         or data["text_self_test"] is not None
+        or data["text_local_fallback"] is not None
         or data["text_evaluation_modus"] in {"noch Bewertung", "nicht erkannt"}
         or data["text_spec"] is not None
         or data["text_build"] is not None
@@ -970,6 +1016,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     backup_ok = data["text_launchable_backup"] is None
     window_ok = data["text_desktop_window"] is None
     self_test_ok = data["text_self_test"] is None
+    fallback_ok = data["text_local_fallback"] is None
     evaluation_ok = data["text_evaluation_modus"] in {"abgeschaltet", "nicht gefunden"}
     pack_ok = data["text_spec"] is None and data["text_build"] is None and data["text_workflow"] is None
     return (
@@ -994,6 +1041,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and backup_ok
         and window_ok
         and self_test_ok
+        and fallback_ok
         and evaluation_ok
         and pack_ok
     )

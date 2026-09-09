@@ -58,5 +58,6 @@ Pruefen.bat in diesem Ordner. Zeigt Foundry und ob
 Text verbessern noch Mistral, Streamlit, Ollama,
 den Offline-Editor (HTML/JS), eine startbare
 Sicherung, die alte Kommandozeile, den Desktop-
-Selbsttest oder die lokale Bewertung nutzt.
+Selbsttest, die lokale Bewertung oder eine lokale
+Regelfassung nutzt.
 Keine Schluessel.

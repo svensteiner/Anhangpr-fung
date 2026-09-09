@@ -20,6 +20,7 @@ if str(SHARED) not in sys.path:
 from pruefen_tools import (
     BACKUP_NOTE_MARK,
     PARK_DIR_NAME,
+    desktop_local_fallback_live_text,
     desktop_self_test_live_text,
     is_launchable_backup,
     leftovers_in_tool,
@@ -83,6 +84,7 @@ def apply_foundry(tool_root: Path) -> tuple[bool, str]:
             and "rules+foundry" in current
             and "if foundry_ready():" in current
             and not desktop_self_test_live_text(current)
+            and not desktop_local_fallback_live_text(current)
         )
     try:
         apply(tool_root)
@@ -775,17 +777,7 @@ def _patch_desktop(path: Path) -> None:
         "        return (MODE_AUTOMATIC, MODE_SAFE, MODE_STRONG)\n"
         "    return (MODE_AUTOMATIC, MODE_SAFE)",
     )
-    desk = _replace_once(
-        desk,
-        '        return "✓ Schnelle lokale Bearbeitung bereit; Mistral beendet noch eine frühere Anfrage."\n'
-        "    if mistral_ready:\n"
-        '        return "✓ Sofortige Textverbesserung bereit; Mistral ist zusätzlich verfügbar."\n'
-        '    return "✓ Sofortige lokale Textverbesserung bereit; Mistral ist optional."',
-        '        return "✓ Schnelle lokale Bearbeitung bereit; Foundry beendet noch eine frühere Anfrage."\n'
-        "    if foundry_ready():\n"
-        '        return "✓ Sofortige Textverbesserung bereit; Foundry (Büro-KI) ist verfügbar."\n'
-        '    return "✓ Sofortige lokale Textverbesserung bereit. Gründlich nur mit Foundry."',
-    )
+    desk = _replace_status_text(desk)
     desk = _replace_once(
         desk,
         "        mistral_for_text = local_model_eligible(current_source, self._mistral_can_start())\n"
@@ -839,7 +831,7 @@ def _patch_desktop(path: Path) -> None:
     desk = _replace_all_if_present(
         desk,
         "Mistral derzeit nicht erreichbar – sichere lokale Fassung wird sofort erstellt",
-        "Foundry derzeit nicht erreichbar – sichere lokale Fassung wird sofort erstellt",
+        "Foundry derzeit nicht erreichbar – der Text bleibt unverändert",
     )
     desk = _replace_all_if_present(
         desk,
@@ -849,17 +841,17 @@ def _patch_desktop(path: Path) -> None:
     desk = _replace_all_if_present(
         desk,
         "Text war für Mistral zu lang; vollständig lokal schnell bearbeitet.",
-        "Text war für Foundry zu lang; vollständig lokal schnell bearbeitet.",
+        "Text war für Foundry zu lang; der Text bleibt unverändert.",
     )
     desk = _replace_all_if_present(
         desk,
         "Mistral hat die Zeitgrenze erreicht; sichere lokale Fassung angezeigt.",
-        "Foundry hat die Zeitgrenze erreicht; sichere lokale Fassung angezeigt.",
+        "Foundry hat die Zeitgrenze erreicht; der Text bleibt unverändert.",
     )
     desk = _replace_all_if_present(
         desk,
         "Mistral war nicht verfügbar; sichere lokale Grundbereinigung angezeigt.",
-        "Foundry war nicht verfügbar; sichere lokale Grundbereinigung angezeigt.",
+        "Foundry war nicht verfügbar; der Text bleibt unverändert.",
     )
     desk = _replace_all_if_present(
         desk,
@@ -869,11 +861,12 @@ def _patch_desktop(path: Path) -> None:
     desk = _replace_all_if_present(
         desk,
         "Schnelle lokale Bearbeitung ist verfügbar; Mistral ist optional.",
-        "Schnelle lokale Bearbeitung ist verfügbar; gründlich nur mit Foundry.",
+        "Foundry ist die einzige Bearbeitung; ohne Foundry bleibt der Text unverändert.",
     )
     desk = _replace_desktop_main(desk)
     desk = _replace_all_if_present(desk, DESKTOP_RUN_OLD, DESKTOP_RUN_STUB)
     desk = _disable_self_test(desk)
+    desk = _neutralize_local_fallback_copy(desk)
     path.write_text(desk, encoding="utf-8")
 
 
@@ -896,10 +889,73 @@ SELF_TEST_FN_STUB = (
 )
 
 
+STATUS_TEXT_NEW = (
+    '        return "✓ Foundry bearbeitet noch eine frühere Anfrage."\n'
+    "    if foundry_ready():\n"
+    '        return "✓ Foundry (Büro-KI) ist verfügbar."\n'
+    '    return "✓ Foundry ist aus. Der Text bleibt unverändert."'
+)
+STATUS_TEXT_OLDS = (
+    '        return "✓ Schnelle lokale Bearbeitung bereit; Mistral beendet noch eine frühere Anfrage."\n'
+    "    if mistral_ready:\n"
+    '        return "✓ Sofortige Textverbesserung bereit; Mistral ist zusätzlich verfügbar."\n'
+    '    return "✓ Sofortige lokale Textverbesserung bereit; Mistral ist optional."',
+    '        return "✓ Schnelle lokale Bearbeitung bereit; Foundry beendet noch eine frühere Anfrage."\n'
+    "    if foundry_ready():\n"
+    '        return "✓ Sofortige Textverbesserung bereit; Foundry (Büro-KI) ist verfügbar."\n'
+    '    return "✓ Sofortige lokale Textverbesserung bereit. Gründlich nur mit Foundry."',
+)
+
+
+def _replace_status_text(desk: str) -> str:
+    """Statuszeile: nur Foundry, keine lokale Fassung. Auch nach früherem Anwenden."""
+    if STATUS_TEXT_NEW in desk:
+        return desk
+    for old in STATUS_TEXT_OLDS:
+        if old in desk:
+            return desk.replace(old, STATUS_TEXT_NEW, 1)
+    raise ValueError("Erwartete Stelle fehlt: system_status_text")
+
+
 def _disable_self_test(desk: str) -> str:
     """Kein python -m app.desktop --self-test mehr über Regeln oder fast-editor."""
     desk = _replace_all_if_present(desk, SELF_TEST_OLD, SELF_TEST_STUB)
     return _replace_all_if_present(desk, SELF_TEST_FN_OLD, SELF_TEST_FN_STUB)
+
+
+LOCAL_FALLBACK_REPLACEMENTS = (
+    ("sichere lokale Fassung wird sofort erstellt", "der Text bleibt unverändert"),
+    ("Sichere lokale Fassung wird sofort erstellt", "Der Text bleibt unverändert"),
+    ("sichere lokale Fassung wird erstellt", "der Text bleibt unverändert"),
+    ("sichere lokale Fassung angezeigt", "der Text bleibt unverändert"),
+    ("sichere lokale Grundbereinigung angezeigt", "der Text bleibt unverändert"),
+    ("ausgegeben wurde die sichere lokale Grundbereinigung", "der Text bleibt unverändert"),
+    ("Die sichere lokale Grundbereinigung wurde manuell gewählt.", "Der Text bleibt unverändert."),
+    ("sichere lokale Grundbereinigung", "unveränderter Text"),
+    ("Sichere lokale Grundbereinigung", "Unveränderter Text"),
+    ("sichere lokale Fassung", "unveränderter Text"),
+    ("Sichere lokale Fassung", "Unveränderter Text"),
+    ("vollständig lokal schnell bearbeitet", "der Text bleibt unverändert"),
+    ("Schnelle lokale Bearbeitung ist verfügbar; gründlich nur mit Foundry.",
+     "Foundry ist die einzige Bearbeitung; ohne Foundry bleibt der Text unverändert."),
+    ("✓ Sofortige lokale Textverbesserung bereit. Gründlich nur mit Foundry.",
+     "✓ Foundry ist aus. Der Text bleibt unverändert."),
+    ("✓ Schnelle lokale Bearbeitung bereit; Foundry beendet noch eine frühere Anfrage.",
+     "✓ Foundry bearbeitet noch eine frühere Anfrage."),
+    ("schnelle lokale Bearbeitung aktiv.", "Foundry ist die einzige Bearbeitung."),
+    ("Lokale Überarbeitung läuft", "Foundry-Überarbeitung läuft"),
+    ("Das lokale Sprachmodell antwortet nicht. Der Text hat diesen PC nicht verlassen.",
+     "Foundry antwortet nicht. Der Text bleibt unverändert."),
+    ("Lokale, sichere Textüberarbeitung ohne Cloud-Fallback.",
+     "Nur Foundry. Ohne Foundry bleibt der Text unverändert."),
+)
+
+
+def _neutralize_local_fallback_copy(desk: str) -> str:
+    """Alte Oberfläche darf keine lokale Fassung mehr versprechen."""
+    for old, new in LOCAL_FALLBACK_REPLACEMENTS:
+        desk = _replace_all_if_present(desk, old, new)
+    return desk
 
 
 DESKTOP_MAIN_HINT = (

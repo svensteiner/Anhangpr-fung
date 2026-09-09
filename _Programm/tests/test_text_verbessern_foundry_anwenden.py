@@ -437,6 +437,10 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "report = run_self_test()" not in desktop
     assert "Kein Selbsttest mit Regeln oder Modellwahl" in desktop
     assert "LLP-FOUNDRY-TOR: kein Selbsttest" in desktop
+    assert "sichere lokale" not in desktop.lower()
+    assert "lokale textverbesserung" not in desktop.lower()
+    assert "schnelle lokale bearbeitung" not in desktop.lower()
+    assert "der Text bleibt unverändert" in desktop
 
     evaluation = (tool / "app" / "evaluation.py").read_text(encoding="utf-8")
     assert "Keine lokale Bewertung" in evaluation
@@ -672,6 +676,21 @@ def test_anwenden_stellt_bewertung_ab(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert "Bewertung" in module.leftovers_in_tool(tool)
+
+
+def test_anwenden_entfernt_lokale_desktop_fassung(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    desktop = tool / "app" / "desktop.py"
+    assert "sichere lokale" in desktop.read_text(encoding="utf-8").lower()
+    assert "Regelfassung" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    text = desktop.read_text(encoding="utf-8")
+    assert "sichere lokale" not in text.lower()
+    text = text + "\nFoundry derzeit nicht erreichbar – sichere lokale Fassung wird sofort erstellt.\n"
+    desktop.write_text(text, encoding="utf-8")
+    assert "Regelfassung" in module.leftovers_in_tool(tool)
 
 
 def test_anwenden_stellt_desktop_selbsttest_ab(tmp_path: Path) -> None:
