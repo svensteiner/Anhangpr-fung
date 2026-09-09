@@ -12,6 +12,9 @@ def test_anleitung_kein_exe_copy_und_modus3_pflicht():
     assert "ohne auswahl startet nichts" in text
     assert "foundry" in text
     assert "pseudokrat bleibt lokal" in text
+    assert "pruefen.bat" in text
+    assert "fachliche unterlagen" in text
+    assert "ohne bestaetigung" in text
 
 
 def test_installieren_kopiert_keine_exe():

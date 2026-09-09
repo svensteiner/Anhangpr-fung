@@ -403,6 +403,32 @@ def test_ugb_review_requires_anhang_and_profile():
     assert missing_profil.status_code == 400
     assert "Rechtsform" in missing_profil.get_json()["error"]
 
+    wrong = client.post(
+        "/ugb_review",
+        data={
+            "rechtsform": "gmbh",
+            "groessenklasse": "klein",
+            "anhang": (io.BytesIO(b"nope"), "anhang.txt"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert wrong.status_code == 400
+    assert "Word" in wrong.get_json()["error"]
+
+
+def test_mode3_ui_uses_excel_labels_and_confirm():
+    root = Path(__file__).resolve().parents[2]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    import app as webapp
+
+    html = webapp.app.test_client().get("/").data.decode("utf-8")
+    assert "Offen – Angabe gefunden" in html
+    assert "Offen – kein Hinweis" in html
+    assert "ug-bestaetigt" in html
+    assert "ug-pp-warn" in html
+    assert "localhost:5555" not in (root / "Starten.bat").read_text(encoding="utf-8")
+
 
 def test_review_checklist_two_stage(tmp_path):
     import docx

@@ -237,6 +237,8 @@ def test_healthz_foundry_status_has_no_secrets():
 
     data = webapp.app.test_client().get("/healthz").get_json()
     assert data["foundry_bereit"] is False
+    assert "pruefprogramm_gefunden" in data
+    assert data["foundry"]["kurz"] == "KI: aus – Heuristik"
     hinweis = data["foundry"]["hinweis"]
     assert any(teil in hinweis for teil in (
         "ohne Modell",

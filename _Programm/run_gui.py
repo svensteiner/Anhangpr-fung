@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
-Startet die Anhangsprüfer GUI-Anwendung.
-
-Für Anfänger: Doppelklicken Sie einfach auf diese Datei!
+Alte Desktop-GUI (nur für Entwicklung). Anwender starten über Starten.bat.
 """
 
 import sys

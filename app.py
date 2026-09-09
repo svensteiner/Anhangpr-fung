@@ -436,6 +436,7 @@ HTML = r"""<!DOCTYPE html>
         </tr>
       </tbody></table>
       <div class="fs-hint" id="fs-hint">Geben Sie einen Mandanten ein, um den Fortschritt der 3 Prüfungsstufen zu sehen.</div>
+      <div class="result-warn hidden" id="plugin-warn"></div>
     </div>
 
     <div class="mode-grid">
@@ -497,7 +498,7 @@ HTML = r"""<!DOCTYPE html>
     <div class="card hidden" id="vj-progress">
       <h2><span class="num">2</span>Vergleich läuft…</h2>
       <div class="progress-bar-wrap"><div class="progress-bar" id="vj-bar"></div></div>
-      <div class="progress-text" id="vj-text">PDFs werden eingelesen…</div>
+      <div class="progress-text" id="vj-text">Dateien werden eingelesen…</div>
     </div>
     <div class="card hidden" id="vj-error">
       <h2><span class="num">✕</span>Fehler</h2>
@@ -613,6 +614,11 @@ HTML = r"""<!DOCTYPE html>
         </select>
       </div>
       <div class="result-note" id="ug-profil-hint">Bitte GmbH oder AG und klein / mittel / groß wählen. Ohne Auswahl startet die Prüfung nicht.</div>
+      <label class="result-note" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="ug-bestaetigt" onchange="ugRefreshStart()">
+        Rechtsform und Größe habe ich geprüft.
+      </label>
+      <div class="result-warn hidden" id="ug-pp-warn"></div>
       <div class="result-note" id="ug-ki-hint">KI: wird geprüft…</div>
       <button class="btn-run" id="ug-btn" disabled onclick="ugRun()">▶ Inhaltsprüfung starten</button>
     </div>
@@ -628,8 +634,8 @@ HTML = r"""<!DOCTYPE html>
     <div class="card hidden" id="ug-result">
       <h2><span class="num">3</span>Prüfungsprotokoll</h2>
       <div class="result-stats">
-        <div class="stat-box stat-text"><div class="stat-val" id="ug-bestaetigen">—</div><div class="stat-lbl">Zu bestätigen (Angabe gefunden)</div></div>
-        <div class="stat-box stat-abw"><div class="stat-val" id="ug-keinhinweis">—</div><div class="stat-lbl">Kein Hinweis gefunden</div></div>
+        <div class="stat-box stat-text"><div class="stat-val" id="ug-bestaetigen">—</div><div class="stat-lbl">Offen – Angabe gefunden</div></div>
+        <div class="stat-box stat-abw"><div class="stat-val" id="ug-keinhinweis">—</div><div class="stat-lbl">Offen – kein Hinweis</div></div>
         <div class="stat-box stat-fehlt"><div class="stat-val" id="ug-fehl">—</div><div class="stat-lbl">Fehlt</div></div>
         <div class="stat-box stat-total"><div class="stat-val" id="ug-na">—</div><div class="stat-lbl">n. a.</div></div>
       </div>
@@ -669,9 +675,16 @@ function dropPdf(e, areaId, inputId, varName, nameId) {
   document.getElementById(areaId).classList.remove('dragover');
   const f = e.dataTransfer.files[0];
   if (!f) return;
+  const input = document.getElementById(inputId);
+  const accept = (input.getAttribute('accept') || '.pdf,.docx').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const name = (f.name || '').toLowerCase();
+  if (accept.length && !accept.some(ext => name.endsWith(ext))) {
+    alert('Bitte eine Datei mit der Endung ' + accept.join(' oder ') + ' wählen.');
+    return;
+  }
   const dt = new DataTransfer(); dt.items.add(f);
-  document.getElementById(inputId).files = dt.files;
-  document.getElementById(inputId).dispatchEvent(new Event('change'));
+  input.files = dt.files;
+  input.dispatchEvent(new Event('change'));
 }
 
 function pickMode(m) {
@@ -793,7 +806,7 @@ async function vjRun() {
   setStep('vj', 2);
   const bar = document.getElementById('vj-bar'), txt = document.getElementById('vj-text');
   let pct = 0, mi = 0;
-  const msgs = [[15,'PDFs werden eingelesen…'],[40,'Posten werden extrahiert…'],[65,'Vorjahreszahlen werden verglichen…'],[88,'Excel-Bericht wird erstellt…']];
+  const msgs = [[15,'Dateien werden eingelesen…'],[40,'Posten werden extrahiert…'],[65,'Vorjahreszahlen werden verglichen…'],[88,'Excel-Bericht wird erstellt…']];
   const iv = setInterval(() => {
     if (mi < msgs.length && pct >= msgs[mi][0]) { txt.textContent = msgs[mi][1]; mi++; }
     if (pct < 90) { pct += 1; bar.style.width = pct + '%'; }
@@ -941,7 +954,8 @@ let ugFile = null;
 function ugRefreshStart() {
   const form = document.getElementById('ug-rechtsform').value;
   const size = document.getElementById('ug-groessenklasse').value;
-  document.getElementById('ug-btn').disabled = !(ugFile && form && size);
+  const ok = document.getElementById('ug-bestaetigt').checked;
+  document.getElementById('ug-btn').disabled = !(ugFile && form && size && ok);
 }
 async function ugSelect() {
   const f = document.getElementById('ug-file').files[0];
@@ -958,14 +972,14 @@ async function ugSelect() {
     const resp = await fetch('/ugb_profil', { method:'POST', body:fd });
     const data = await resp.json();
     if (!resp.ok) {
-      hint.textContent = data.error || 'Der Anhang konnte nicht gelesen werden.';
+      hint.textContent = data.error || 'Der Anhang konnte nicht gelesen werden. Bitte Rechtsform und Größe selbst wählen.';
       return;
     }
     if (data.rechtsform) document.getElementById('ug-rechtsform').value = data.rechtsform;
     if (data.groessenklasse) document.getElementById('ug-groessenklasse').value = data.groessenklasse;
-    hint.textContent = data.hinweis || '';
+    hint.textContent = data.hinweis || 'Vorschlag aus dem Anhang. Bitte prüfen und unten bestätigen.';
   } catch (e) {
-    hint.textContent = 'Bitte GmbH oder AG und klein / mittel / groß selbst wählen.';
+    hint.textContent = 'Gesellschaft konnte nicht automatisch gelesen werden. Bitte GmbH oder AG und klein / mittel / groß selbst wählen.';
   }
   ugRefreshStart();
 }
@@ -975,6 +989,10 @@ async function ugRun() {
   const size = document.getElementById('ug-groessenklasse').value;
   if (!form || !size) {
     ugError('Bitte zuerst Rechtsform und Größenklasse wählen.');
+    return;
+  }
+  if (!document.getElementById('ug-bestaetigt').checked) {
+    ugError('Bitte bestätigen, dass Rechtsform und Größe stimmen.');
     return;
   }
   hide('ug-upload'); hide('ug-error'); hide('ug-result'); show('ug-progress');
@@ -1092,12 +1110,33 @@ async function quitApp() {
   fetch('/healthz').then(r => r.json()).then(d => {
     const st = d.foundry || {};
     const txt = d.foundry_bereit
-      ? 'KI: Microsoft Foundry (zentral)'
-      : (st.hinweis || 'KI: aus – Prüfung läuft mit Heuristik');
+      ? (st.kurz || 'KI: bereit')
+      : (st.kurz || 'KI: aus – Heuristik');
     const badge = document.getElementById('ki-badge');
     const hint = document.getElementById('ug-ki-hint');
     if (badge) badge.textContent = txt;
     if (hint) hint.textContent = txt;
+    const pp = document.getElementById('ug-pp-warn');
+    if (pp) {
+      if (d.pruefprogramm_gefunden) {
+        pp.classList.add('hidden');
+        pp.textContent = '';
+      } else {
+        pp.classList.remove('hidden');
+        pp.textContent = 'Das Excel-Prüfprogramm fehlt im Ordner „Fachliche Unterlagen / UGB-Inhaltsprüfung“. Die Prüfung würde mit der kurzen Standardliste laufen – bitte den Fachordner prüfen.';
+      }
+    }
+    const plug = document.getElementById('plugin-warn');
+    if (plug) {
+      const fehler = d.plugin_fehler || [];
+      if (!fehler.length) {
+        plug.classList.add('hidden');
+        plug.textContent = '';
+      } else {
+        plug.classList.remove('hidden');
+        plug.textContent = 'Ein Mandantenprofil konnte nicht geladen werden. Dieser Lauf nutzt das Standardprofil: ' + fehler.join(' · ');
+      }
+    }
   }).catch(() => {});
 })();
 </script>
@@ -1123,6 +1162,7 @@ def healthz():
         "plugin_fehler": plugin_errors(),
         "foundry_bereit": is_ai_ready(),
         "foundry": describe_status(),
+        "pruefprogramm_gefunden": _find_pruefprogramm() is not None,
     })
 
 
@@ -1269,7 +1309,11 @@ def compare_route():
     cur = request.files.get("current")
     pri = request.files.get("prior")
     if not cur or not pri:
-        return jsonify({"error": "Beide PDF-Dateien müssen hochgeladen werden."}), 400
+        return jsonify({"error": "Beide Abschlüsse müssen hochgeladen werden (PDF oder Word)."}), 400
+    cur_ok = Path(cur.filename or "").suffix.lower() in (".pdf", ".docx")
+    pri_ok = Path(pri.filename or "").suffix.lower() in (".pdf", ".docx")
+    if not cur_ok or not pri_ok:
+        return jsonify({"error": "Bitte PDF- oder Word-Dateien wählen."}), 400
 
     mandant = request.form.get("mandant", "")
     pipeline = get_pipeline(mandant)
@@ -1491,6 +1535,8 @@ def ugb_review_route():
 
     with tempfile.TemporaryDirectory() as tmp:
         suffix = Path(anhang_file.filename or "anhang.pdf").suffix.lower() or ".pdf"
+        if suffix not in (".pdf", ".docx"):
+            return jsonify({"error": "Bitte eine PDF- oder Word-Datei wählen."}), 400
         anhang_p = Path(tmp) / (anhang_file.filename or f"anhang{suffix}")
         anhang_file.save(str(anhang_p))
 
@@ -1674,7 +1720,7 @@ def _main() -> None:
     print(f"   Falls der Browser nicht aufgeht: {('http://localhost:%d' % port)}")
     print()
     print("   Dieses Fenster BITTE OFFEN LASSEN, solange Sie arbeiten.")
-    print("   Zum Beenden: dieses Fenster schliessen.")
+    print("   Zum Beenden: Knopf Beenden oben rechts in der Oberflaeche.")
     print("=" * 64)
     # Mandantenprofile: der Anwender muss sehen, was angestöpselt ist – und
     # vor allem, wenn ein Profil NICHT geladen wurde.

@@ -208,6 +208,7 @@ def describe_status() -> dict[str, Any]:
         )
     else:
         hinweis = "Foundry ist eingerichtet. Die Tools können den zentralen Layer nutzen."
+    kurz = "KI: bereit" if bereit else "KI: aus – Heuristik"
     return {
         "enabled": cfg.enabled,
         "provider_ok": provider_ok,
@@ -216,6 +217,7 @@ def describe_status() -> dict[str, Any]:
         "schluessel_gesetzt": key_ok,
         "bereit": bereit,
         "hinweis": hinweis,
+        "kurz": kurz,
     }
 
 

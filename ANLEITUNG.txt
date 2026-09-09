@@ -58,6 +58,11 @@ MODUS 3 - UGB-INHALTSPRUEFUNG (zwei Schritte)
              Das Tool schlaegt Rechtsform und Groesse vor.
              Bitte GmbH oder AG und klein / mittel / gross
              bestaetigen. Ohne Auswahl startet nichts.
+             Ohne Bestaetigung startet nichts.
+
+  Das KPMG-Pruefprogramm liegt im Ordner
+    Fachliche Unterlagen\UGB-Inhaltspruefung
+  Fehlt die Datei, warnt das Tool vor dem Start.
 
   Schritt 2: "Inhaltspruefung starten".
              Zuerst fallen Fragen weg, die fuer diese
@@ -80,6 +85,9 @@ KI (MICROSOFT FOUNDRY):
 
   Ist der Zugang nicht erreichbar: Heuristik, kein stiller Wechsel.
   Pseudokrat bleibt lokal und nutzt Foundry nicht.
+
+  Status ohne Schluessel: _Gemeinsam\llp_ai\Pruefen.bat
+  In der Oberflaeche unten kurz "KI: bereit" oder "KI: aus".
 
 
 ERGEBNISSE:

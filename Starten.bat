@@ -16,6 +16,14 @@ echo.
 
 cd /d "%~dp0"
 
+if not exist "%~dp0app.py" (
+    echo  Starten.bat liegt nicht im Programmordner.
+    echo  Bitte die Datei im Ordner des Anhangspruefers doppelklicken.
+    echo.
+    pause
+    exit /b 1
+)
+
 rem Zuerst der bestehende Kanzlei-Ordner (dort liegt der Foundry-Zugang),
 rem erst danach die Kopie im Programmordner.
 if exist "%~dp0..\_Gemeinsam" set "LLP_SHARED_AI_ROOT=%~dp0..\_Gemeinsam"
@@ -58,7 +66,7 @@ echo.
 set PYTHONIOENCODING=utf-8
 set PYTHONUTF8=1
 
-start "" "http://localhost:5555"
+rem Browser oeffnet app.py selbst, sobald der richtige Port feststeht.
 %PY% app.py
 
 if errorlevel 1 (

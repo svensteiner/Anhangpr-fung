@@ -83,6 +83,7 @@ def describe_status() -> dict:
             "schluessel_gesetzt": False,
             "bereit": False,
             "hinweis": "Der zentrale Foundry-Layer ist nicht erreichbar. Prüfung ohne Modell.",
+            "kurz": "KI: aus – Heuristik",
         }
     try:
         data = _LAYER["describe_status"]()
@@ -95,6 +96,7 @@ def describe_status() -> dict:
             "schluessel_gesetzt": False,
             "bereit": False,
             "hinweis": "Foundry-Status konnte nicht gelesen werden. Prüfung ohne Modell.",
+            "kurz": "KI: aus – Heuristik",
         }
     if not isinstance(data, dict):
         return {
@@ -105,6 +107,7 @@ def describe_status() -> dict:
             "schluessel_gesetzt": False,
             "bereit": False,
             "hinweis": "Foundry-Status war ungültig. Prüfung ohne Modell.",
+            "kurz": "KI: aus – Heuristik",
         }
     return data
 

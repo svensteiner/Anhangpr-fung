@@ -34,6 +34,29 @@ def test_extract_from_anhang_reads_docx(tmp_path):
     assert haft.prior_value == 8000.0
 
 
+def test_compare_route_rejects_wrong_suffix():
+    root = Path(__file__).resolve().parents[2]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    import app as webapp
+
+    client = webapp.app.test_client()
+    missing = client.post("/compare")
+    assert missing.status_code == 400
+    assert "PDF oder Word" in missing.get_json()["error"]
+
+    wrong = client.post(
+        "/compare",
+        data={
+            "current": (io.BytesIO(b"a"), "jetzt.txt"),
+            "prior": (io.BytesIO(b"b"), "vorher.txt"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert wrong.status_code == 400
+    assert "Word" in wrong.get_json()["error"]
+
+
 def test_pruefen_route_accepts_docx_and_rejects_other():
     root = Path(__file__).resolve().parents[2]
     if str(root) not in sys.path:
