@@ -552,7 +552,9 @@ def test_ugb_web_e2e_docx_gmbh_klein(tmp_path):
     assert "unbekannt" not in blob
     assert "gmbh" in body["hinweis"].lower()
     assert "klein" in body["hinweis"].lower()
+    assert "teil 2 rest" in body["hinweis"].lower()
     assert body["zu_pruefen"] >= 1
+    assert body["zu_pruefen"] <= body["gesamt"]
     assert any("standard-checkliste" in w.lower() for w in body.get("warnungen") or [])
     out = root / "Ergebnisse" / body["filename"]
     assert out.is_file()
@@ -604,6 +606,55 @@ def test_review_checklist_two_stage(tmp_path):
     assert info["ki"] is None
     reason = next(f.technical_reasoning for f in result.findings if f.checklist_item_id == "K2")
     assert "Nicht erforderlich" in reason
+    assert info["teil1_zu_pruefen"] == 1
+    assert "Teil 2 Rest 1" in info["hinweis"]
+
+
+def test_review_checklist_zaehlt_rest_nach_teil2(tmp_path):
+    import docx
+    from anhangspruefer.compliance.ugb_pipeline import review_checklist
+
+    doc = docx.Document()
+    doc.add_paragraph(
+        "Die Musterfirma Handels GmbH ist eine kleine Kapitalgesellschaft. "
+        "Die Vorräte werden zu Anschaffungskosten bewertet. "
+        "Die Vorratsbewertung erfolgt zu Anschaffungskosten."
+    )
+    p = tmp_path / "anhang.docx"
+    doc.save(str(p))
+
+    gilt_gmbh_klein = [
+        "AG groß; AG mittel; AG klein; GmbH groß; GmbH mittel; GmbH klein"
+    ]
+    cl = Checklist(name="t", version="")
+    cl.add_item(ChecklistItem(
+        item_id="K1", category="Vorräte",
+        description="Angabe der Vorratsbewertung",
+        search_keywords=["Vorratsbewertung"],
+        size_classes=gilt_gmbh_klein,
+    ))
+    cl.add_item(ChecklistItem(
+        item_id="K2", category="Derivative",
+        description="Angabe zu Derivaten",
+        search_keywords=["Derivat"],
+        size_classes=gilt_gmbh_klein,
+    ))
+    cl.add_item(ChecklistItem(
+        item_id="K3", category="Allgemein",
+        description="Angabe der Aktiengattungen",
+        size_classes=["AG groß", "AG mittel"],
+    ))
+
+    result, info = review_checklist(p, cl, "gmbh", "klein")
+    st = {f.checklist_item_id: f.status for f in result.findings}
+    assert st["K3"] == ComplianceStatus.NOT_APPLICABLE
+    assert st["K2"] == ComplianceStatus.NOT_APPLICABLE
+    assert info["teil1_zu_pruefen"] == 2
+    assert info["zu_pruefen"] == 1
+    assert info["maschinell"] == 1
+    assert "Teil 1 2 Fragen" in info["hinweis"]
+    assert "Teil 2 Rest 1 von 3 geprüft" in info["hinweis"]
+    assert "unbekannt" not in info["hinweis"].lower()
 
 
 def test_rechtsgrund_na_reason_has_no_machine_prefix():

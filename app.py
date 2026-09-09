@@ -1721,9 +1721,10 @@ def ugb_review_route():
         "rechtsform": legal_form,
         "groessenklasse": size_class,
         "ki": ki_info["ki"] if isinstance(ki_info, dict) else None,
-        "hinweis": (
-            f"Für {form_txt} {size_txt}: "
-            f"{info.get('zu_pruefen', 0)} von {len(findings)} Fragen geprüft."
+        "hinweis": info.get("hinweis")
+        or (
+            f"Für {form_txt} {size_txt}: Teil 1 {info.get('teil1_zu_pruefen', info.get('zu_pruefen', 0))} "
+            f"Fragen (Rechtsgrund), Teil 2 Rest {info.get('zu_pruefen', 0)} von {len(findings)} geprüft."
         ),
     }
     _record_stage(request.form.get("mandant", ""), "ugb", out_fname, summary)

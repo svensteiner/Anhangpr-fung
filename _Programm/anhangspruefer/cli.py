@@ -205,9 +205,13 @@ def run_review(args):
     )
     form_txt = "GmbH" if legal_form == "gmbh" else "AG"
     size_txt = {"klein": "klein", "mittel": "mittel", "gross": "groß"}[size_class]
+    print()
     print(
-        f"\nFür {form_txt} {size_txt}: "
-        f"{info.get('zu_pruefen', 0)} von {len(result.findings)} Fragen geprüft."
+        info.get("hinweis")
+        or (
+            f"Für {form_txt} {size_txt}: Teil 1 {info.get('teil1_zu_pruefen', info.get('zu_pruefen', 0))} "
+            f"Fragen (Rechtsgrund), Teil 2 Rest {info.get('zu_pruefen', 0)} von {len(result.findings)} geprüft."
+        )
     )
     print(f"Checkliste: {output_path}")
     print("Kein stilles unbekannt. Offene Punkte in Excel bestätigen.")

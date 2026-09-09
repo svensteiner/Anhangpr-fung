@@ -40,6 +40,8 @@ TAEGLICH
      „unbekannt“. Vor Teil 2 steht, ob die KI bereit
      ist; wenn aus, nur Heuristik (Pruefen.bat).
      Knopf „Teil 2: Rest pruefen“.
+     Danach steht, wie viele Fragen vom Rest
+     wirklich geprueft wurden (nicht die Teil-1-Zahl).
      Offene Punkte in Excel abarbeiten.
 
   2  Text verbessern

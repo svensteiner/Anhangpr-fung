@@ -440,10 +440,12 @@ def apply_topic_relevance(
     anwendbar = sorted({c for c, ok in applicable_cache.items() if ok})
     nicht = sorted({c for c, ok in applicable_cache.items() if not ok})
     result._update_statistics()
+    na = sum(1 for f in result.findings if f.status == ComplianceStatus.NOT_APPLICABLE)
     return {
         "anwendbar": anwendbar,
         "nicht_anwendbar": nicht,
         "umgestellt": umgestellt,
+        "zu_pruefen": len(result.findings) - na,
     }
 
 

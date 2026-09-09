@@ -124,6 +124,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "keine alte kommandozeile" in text
     assert "keine startbare desktop-oberflaeche" in text
     assert "vor teil 2" in text
+    assert "wie viele fragen vom rest" in text
     assert "bei jedem start" in text
     assert "bitte pruefen.bat" in text
     assert "sagt installieren das klar" in text
