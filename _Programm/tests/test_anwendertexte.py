@@ -283,6 +283,11 @@ def test_text_verbessern_foundry_kit_liegt_bereit():
     assert "wie gewohnt" not in lies
     assert "foundry-seite" in lies
     assert "startet nicht" in lies
+    assert "schnell bleibt lokal" not in lies
+    assert "keine lokale regelfassung" in lies
+    assert "unveraendert" in lies or "unverändert" in lies
+    assert "selbsttest" in lies
+    assert "bewertung" in lies
     kit_start = (kit / "Starten.bat").read_text(encoding="utf-8").lower()
     assert "anwenden.py" in kit_start
     assert "--leise" in kit_start
