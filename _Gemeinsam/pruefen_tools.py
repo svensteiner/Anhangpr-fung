@@ -264,6 +264,44 @@ def hybrid_modus(path: Path | None) -> str:
     return "nicht erkannt"
 
 
+def find_local_rules(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "app/providers/local.py")
+        if found is not None:
+            return found
+    return None
+
+
+def local_rules_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "LLP-FOUNDRY-TOR" in text and "Lokale Regeln sind abgeschaltet" in text:
+        return "abgeschaltet"
+    if "class LocalRuleProvider" in text:
+        return "noch Regeln"
+    return "nicht erkannt"
+
+
+def find_fast_editor(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "app/providers/fast_editor.py")
+        if found is not None:
+            return found
+    return None
+
+
+def fast_editor_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "LLP-FOUNDRY-TOR" in text and "Schnell-Editor ist abgeschaltet" in text:
+        return "abgeschaltet"
+    if "class FastEditorialProvider" in text:
+        return "noch Regeln"
+    return "nicht erkannt"
+
+
 START_DOC_RELS = ("README.md", "SCHNELLSTART.md", "LIESMICH.txt")
 WEB_HTML_RELS = (
     Path("web") / "TextVerbessern-Browser.html",
@@ -627,6 +665,8 @@ def report(start: Path | None = None) -> dict[str, object]:
     api = find_text_api(roots)
     pipeline = find_text_pipeline(roots)
     hybrid = find_text_hybrid(roots)
+    local_rules = find_local_rules(roots)
+    fast_editor = find_fast_editor(roots)
     pyproject = find_text_pyproject(roots)
     providers_init = find_providers_init(roots)
     modus = text_verbessern_modus(desktop)
@@ -639,6 +679,8 @@ def report(start: Path | None = None) -> dict[str, object]:
     cli_modus = text_cli_modus(api)
     pipeline_mode = pipeline_modus(pipeline)
     hybrid_mode = hybrid_modus(hybrid)
+    local_rules_mode = local_rules_modus(local_rules)
+    fast_editor_mode = fast_editor_modus(fast_editor)
     pyproject_mode = pyproject_modus(pyproject)
     providers_init_mode = providers_init_modus(providers_init)
     docs_mode = start_docs_modus(roots=roots)
@@ -677,6 +719,8 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_pipeline_modus": pipeline_mode,
         "text_hybrid": hybrid,
         "text_hybrid_modus": hybrid_mode,
+        "text_local_rules_modus": local_rules_mode,
+        "text_fast_editor_modus": fast_editor_mode,
         "text_pyproject": pyproject,
         "text_pyproject_modus": pyproject_mode,
         "text_providers_init": providers_init,
@@ -735,6 +779,8 @@ def format_report(data: dict[str, object]) -> str:
         "  Bewertung:       " + str(data["text_evaluation_modus"]),
         "  Text-Pipeline:   " + str(data["text_pipeline_modus"]),
         "  Hybrid-Weg:      " + str(data["text_hybrid_modus"]),
+        "  Lokal-Regeln:    " + str(data["text_local_rules_modus"]),
+        "  Schnell-Editor:  " + str(data["text_fast_editor_modus"]),
         "  Paketdatei:      " + str(data["text_pyproject_modus"]),
         "  Provider-Export: " + str(data["text_providers_init_modus"]),
         "  Tool-Anleitung:  " + str(data["text_docs_modus"]),
@@ -835,6 +881,16 @@ def format_report(data: dict[str, object]) -> str:
             "  hybrid.py ruft noch Mistral oder lokale Regeln auf."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_local_rules_modus"] in {"noch Regeln", "nicht erkannt"}:
+        lines.append(
+            "  local.py aendert den Text noch lokal."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
+    if data["text_fast_editor_modus"] in {"noch Regeln", "nicht erkannt"}:
+        lines.append(
+            "  fast_editor.py aendert den Text noch lokal."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     if data["text_pyproject_modus"] in {"noch API", "noch Streamlit", "noch CLI", "nicht erkannt"}:
         lines.append(
             "  pyproject.toml zieht noch Streamlit oder uvicorn nach."
@@ -891,6 +947,12 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
     evaluation = tool_root / "app" / "evaluation.py"
     if evaluation.is_file() and evaluation_modus(evaluation) != "abgeschaltet":
         reasons.append("Bewertung")
+    local_rules = tool_root / "app" / "providers" / "local.py"
+    if local_rules.is_file() and local_rules_modus(local_rules) != "abgeschaltet":
+        reasons.append("Lokal-Regeln")
+    fast_editor = tool_root / "app" / "providers" / "fast_editor.py"
+    if fast_editor.is_file() and fast_editor_modus(fast_editor) != "abgeschaltet":
+        reasons.append("Schnell-Editor")
     pipeline = tool_root / "app" / "pipeline.py"
     if pipeline.is_file() and pipeline_modus(pipeline) != "Foundry":
         reasons.append("Pipeline")
@@ -977,6 +1039,8 @@ def text_has_leftovers(
         or data["text_cli_modus"] == "noch CLI"
         or data["text_pipeline_modus"] in {"noch Mistral", "noch Regeln", "nicht erkannt"}
         or data["text_hybrid_modus"] in {"noch Mistral", "noch Regeln", "nicht erkannt"}
+        or data["text_local_rules_modus"] in {"noch Regeln", "nicht erkannt"}
+        or data["text_fast_editor_modus"] in {"noch Regeln", "nicht erkannt"}
         or data["text_pyproject_modus"] in {"noch API", "noch Streamlit", "noch CLI", "nicht erkannt"}
         or data["text_providers_init_modus"] in {"noch Mistral", "nicht erkannt"}
         or data["text_docs_modus"] in {"noch alt", "nicht erkannt"}
@@ -1008,6 +1072,8 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     cli_ok = data["text_cli_modus"] in {"abgeschaltet", "nicht gefunden"}
     pipeline_ok = data["text_pipeline_modus"] in {"Foundry", "nicht gefunden"}
     hybrid_ok = data["text_hybrid_modus"] in {"Foundry", "nicht gefunden"}
+    local_rules_ok = data["text_local_rules_modus"] in {"abgeschaltet", "nicht gefunden"}
+    fast_editor_ok = data["text_fast_editor_modus"] in {"abgeschaltet", "nicht gefunden"}
     pyproject_ok = data["text_pyproject_modus"] in {"abgeschaltet", "nicht gefunden"}
     init_ok = data["text_providers_init_modus"] in {"Foundry", "nicht gefunden"}
     docs_ok = data["text_docs_modus"] in {"Foundry", "nicht gefunden"}
@@ -1033,6 +1099,8 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and cli_ok
         and pipeline_ok
         and hybrid_ok
+        and local_rules_ok
+        and fast_editor_ok
         and pyproject_ok
         and init_ok
         and docs_ok

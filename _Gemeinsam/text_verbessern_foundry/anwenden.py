@@ -85,6 +85,7 @@ def apply_foundry(tool_root: Path) -> tuple[bool, str]:
             and "if foundry_ready():" in current
             and not desktop_self_test_live_text(current)
             and not desktop_local_fallback_live_text(current)
+            and leftovers_in_tool(tool_root) == []
         )
     try:
         apply(tool_root)
@@ -163,6 +164,14 @@ def apply(tool_root: Path) -> list[str]:
     if mistral.is_file():
         _patch_mistral_provider(mistral)
         done.append(str(mistral))
+    local_rules = tool_root / LOCAL_RULES_REL
+    if local_rules.is_file():
+        _disable_local_rules(local_rules)
+        done.append(str(local_rules))
+    fast_editor = tool_root / FAST_EDITOR_REL
+    if fast_editor.is_file():
+        _disable_fast_editor(fast_editor)
+        done.append(str(fast_editor))
 
     return done
 
@@ -222,6 +231,26 @@ EXE_REL_DIRS = (
     Path("dist") / "TextVerbessern",
     Path("packaging") / "output",
     Path("release"),
+)
+LOCAL_RULES_REL = Path("app") / "providers" / "local.py"
+FAST_EDITOR_REL = Path("app") / "providers" / "fast_editor.py"
+REWRITE_SIG = (
+    "    def rewrite(self, text: str, constraints: SemanticConstraints, "
+    "options: TransformOptions) -> str:\n"
+)
+LOCAL_RULES_STUB = (
+    REWRITE_SIG
+    + "        raise RuntimeError(\n"
+    + '            "Lokale Regeln sind abgeschaltet. Nur Foundry. '
+    + 'Der Text bleibt unverändert."\n'
+    + "        )  # LLP-FOUNDRY-TOR\n"
+)
+FAST_EDITOR_STUB = (
+    REWRITE_SIG
+    + "        raise RuntimeError(\n"
+    + '            "Schnell-Editor ist abgeschaltet. Nur Foundry. '
+    + 'Der Text bleibt unverändert."\n'
+    + "        )  # LLP-FOUNDRY-TOR\n"
 )
 STREAMLIT_REL = Path("app") / "ui" / "streamlit_app.py"
 EVALUATION_REL = Path("app") / "evaluation.py"
@@ -594,6 +623,26 @@ def _patch_local_runtime(path: Path) -> None:
         "    return False  # LLP-FOUNDRY-TOR: kein Ollama\n",
     )
     path.write_text(text, encoding="utf-8")
+
+
+def _disable_local_rules(path: Path) -> None:
+    """LocalRuleProvider darf den Text nicht mehr ändern."""
+    text = path.read_text(encoding="utf-8")
+    if "LLP-FOUNDRY-TOR" in text and "Lokale Regeln sind abgeschaltet" in text:
+        return
+    if REWRITE_SIG not in text:
+        raise ValueError("Erwartete Stelle fehlt: LocalRuleProvider.rewrite")
+    path.write_text(text.replace(REWRITE_SIG, LOCAL_RULES_STUB, 1), encoding="utf-8")
+
+
+def _disable_fast_editor(path: Path) -> None:
+    """FastEditorialProvider darf den Text nicht mehr ändern."""
+    text = path.read_text(encoding="utf-8")
+    if "LLP-FOUNDRY-TOR" in text and "Schnell-Editor ist abgeschaltet" in text:
+        return
+    if REWRITE_SIG not in text:
+        raise ValueError("Erwartete Stelle fehlt: FastEditorialProvider.rewrite")
+    path.write_text(text.replace(REWRITE_SIG, FAST_EDITOR_STUB, 1), encoding="utf-8")
 
 
 def _patch_mistral_provider(path: Path) -> None:

@@ -121,6 +121,8 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert "Bewertung:" in blob
     assert "Text-Pipeline:" in blob
     assert "Hybrid-Weg:" in blob
+    assert "Lokal-Regeln:" in blob
+    assert "Schnell-Editor:" in blob
     assert "Paketdatei:" in blob
     assert "Original-Start:" in blob
     assert "Provider-Export:" in blob
@@ -420,6 +422,37 @@ def test_report_foundry_desktop_aber_mistral_pipeline_ist_nicht_ok(tmp_path: Pat
     assert "pipeline.py" in blob
     assert module.text_foundry_ok(gemeinsam) is False
     assert module.text_has_leftovers(data) is True
+
+
+def test_report_foundry_aber_lokal_provider_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    (tools / "rephraser" / "app" / "providers" / "local.py").write_text(
+        "class LocalRuleProvider:\n"
+        "    def rewrite(self, text):\n"
+        "        return text\n",
+        encoding="utf-8",
+    )
+    (tools / "rephraser" / "app" / "providers" / "fast_editor.py").write_text(
+        "class FastEditorialProvider:\n"
+        "    def rewrite(self, text):\n"
+        "        return text\n",
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_local_rules_modus"] == "noch Regeln"
+    assert data["text_fast_editor_modus"] == "noch Regeln"
+    blob = module.format_report(data)
+    assert "local.py" in blob
+    assert "fast_editor.py" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    reasons = module.leftovers_in_tool(tools / "rephraser")
+    assert "Lokal-Regeln" in reasons
+    assert "Schnell-Editor" in reasons
 
 
 def test_report_foundry_desktop_aber_regeln_pipeline_ist_nicht_ok(tmp_path: Path) -> None:

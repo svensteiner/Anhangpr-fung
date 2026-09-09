@@ -339,6 +339,20 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         "        self.base_url = 'http://127.0.0.1:11434'\n",
         encoding="utf-8",
     )
+    (tool / "app" / "providers" / "local.py").write_text(
+        "class LocalRuleProvider:\n"
+        "    def rewrite(self, text: str, constraints: SemanticConstraints, "
+        "options: TransformOptions) -> str:\n"
+        "        return text.replace('  ', ' ')\n",
+        encoding="utf-8",
+    )
+    (tool / "app" / "providers" / "fast_editor.py").write_text(
+        "class FastEditorialProvider:\n"
+        "    def rewrite(self, text: str, constraints: SemanticConstraints, "
+        "options: TransformOptions) -> str:\n"
+        "        return text + '!'\n",
+        encoding="utf-8",
+    )
     (tool / "app" / "providers" / "hybrid.py").write_text(
         "from app.providers.mistral_provider import LocalMistralProvider\n\n"
         "class HybridLocalProvider:\n"
@@ -405,6 +419,13 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "FoundryEditorialProvider" in hybrid
     assert 'name = "rules+foundry"' in hybrid
     assert "LocalMistralProvider" not in hybrid
+    local_rules = (tool / "app" / "providers" / "local.py").read_text(encoding="utf-8")
+    assert "Lokale Regeln sind abgeschaltet" in local_rules
+    assert "LLP-FOUNDRY-TOR" in local_rules
+    fast_editor = (tool / "app" / "providers" / "fast_editor.py").read_text(encoding="utf-8")
+    assert "Schnell-Editor ist abgeschaltet" in fast_editor
+    assert "LLP-FOUNDRY-TOR" in fast_editor
+
     assert "LocalRuleProvider" not in hybrid
     assert "self.foundry" in hybrid
     assert "self.rules" not in hybrid
@@ -676,6 +697,27 @@ def test_anwenden_stellt_bewertung_ab(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert "Bewertung" in module.leftovers_in_tool(tool)
+
+
+def test_anwenden_stellt_lokal_provider_ab(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    assert "Lokal-Regeln" in module.leftovers_in_tool(tool)
+    assert "Schnell-Editor" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    local_rules = tool / "app" / "providers" / "local.py"
+    assert "Lokale Regeln sind abgeschaltet" in local_rules.read_text(encoding="utf-8")
+    fast_editor = tool / "app" / "providers" / "fast_editor.py"
+    assert "Schnell-Editor ist abgeschaltet" in fast_editor.read_text(encoding="utf-8")
+    local_rules.write_text(
+        "class LocalRuleProvider:\n"
+        "    def rewrite(self, text: str, constraints: SemanticConstraints, "
+        "options: TransformOptions) -> str:\n"
+        "        return text\n",
+        encoding="utf-8",
+    )
+    assert "Lokal-Regeln" in module.leftovers_in_tool(tool)
 
 
 def test_anwenden_entfernt_lokale_desktop_fassung(tmp_path: Path) -> None:
