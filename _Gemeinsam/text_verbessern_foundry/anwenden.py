@@ -132,6 +132,7 @@ def apply(tool_root: Path) -> list[str]:
     done.extend(_write_start_notes(tool_root))
     extra = _patch_leftover_docs(tool_root)
     done.extend(extra)
+    done.extend(_park_web_scripts(tool_root))
     hybrid = tool_root / "app" / "providers" / "hybrid.py"
     if hybrid.is_file():
         _patch_hybrid(hybrid)
@@ -432,6 +433,19 @@ def _patch_web_html(tool_root: Path) -> list[str]:
         path.write_text(WEB_STUB, encoding="utf-8")
         written.append(str(path))
     return written
+
+
+def _park_web_scripts(tool_root: Path) -> list[str]:
+    """app.js/editor.js würden den Offline-Editor wieder starten, wenn HTML zurückgelegt wird."""
+    parked: list[str] = []
+    web = tool_root / "web"
+    if not web.is_dir():
+        return parked
+    for path in sorted(web.glob("*.js")):
+        dest = _park_file(path)
+        if dest is not None:
+            parked.append(str(dest))
+    return parked
 
 
 def _park_exe(tool_root: Path) -> list[str]:

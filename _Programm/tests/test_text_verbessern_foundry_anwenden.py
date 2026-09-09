@@ -249,6 +249,8 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         "<html><body><p>kein Mistral-Modell</p></body></html>\n",
         encoding="utf-8",
     )
+    (web / "app.js").write_text("export function startEditor() {}\n", encoding="utf-8")
+    (web / "editor.js").write_text("export function bindEditor() {}\n", encoding="utf-8")
     pack = tool / "packaging"
     pack.mkdir(parents=True, exist_ok=True)
     (pack / "TextVerbessern.spec").write_text(
@@ -476,6 +478,11 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     index = (tool / "web" / "index.html").read_text(encoding="utf-8")
     assert "Offline-Datei startet nicht" in index
     assert "<script" not in index.lower()
+    assert not (tool / "web" / "app.js").is_file()
+    assert not (tool / "web" / "editor.js").is_file()
+    assert (tool / "web" / "app.js.llp-alt").is_file()
+    assert (tool / "web" / "editor.js.llp-alt").is_file()
+    assert "startEditor" in (tool / "web" / "app.js.llp-alt").read_text(encoding="utf-8")
     cli = (tool / "app" / "main.py").read_text(encoding="utf-8")
     assert 'choices=["fast-editor", "rules", "foundry"]' in cli
     assert "mistral-local" not in cli
@@ -568,6 +575,19 @@ def test_anwenden_scheitert_wenn_mistral_export_bleibt(tmp_path: Path) -> None:
     ok, msg = module.apply_foundry(tool)
     assert ok is False
     assert "LocalMistralProvider" in msg or "exportiert" in msg
+
+
+def test_anwenden_parkt_offline_js(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    assert "Offline-JS" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    assert not (tool / "web" / "app.js").is_file()
+    assert not (tool / "web" / "editor.js").is_file()
+    assert (tool / "web" / "app.js.llp-alt").is_file()
+    assert (tool / "web" / "editor.js.llp-alt").is_file()
+    assert module.leftovers_in_tool(tool) == []
 
 
 def test_anwenden_ersetzt_banner_html_durch_stub(tmp_path: Path) -> None:

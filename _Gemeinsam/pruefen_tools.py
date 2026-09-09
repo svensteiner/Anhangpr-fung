@@ -290,6 +290,25 @@ def find_live_web_html(roots: list[Path]) -> Path | None:
     return None
 
 
+def live_web_js(tool_root: Path) -> Path | None:
+    web = tool_root / "web"
+    if not web.is_dir():
+        return None
+    for path in sorted(web.glob("*.js")):
+        if path.is_file():
+            return path
+    return None
+
+
+def find_live_web_js(roots: list[Path]) -> Path | None:
+    for root in roots:
+        for name in TOOL_NAMES["text"]:
+            found = live_web_js(root / name)
+            if found is not None:
+                return found
+    return None
+
+
 def find_live_spec(roots: list[Path]) -> Path | None:
     for root in roots:
         found = _first_existing(root, TOOL_NAMES["text"], str(SPEC_REL))
@@ -448,6 +467,7 @@ def report(start: Path | None = None) -> dict[str, object]:
     providers_init_mode = providers_init_modus(providers_init)
     docs_mode = start_docs_modus(roots=roots)
     web_html = find_live_web_html(roots)
+    web_js = find_live_web_js(roots)
     spec = find_live_spec(roots)
     build = find_live_build_script(roots)
     workflow = find_live_portable_workflow(roots)
@@ -481,6 +501,7 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_providers_init_modus": providers_init_mode,
         "text_docs_modus": docs_mode,
         "text_web_html": web_html,
+        "text_web_js": web_js,
         "text_spec": spec,
         "text_build": build,
         "text_workflow": workflow,
@@ -521,6 +542,8 @@ def format_report(data: dict[str, object]) -> str:
         "  Tool-Anleitung:  " + str(data["text_docs_modus"]),
         "  Offline-HTML:    "
         + ("noch alt – Anwenden.bat" if data["text_web_html"] else "ok oder fehlt"),
+        "  Offline-JS:      "
+        + ("noch da – Anwenden.bat" if data["text_web_js"] else "beiseite"),
         "  Packaging:       "
         + ("noch da – Anwenden.bat" if data["text_spec"] else "beiseite"),
         "  Original-Start:  "
@@ -609,6 +632,11 @@ def format_report(data: dict[str, object]) -> str:
             "  web/TextVerbessern-Browser.html ist noch der alte Offline-Start."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_web_js"] is not None:
+        lines.append(
+            "  web/app.js oder web/editor.js liegt noch im Tool-Ordner."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     if data["text_spec"] is not None or data["text_build"] is not None or data["text_workflow"] is not None:
         lines.append(
             "  Ein Packaging- oder Build-Rezept liegt noch im Tool-Ordner."
@@ -665,6 +693,8 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
         if html.is_file() and web_html_modus(html) != "abgeschaltet":
             reasons.append("Offline-HTML")
             break
+    if live_web_js(tool_root) is not None:
+        reasons.append("Offline-JS")
     if (tool_root / SPEC_REL).is_file():
         reasons.append("Packaging-Spec")
     if (tool_root / BUILD_REL).is_file():
@@ -708,6 +738,7 @@ def text_has_leftovers(
         or data["text_providers_init_modus"] in {"noch Mistral", "nicht erkannt"}
         or data["text_docs_modus"] in {"noch alt", "nicht erkannt"}
         or data["text_web_html"] is not None
+        or data["text_web_js"] is not None
         or data["text_spec"] is not None
         or data["text_build"] is not None
         or data["text_workflow"] is not None
@@ -732,6 +763,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     init_ok = data["text_providers_init_modus"] in {"Foundry", "nicht gefunden"}
     docs_ok = data["text_docs_modus"] in {"Foundry", "nicht gefunden"}
     web_ok = data["text_web_html"] is None
+    web_js_ok = data["text_web_js"] is None
     pack_ok = data["text_spec"] is None and data["text_build"] is None and data["text_workflow"] is None
     return (
         data["text_modus"] == "Foundry"
@@ -750,6 +782,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and init_ok
         and docs_ok
         and web_ok
+        and web_js_ok
         and pack_ok
     )
 

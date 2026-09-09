@@ -120,6 +120,7 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert "Provider-Export:" in blob
     assert "Tool-Anleitung:" in blob
     assert "Offline-HTML:" in blob
+    assert "Offline-JS:" in blob
     assert "Packaging:" in blob
     assert module.text_foundry_ok(gemeinsam) is True
 
@@ -476,6 +477,24 @@ def test_report_foundry_aber_offline_html_ist_nicht_ok(tmp_path: Path) -> None:
     assert "Offline-HTML" in blob or "index.html" in blob
     assert module.text_foundry_ok(gemeinsam) is False
     assert "Offline-HTML" in module.leftovers_in_tool(tools / "rephraser")
+
+
+def test_report_foundry_aber_offline_js_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    js = tools / "rephraser" / "web" / "app.js"
+    js.parent.mkdir(parents=True)
+    js.write_text("export function startEditor() {}\n", encoding="utf-8")
+    data = module.report(gemeinsam)
+    assert data["text_web_js"] is not None
+    blob = module.format_report(data)
+    assert "Offline-JS" in blob or "app.js" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Offline-JS" in module.leftovers_in_tool(tools / "rephraser")
 
 
 def test_report_foundry_aber_packaging_spec_ist_nicht_ok(tmp_path: Path) -> None:

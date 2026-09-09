@@ -24,7 +24,7 @@ EINMALIG
   keine Streamlit-Datei, keine alte EXE, kein Ollama-Rest,
   keine alte API, keine Mistral-Pipeline,
   kein Mistral-Export, keine EXE-Anleitung im Tool-Ordner,
-  keine alte Offline-HTML.
+  keine alte Offline-HTML, kein Offline-Editor-Skript.
   Bleibt ein alter Weg, sagt Installieren das klar.
 
 TAEGLICH
