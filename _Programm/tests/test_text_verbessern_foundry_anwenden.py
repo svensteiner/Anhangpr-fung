@@ -140,6 +140,8 @@ STREAMLIT_MAIN = '''from app.local_runtime import (
 from app.pipeline import run_pipeline
 from app.providers.base import ProviderError
 
+st.set_page_config(page_title="Text verbessern", page_icon="✍️", layout="centered")
+
 
 @st.cache_data(ttl=10, show_spinner=False)
 def cached_local_mistral_ready() -> bool:
@@ -320,6 +322,10 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "Foundry war nicht verfügbar" in streamlit
     assert "Mistral hat die Zeitgrenze" not in streamlit
     assert "Mistral war nicht verfügbar" not in streamlit
+    assert "return foundry_ready()" in streamlit
+    assert "return local_mistral_ready()" not in streamlit
+    assert "st.stop()" in streamlit
+    assert "Streamlit-Oberflaeche startet nicht" in streamlit
 
     launcher = (tool / "TEXT VERBESSERN.cmd").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" in launcher

@@ -479,6 +479,8 @@ def test_mode3_ui_uses_excel_labels_and_confirm():
     assert "/ugb_eingrenzung" in html
     assert "Teil 2: Rest prüfen" in html
     assert "Teil 2: Rest prüfen…" in html
+    assert "Unbekannter Fehler" not in html
+    assert "bitte die Meldung lesen oder die IT rufen" in html
     assert "Zuerst Gesellschaft wählen" in html
     assert "Teil 2: offene Punkte in Excel" in html
     assert "bestaetigt" in html

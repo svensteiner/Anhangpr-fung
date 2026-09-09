@@ -78,6 +78,7 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "text verbessern" in low
     assert "anleitung.txt" in low
     assert "foundry-tor" in low or "foundry tor" in low
+    assert "daneben" in low
 
 
 def test_share_anleitung_fuer_kollegen():

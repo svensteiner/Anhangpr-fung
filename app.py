@@ -823,7 +823,7 @@ async function vjRun() {
   try {
     const resp = await fetch(url, { method:'POST', body:fd });
     clearInterval(iv); bar.style.width = '100%';
-    if (!resp.ok) { const e = await resp.json(); vjError(e.error || 'Unbekannter Fehler'); return; }
+    if (!resp.ok) { const e = await resp.json(); vjError(e.error || 'Fehler – bitte die Meldung lesen oder die IT rufen'); return; }
     const data = await resp.json();
     setTimeout(() => vjShowResult(data), 400);
   } catch (e) { clearInterval(iv); vjError('Verbindungsfehler: ' + e.message); }
@@ -920,7 +920,7 @@ async function bgRun() {
   try {
     const resp = await fetch('/pruefen', { method:'POST', body:fd });
     clearInterval(iv); bar.style.width = '100%';
-    if (!resp.ok) { const e = await resp.json(); bgError(e.error || 'Unbekannter Fehler'); return; }
+    if (!resp.ok) { const e = await resp.json(); bgError(e.error || 'Fehler – bitte die Meldung lesen oder die IT rufen'); return; }
     const data = await resp.json();
     setTimeout(() => bgShowResult(data), 400);
   } catch (e) { clearInterval(iv); bgError('Verbindungsfehler: ' + e.message); }

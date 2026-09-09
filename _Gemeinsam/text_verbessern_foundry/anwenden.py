@@ -537,6 +537,23 @@ def _patch_streamlit(path: Path) -> None:
         "mistral_ready = cached_local_mistral_ready()",
         "mistral_ready = foundry_ready()",
     )
+    st = _replace_all_if_present(
+        st,
+        "    return local_mistral_ready()",
+        "    return foundry_ready()",
+    )
+    if (
+        'st.set_page_config(page_title="Text verbessern"' in st
+        and "Die Streamlit-Oberflaeche startet nicht" not in st
+    ):
+        st = _ensure_line_after(
+            st,
+            'st.set_page_config(page_title="Text verbessern", page_icon="✍️", layout="centered")',
+            'st.warning("Bitte Desktop Text verbessern oder '
+            "_Gemeinsam\\\\text_verbessern_foundry\\\\Starten.bat. "
+            'Die Streamlit-Oberflaeche startet nicht. Nur Foundry, kein Mistral.")\n'
+            "st.stop()",
+        )
     st = _replace_all(
         st,
         "Sofortige Textverbesserung bereit; Mistral ist zusätzlich verfügbar.",
