@@ -727,6 +727,17 @@ def test_anwenden_parkt_ci_rezepte(tmp_path: Path) -> None:
         "run: python -m app.evaluation\n", encoding="utf-8"
     )
     assert "CI-Rezept" in module.leftovers_in_tool(tool)
+    (tool / ".github" / "workflows" / "tests.yml").unlink()
+    (tool / ".github" / "workflows" / "release.yml").write_text(
+        "name: Release\n        run: python -m app.evaluation\n",
+        encoding="utf-8",
+    )
+    assert "CI-Rezept" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    assert not (tool / ".github" / "workflows" / "release.yml").is_file()
+    assert (tool / ".github" / "workflows" / "release.yml.llp-alt").is_file()
+    assert module.leftovers_in_tool(tool) == []
 
 
 def test_anwenden_stellt_desktop_pipeline_ab(tmp_path: Path) -> None:

@@ -335,12 +335,23 @@ WEB_HTML_RELS = (
 )
 SPEC_REL = Path("packaging") / "TextVerbessern.spec"
 BUILD_REL = Path("scripts") / "build_browser_standalone.py"
-WORKFLOW_REL = Path(".github") / "workflows" / "windows-portable.yml"
-WORKFLOW_RELS = (
-    WORKFLOW_REL,
-    Path(".github") / "workflows" / "tests.yml",
-    Path(".github") / "workflows" / "pages.yml",
-)
+WORKFLOW_DIR = Path(".github") / "workflows"
+
+
+def live_workflow_files(tool_root: Path) -> list[Path]:
+    """Jedes noch lebende CI-Rezept, nicht nur die drei bekannten Dateinamen."""
+    folder = tool_root / WORKFLOW_DIR
+    if not folder.is_dir():
+        return []
+    found: list[Path] = []
+    for path in sorted(folder.iterdir()):
+        if not path.is_file():
+            continue
+        if path.name.endswith(".llp-alt"):
+            continue
+        if path.suffix.lower() in {".yml", ".yaml"}:
+            found.append(path)
+    return found
 
 
 def web_html_modus(path: Path | None) -> str:
@@ -467,10 +478,10 @@ def find_live_build_script(roots: list[Path]) -> Path | None:
 
 def find_live_portable_workflow(roots: list[Path]) -> Path | None:
     for root in roots:
-        for rel in WORKFLOW_RELS:
-            found = _first_existing(root, TOOL_NAMES["text"], str(rel))
-            if found is not None:
-                return found
+        for name in TOOL_NAMES["text"]:
+            files = live_workflow_files(root / name)
+            if files:
+                return files[0]
     return None
 
 
@@ -1081,7 +1092,7 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
         reasons.append("Packaging-Spec")
     if (tool_root / BUILD_REL).is_file():
         reasons.append("Build-Skript")
-    if any((tool_root / rel).is_file() for rel in WORKFLOW_RELS):
+    if live_workflow_files(tool_root):
         reasons.append("CI-Rezept")
     provider = tool_root / "app" / "providers" / "foundry_provider.py"
     if desktop.is_file() and not provider.is_file():

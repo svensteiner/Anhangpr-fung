@@ -156,6 +156,8 @@ def test_share_anleitung_fuer_kollegen():
     assert "heuristik / regeln" not in lies
     assert "text verbessern" in lies
     assert "aendert den text nicht" in lies or "ändert den text nicht" in lies
+    assert "ci-rezepte" in lies
+    assert "anhang-ollama" in lies
 
 
 def test_entwicklerdoku_verweist_auf_browser_nicht_alte_gui():

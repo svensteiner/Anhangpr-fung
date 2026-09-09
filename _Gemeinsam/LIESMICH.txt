@@ -23,7 +23,8 @@ auf Ollama, OpenAI oder Anthropic.
 3. Starten.bat oder Desktop-Verknuepfung. Bleibt ein alter Weg,
    erscheint eine Zeile („Bitte Pruefen.bat“).
 4. Status ohne Schlüssel: Pruefen.bat in diesem Ordner
-   doppelklicken (Foundry und Nachbar-Tools, keine Schlüssel).
+   doppelklicken (Foundry, Nachbar-Tools, Restwege wie
+   Mistral, CI-Rezepte, Anhang-Ollama; keine Schlüssel).
 5. Anderes Tool anbinden: `from llp_ai.company_ai import ask_ai, is_ai_ready`.
    Kein eigener OpenAI-/Ollama-Client.
    Ist Foundry aus: Anhangspruefer Heuristik,

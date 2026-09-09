@@ -25,6 +25,7 @@ from pruefen_tools import (
     desktop_self_test_live_text,
     is_launchable_backup,
     leftovers_in_tool,
+    live_workflow_files,
 )
 
 MODE_STRONG_OLD = 'MODE_STRONG = "Gründlich mit Mistral (bis 45 s)"'
@@ -223,12 +224,6 @@ EXE_NAMES = (
 )
 
 SPEC_REL = Path("packaging") / "TextVerbessern.spec"
-WORKFLOW_REL = Path(".github") / "workflows" / "windows-portable.yml"
-WORKFLOW_RELS = (
-    WORKFLOW_REL,
-    Path(".github") / "workflows" / "tests.yml",
-    Path(".github") / "workflows" / "pages.yml",
-)
 BUILD_RELS = (
     Path("scripts") / "build_browser_standalone.py",
 )
@@ -588,10 +583,7 @@ def _park_packaging(tool_root: Path) -> list[str]:
 def _park_leftover_workflows(tool_root: Path) -> list[str]:
     """CI darf keine EXE, Bewertung oder Offline-Editor mehr starten."""
     parked: list[str] = []
-    for rel in WORKFLOW_RELS:
-        workflow = tool_root / rel
-        if not workflow.is_file():
-            continue
+    for workflow in live_workflow_files(tool_root):
         dest = workflow.with_name(workflow.name + ".llp-alt")
         if dest.exists():
             continue

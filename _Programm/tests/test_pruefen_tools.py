@@ -768,6 +768,23 @@ def test_report_foundry_aber_tests_ci_ist_nicht_ok(tmp_path: Path) -> None:
     assert "CI-Rezept" in module.leftovers_in_tool(tools / "rephraser")
 
 
+def test_report_foundry_aber_beliebiges_ci_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    workflow = tools / "rephraser" / ".github" / "workflows" / "release.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: Release\n", encoding="utf-8")
+    data = module.report(gemeinsam)
+    assert data["text_workflow"] is not None
+    assert data["text_workflow"].name == "release.yml"
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "CI-Rezept" in module.leftovers_in_tool(tools / "rephraser")
+
+
 def test_report_foundry_aber_packaging_spec_ist_nicht_ok(tmp_path: Path) -> None:
     module = _load()
     tools = tmp_path / "AI Tools"
