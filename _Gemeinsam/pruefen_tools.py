@@ -57,7 +57,7 @@ def anhang_ollama_live(path: Path | None) -> bool:
     if path is None or not path.is_file():
         return False
     text = path.read_text(encoding="utf-8", errors="replace")
-    return "/api/generate" in text
+    return "/api/generate" in text or 'DEFAULT_MODEL = "mistral"' in text
 
 
 def find_anhang_ollama(roots: list[Path]) -> Path | None:

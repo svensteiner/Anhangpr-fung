@@ -792,6 +792,28 @@ def test_report_foundry_aber_anhang_ollama_ist_nicht_ok(tmp_path: Path) -> None:
     assert module.text_has_leftovers(data) is True
 
 
+def test_report_foundry_aber_anhang_mistral_default_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    anhang = tools / "Anhangpr-fung"
+    (anhang / "_Programm" / "anhangspruefer" / "compliance" / "knowledge").mkdir(parents=True)
+    (anhang / "Starten.bat").write_text("@echo off\n", encoding="utf-8")
+    matcher = (
+        anhang
+        / "_Programm"
+        / "anhangspruefer"
+        / "compliance"
+        / "knowledge"
+        / "llm_matcher.py"
+    )
+    matcher.write_text('DEFAULT_MODEL = "mistral"\n', encoding="utf-8")
+    data = module.report(gemeinsam)
+    assert data["anhang_ollama"] is not None
+    assert module.text_has_leftovers(data) is True
+
+
 def test_report_foundry_aber_fremd_ki_ist_nicht_ok(tmp_path: Path) -> None:
     module = _load()
     tools = tmp_path / "AI Tools"

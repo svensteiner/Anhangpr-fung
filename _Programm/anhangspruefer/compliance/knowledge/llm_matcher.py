@@ -29,7 +29,7 @@ from ...utils.logging_config import get_logger
 logger = get_logger("llm_matcher")
 
 DEFAULT_BASE_URL = "http://127.0.0.1:11434"
-DEFAULT_MODEL = "mistral"
+DEFAULT_MODEL = "abgeschaltet"
 
 # deutsche Stoppwörter + generische Checklisten-Wörter (tragen nichts zur
 # Kandidatenauswahl bei, weil sie fast jeden Prüfpunkt/Absatz treffen)
