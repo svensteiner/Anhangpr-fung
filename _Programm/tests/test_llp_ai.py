@@ -25,6 +25,15 @@ def _reset(monkeypatch: pytest.MonkeyPatch, **env: str) -> None:
         "FOUNDRY_DEPLOYMENT",
         "FOUNDRY_API_KEY",
         "FOUNDRY_API_VERSION",
+        "AZURE_OPENAI_ENDPOINT",
+        "AZURE_OPENAI_DEPLOYMENT",
+        "AZURE_OPENAI_DEPLOYMENT_NAME",
+        "AZURE_OPENAI_MODEL",
+        "AZURE_OPENAI_API_KEY",
+        "AZURE_OPENAI_API_VERSION",
+        "AZURE_AI_ENDPOINT",
+        "AZURE_AI_FOUNDRY_ENDPOINT",
+        "AZURE_AI_API_KEY",
     ):
         monkeypatch.delenv(key, raising=False)
     for key, value in env.items():
@@ -47,6 +56,34 @@ def test_ready_false_for_other_provider(monkeypatch):
         FOUNDRY_API_KEY="x",
     )
     assert layer.is_ai_ready() is False
+
+
+def test_existing_azure_foundry_access_without_new_flag(monkeypatch):
+    """Der Zugang, der beim Anhangsprüfer schon funktionierte: Azure-Namen, kein neues Flag."""
+    _reset(
+        monkeypatch,
+        AZURE_OPENAI_ENDPOINT="https://llp.openai.azure.com",
+        AZURE_OPENAI_DEPLOYMENT="llp-model",
+        AZURE_OPENAI_API_KEY="existing-key",
+    )
+    assert layer.is_ai_ready() is True
+    status = layer.describe_status()
+    assert status["bereit"] is True
+    blob = json.dumps(status)
+    assert "existing-key" not in blob
+    assert "llp.openai" not in blob
+
+
+def test_explicit_off_wins_even_with_credentials(monkeypatch):
+    _reset(
+        monkeypatch,
+        COMPANY_AI_ENABLED="false",
+        FOUNDRY_ENDPOINT="https://example.openai.azure.com",
+        FOUNDRY_DEPLOYMENT="gpt",
+        FOUNDRY_API_KEY="x",
+    )
+    assert layer.is_ai_ready() is False
+    assert "bewusst ausgeschaltet" in layer.describe_status()["hinweis"]
 
 
 def test_ready_true_only_for_foundry_with_credentials(monkeypatch):
@@ -138,7 +175,13 @@ def test_healthz_foundry_status_has_no_secrets():
 
     data = webapp.app.test_client().get("/healthz").get_json()
     assert data["foundry_bereit"] is False
-    assert "ohne Modell" in data["foundry"]["hinweis"] or "nicht erreichbar" in data["foundry"]["hinweis"]
+    hinweis = data["foundry"]["hinweis"]
+    assert any(teil in hinweis for teil in (
+        "ohne Modell",
+        "nicht erreichbar",
+        "nicht gefunden",
+        "bewusst ausgeschaltet",
+    ))
     blob = json.dumps(data)
     assert "api_key" not in blob
     assert "FOUNDRY_API_KEY" not in blob

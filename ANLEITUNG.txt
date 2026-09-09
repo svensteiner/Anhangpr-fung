@@ -76,10 +76,12 @@ KI (MICROSOFT FOUNDRY):
   (liegt auch im Programmordner unter _Gemeinsam, falls
    der Server-Ordner noch nicht eingerichtet ist.)
 
-  Schluessel nur in llp_ai\.env, niemals ins Git.
-  Anbieter ist fest Foundry. Kein stiller Wechsel.
+  Der Zugang ist derselbe wie bisher: Datei llp_ai\.env
+  auf dem Server (nicht neu anlegen, wenn sie schon da ist).
+  Auch AZURE_OPENAI_ENDPOINT / _DEPLOYMENT / _API_KEY gelten.
+  Schluessel niemals ins Git.
 
-  Ist Foundry aus: das Tool arbeitet mit der Heuristik.
+  Ist der Zugang nicht erreichbar: Heuristik, kein stiller Wechsel.
   Pseudokrat bleibt lokal und nutzt Foundry nicht.
 
 

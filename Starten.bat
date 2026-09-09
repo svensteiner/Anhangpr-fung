@@ -16,8 +16,10 @@ echo.
 
 cd /d "%~dp0"
 
-if exist "%~dp0_Gemeinsam" set "LLP_SHARED_AI_ROOT=%~dp0_Gemeinsam"
+rem Zuerst der bestehende Kanzlei-Ordner (dort liegt der Foundry-Zugang),
+rem erst danach die Kopie im Programmordner.
 if exist "%~dp0..\_Gemeinsam" set "LLP_SHARED_AI_ROOT=%~dp0..\_Gemeinsam"
+if not defined LLP_SHARED_AI_ROOT if exist "%~dp0_Gemeinsam" set "LLP_SHARED_AI_ROOT=%~dp0_Gemeinsam"
 
 set "PY="
 py -3 -c "import sys" >nul 2>&1 && set "PY=py -3"

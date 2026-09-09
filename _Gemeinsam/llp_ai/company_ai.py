@@ -16,8 +16,29 @@ from pathlib import Path
 from typing import Any
 
 _ALLOWED_PROVIDER = "foundry"
-_ENV_FILE = Path(__file__).resolve().parent / ".env"
+_OFFICE_SHARED = Path(r"K:\LLP Wirtschaftsprüfung\AI Tools\_Gemeinsam")
 _ENV_LOADED = False
+_ENDPOINT_KEYS = (
+    "FOUNDRY_ENDPOINT",
+    "AZURE_OPENAI_ENDPOINT",
+    "AZURE_AI_ENDPOINT",
+    "AZURE_AI_FOUNDRY_ENDPOINT",
+)
+_DEPLOYMENT_KEYS = (
+    "FOUNDRY_DEPLOYMENT",
+    "AZURE_OPENAI_DEPLOYMENT",
+    "AZURE_OPENAI_DEPLOYMENT_NAME",
+    "AZURE_OPENAI_MODEL",
+)
+_KEY_KEYS = (
+    "FOUNDRY_API_KEY",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_AI_API_KEY",
+)
+_VERSION_KEYS = (
+    "FOUNDRY_API_VERSION",
+    "AZURE_OPENAI_API_VERSION",
+)
 
 
 class CompanyAIError(Exception):
@@ -44,15 +65,41 @@ def _truthy(value: str | None) -> bool:
     return (value or "").strip().lower() in {"1", "true", "yes", "on", "ja"}
 
 
-def _load_env_file() -> None:
-    global _ENV_LOADED
-    if _ENV_LOADED or not _ENV_FILE.is_file():
-        _ENV_LOADED = True
-        return
+def _env_files() -> list[Path]:
+    roots: list[Path] = []
+    shared = os.environ.get("LLP_SHARED_AI_ROOT")
+    if shared:
+        roots.append(Path(shared))
+    roots.append(_OFFICE_SHARED)
+    here = Path(__file__).resolve().parent
+    roots.append(here.parent)
     try:
-        text = _ENV_FILE.read_text(encoding="utf-8")
+        roots.append(here.parents[2] / "_Gemeinsam")
+    except IndexError:
+        pass
+    files: list[Path] = []
+    for root in roots:
+        files.append(root / "llp_ai" / ".env")
+        files.append(root / ".env")
+    files.append(here / ".env")
+    seen: set[Path] = set()
+    unique: list[Path] = []
+    for path in files:
+        try:
+            resolved = path.resolve()
+        except OSError:
+            resolved = path
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        unique.append(path)
+    return unique
+
+
+def _apply_env_file(path: Path) -> None:
+    try:
+        text = path.read_text(encoding="utf-8")
     except OSError:
-        _ENV_LOADED = True
         return
     for raw in text.splitlines():
         line = raw.strip()
@@ -63,18 +110,56 @@ def _load_env_file() -> None:
         if not key or key in os.environ:
             continue
         os.environ[key] = value.strip().strip('"').strip("'")
+
+
+def _load_env_file() -> None:
+    global _ENV_LOADED
+    if _ENV_LOADED:
+        return
+    for path in _env_files():
+        if path.is_file():
+            _apply_env_file(path)
     _ENV_LOADED = True
+
+
+def _first_env(*names: str) -> str:
+    for name in names:
+        value = (os.environ.get(name) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _normalize_provider(raw: str) -> str:
+    name = (raw or "").strip().lower()
+    if name in {"", "foundry", "azure", "azure-openai", "azure_openai", "microsoft"}:
+        return _ALLOWED_PROVIDER
+    return name
+
+
+def _explicitly_disabled() -> bool:
+    raw = os.environ.get("COMPANY_AI_ENABLED")
+    if raw is None or raw.strip() == "":
+        return False
+    return not _truthy(raw)
 
 
 def get_config() -> Config:
     _load_env_file()
+    endpoint = _first_env(*_ENDPOINT_KEYS).rstrip("/")
+    deployment = _first_env(*_DEPLOYMENT_KEYS)
+    api_key = _first_env(*_KEY_KEYS)
+    api_version = _first_env(*_VERSION_KEYS) or "v1"
+    provider = _normalize_provider(_first_env("COMPANY_AI_PROVIDER"))
+    has_creds = bool(endpoint and deployment and api_key)
+    enabled = (not _explicitly_disabled()) and has_creds
     return Config(
-        enabled=_truthy(os.environ.get("COMPANY_AI_ENABLED")),
-        provider=(os.environ.get("COMPANY_AI_PROVIDER") or "").strip().lower(),
-        endpoint=(os.environ.get("FOUNDRY_ENDPOINT") or "").strip().rstrip("/"),
-        deployment=(os.environ.get("FOUNDRY_DEPLOYMENT") or "").strip(),
-        api_key=(os.environ.get("FOUNDRY_API_KEY") or "").strip(),
-        api_version=(os.environ.get("FOUNDRY_API_VERSION") or "v1").strip() or "v1",
+        enabled=enabled,
+        provider=provider,
+        endpoint=endpoint,
+        deployment=deployment,
+        api_key=api_key,
+        api_version=api_version,
     )
 
 
@@ -99,11 +184,12 @@ def describe_status() -> dict[str, Any]:
     deployment_ok = bool(cfg.deployment)
     key_ok = bool(cfg.api_key)
     bereit = is_ai_ready()
-    if not cfg.enabled:
-        hinweis = "Foundry ist aus. Die Tools arbeiten ohne Modell (Heuristik/Regeln)."
+    irgendetwas = endpoint_ok or deployment_ok or key_ok
+    if _explicitly_disabled():
+        hinweis = "Foundry ist bewusst ausgeschaltet. Die Tools arbeiten ohne Modell (Heuristik/Regeln)."
     elif not provider_ok:
         hinweis = "Anbieter ist nicht Foundry. Es findet kein stiller Wechsel statt."
-    elif not (endpoint_ok and deployment_ok and key_ok):
+    elif irgendetwas and not (endpoint_ok and deployment_ok and key_ok):
         fehlend = [
             name for name, ok in (
                 ("Endpoint", endpoint_ok),
@@ -112,6 +198,11 @@ def describe_status() -> dict[str, Any]:
             ) if not ok
         ]
         hinweis = "Foundry ist unvollständig eingerichtet (" + ", ".join(fehlend) + ")."
+    elif not irgendetwas:
+        hinweis = (
+            "Foundry-Zugang nicht gefunden. Es gilt die bestehende Datei "
+            "llp_ai\\.env auf dem Server (derselbe Zugang wie bisher beim Anhangsprüfer)."
+        )
     else:
         hinweis = "Foundry ist eingerichtet. Die Tools können den zentralen Layer nutzen."
     return {

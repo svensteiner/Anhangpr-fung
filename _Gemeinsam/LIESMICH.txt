@@ -13,11 +13,11 @@ Einziger KI-Zugang für alle LLP-Tools, die ein Modell brauchen.
 Anbieter ist fest Microsoft Foundry. Kein stiller Wechsel
 auf Ollama, OpenAI oder Anthropic.
 
-1. Datei llp_ai\.env aus llp_ai\.env.example anlegen.
-2. COMPANY_AI_ENABLED=true setzen.
-3. Endpoint, Deployment und Schlüssel eintragen.
-4. Tools starten wie gewohnt (Starten.bat).
-5. Status ohne Schlüssel: llp_ai\Pruefen.bat doppelklicken.
+1. Bestehende Datei llp_ai\.env auf dem Server behalten
+   (derselbe Zugang, der beim Anhangsprüfer schon ging).
+2. Nicht neu anlegen, wenn die Datei schon da ist.
+3. Tools starten wie gewohnt (Starten.bat).
+4. Status ohne Schlüssel: llp_ai\Pruefen.bat doppelklicken.
 
 Ist Foundry aus oder nicht erreichbar, arbeiten die Tools
 ohne Modell weiter (Heuristik / Regeln).
