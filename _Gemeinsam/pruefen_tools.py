@@ -267,7 +267,7 @@ def main(argv: list[str] | None = None) -> int:
     print(format_report(data))
     foundry = data["foundry"]
     assert isinstance(foundry, dict)
-        leftover = (
+    leftover = (
         data["text_modus"] == "noch Mistral"
         or data["text_start"] == "noch Streamlit"
         or data["text_cmd_modus"] == "noch alt"
