@@ -166,6 +166,8 @@ def test_text_verbessern_foundry_kit_liegt_bereit():
     assert "ollama" in lies
     assert "start_windows.ps1" in lies
     assert "streamlit" in lies
+    assert "schnellstart.md" in lies
+    assert "liesmich-foundry.txt" in lies
     start = (ROOT / "_Gemeinsam" / "llp_start" / "Start.bat").read_text(encoding="utf-8")
     low = start.lower()
     assert "anwenden.py" in low

@@ -109,6 +109,7 @@ def apply(tool_root: Path) -> list[str]:
     ps1 = _patch_windows_start(tool_root)
     if ps1 is not None:
         done.append(str(ps1))
+    done.extend(_write_start_notes(tool_root))
 
     return done
 
@@ -202,6 +203,49 @@ def _patch_windows_start(tool_root: Path) -> Path | None:
         backup.write_text(current, encoding="utf-8")
     path.write_text(PS1_CMD, encoding="utf-8")
     return path
+
+
+NOTE_MARK = "LLP-FOUNDRY-TOR"
+SCHNELLSTART_NAME = "SCHNELLSTART.md"
+LIESMICH_NAME = "LIESMICH-FOUNDRY.txt"
+START_NOTE = """LLP-FOUNDRY-TOR
+Text verbessern – nur Foundry (Büro-KI)
+
+Das Programm bleibt auf dem Server. Nicht auf den PC kopieren.
+Keine EXE, kein Mistral, kein Streamlit.
+
+Start:
+  Desktop „Text verbessern“
+  oder  _Gemeinsam\\text_verbessern_foundry\\Starten.bat
+  oder  Tools_starten.bat, Punkt 2
+
+Nur Microsoft Foundry (llp_ai). Ist Foundry aus,
+bleibt der Text unverändert – das Tool sagt Bescheid.
+
+Schlüssel nur in llp_ai\\.env.
+"""
+
+
+def _backup_then_write(path: Path, content: str) -> Path:
+    if path.is_file():
+        current = path.read_text(encoding="utf-8", errors="replace")
+        if NOTE_MARK in current and current == content:
+            return path
+        backup = path.with_name(path.name + ".llp-alt")
+        if NOTE_MARK not in current and not backup.is_file():
+            backup.write_text(current, encoding="utf-8")
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
+def _write_start_notes(tool_root: Path) -> list[str]:
+    """Offizielle SCHNELLSTART.md zeigt sonst EXE/Mistral/Streamlit."""
+    written: list[str] = []
+    schnell = tool_root / SCHNELLSTART_NAME
+    if schnell.is_file() or (tool_root / "TEXT VERBESSERN.cmd").is_file():
+        written.append(str(_backup_then_write(schnell, START_NOTE)))
+    written.append(str(_backup_then_write(tool_root / LIESMICH_NAME, START_NOTE)))
+    return written
 
 
 def _park_exe(tool_root: Path) -> list[str]:

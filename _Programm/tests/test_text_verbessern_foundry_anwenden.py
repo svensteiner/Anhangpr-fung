@@ -192,6 +192,12 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         '& $venvPython -m streamlit run "app/ui/streamlit_app.py"\n',
         encoding="utf-8",
     )
+    (tool / "SCHNELLSTART.md").write_text(
+        "# Text verbessern\n\n"
+        "Doppelklicke auf TextVerbessern.exe.\n"
+        "Gründlich mit Mistral ist optional.\n",
+        encoding="utf-8",
+    )
     return tool
 
 
@@ -260,6 +266,17 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     ps1_bak = (tool / "scripts" / "start_windows.ps1.llp-alt").read_text(encoding="utf-8")
     assert "streamlit" in ps1_bak.lower()
     assert "LLP-FOUNDRY-TOR" not in ps1_bak
+
+    note = (tool / "LIESMICH-FOUNDRY.txt").read_text(encoding="utf-8")
+    assert "LLP-FOUNDRY-TOR" in note
+    assert "kein mistral" in note.lower()
+    assert "kein streamlit" in note.lower()
+    schnell = (tool / "SCHNELLSTART.md").read_text(encoding="utf-8")
+    assert schnell == note
+    assert "textverbessern.exe" not in schnell.lower()
+    schnell_bak = (tool / "SCHNELLSTART.md.llp-alt").read_text(encoding="utf-8")
+    assert "Gründlich mit Mistral" in schnell_bak
+    assert "LLP-FOUNDRY-TOR" not in schnell_bak
 
     ok2, msg2 = module.apply_foundry(tool)
     assert ok2, msg2

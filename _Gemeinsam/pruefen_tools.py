@@ -54,6 +54,25 @@ def find_text_desktop(roots: list[Path]) -> Path | None:
     return None
 
 
+def find_text_startskript(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "scripts/start_windows.ps1")
+        if found is not None:
+            return found
+    return None
+
+
+def text_startskript_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "LLP-FOUNDRY-TOR" in text and "streamlit" not in text.lower():
+        return "Foundry-Tor"
+    if "streamlit" in text.lower():
+        return "noch Streamlit"
+    return "nicht erkannt"
+
+
 def find_pseudokrat(roots: list[Path]) -> Path | None:
     for root in roots:
         found = _first_existing(root, TOOL_NAMES["pseudo"], "START.bat")
@@ -78,12 +97,16 @@ def text_verbessern_modus(desktop: Path | None) -> str:
 def report(start: Path | None = None) -> dict[str, object]:
     roots = search_roots(start)
     desktop = find_text_desktop(roots)
+    startskript = find_text_startskript(roots)
     modus = text_verbessern_modus(desktop)
+    start_modus = text_startskript_modus(startskript)
     return {
         "foundry": describe_status(),
         "anhang": find_anhang(roots),
         "text_desktop": desktop,
         "text_modus": modus,
+        "text_startskript": startskript,
+        "text_start": start_modus,
         "pseudokrat": find_pseudokrat(roots),
     }
 
@@ -106,6 +129,7 @@ def format_report(data: dict[str, object]) -> str:
             if data["text_desktop"]
             else "nicht gefunden"
         ),
+        "  Startskript:     " + str(data["text_start"]),
         "  Pseudokrat:      "
         + (
             "gefunden (lokal, ohne Foundry)"
@@ -119,13 +143,20 @@ def format_report(data: dict[str, object]) -> str:
             "  Text verbessern zeigt noch Mistral."
             " Punkt 2 oeffnet dann die Foundry-Seite, nicht Mistral."
         )
+    if data["text_start"] == "noch Streamlit":
+        lines.append(
+            "  start_windows.ps1 startet noch Streamlit."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     lines.append("  Keine Schluessel in dieser Anzeige.")
     lines.append("  Anleitung: ANLEITUNG.txt in diesem Ordner.")
     return "\n".join(lines)
 
 
 def text_foundry_ok(start: Path | None = None) -> bool:
-    return report(start)["text_modus"] == "Foundry"
+    data = report(start)
+    start_ok = data["text_start"] in {"Foundry-Tor", "nicht gefunden"}
+    return data["text_modus"] == "Foundry" and start_ok
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -139,7 +170,7 @@ def main(argv: list[str] | None = None) -> int:
     print(format_report(data))
     foundry = data["foundry"]
     assert isinstance(foundry, dict)
-    if data["text_modus"] == "noch Mistral":
+    if data["text_modus"] == "noch Mistral" or data["text_start"] == "noch Streamlit":
         return 2
     return 0 if foundry["bereit"] else 1
 

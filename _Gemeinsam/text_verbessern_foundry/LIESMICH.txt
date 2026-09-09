@@ -22,7 +22,8 @@ Wenn daneben noch der Ordner rephraser liegt und
    scripts\\start_windows.ps1 im Tool-Ordner
    oeffnen nur die Foundry-Seite, nicht Streamlit
    und nicht Mistral. Eine alte Desktop-EXE wird
-   zur Seite gelegt (.llp-alt).
+   zur Seite gelegt (.llp-alt). SCHNELLSTART.md
+   und LIESMICH-FOUNDRY.txt zeigen denselben Weg.
 
 Nicht nötig, wenn das Tool bereits „Gründlich mit Foundry“
 zeigt. Ein zweiter Lauf ändert nichts.

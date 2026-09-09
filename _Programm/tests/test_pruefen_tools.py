@@ -29,6 +29,7 @@ def test_report_findet_diesen_anhangspruefer() -> None:
     assert Path(data["anhang"]).name == "Starten.bat"
     text = module.format_report(data)
     assert "Anhangspruefer:  gefunden" in text
+    assert "Startskript:" in text
     assert "ANLEITUNG.txt" in text
     assert "Schluessel" in text
     assert "FOUNDRY_API_KEY" not in text
@@ -50,14 +51,20 @@ def test_report_erkennt_mistral_bei_text_verbessern(tmp_path: Path) -> None:
         'return "rules+mistral-local", "substantial"\n',
         encoding="utf-8",
     )
+    ps1 = tools / "rephraser" / "scripts" / "start_windows.ps1"
+    ps1.parent.mkdir(parents=True)
+    ps1.write_text('& $venvPython -m streamlit run "app/ui/streamlit_app.py"\n', encoding="utf-8")
     (tools / "Pseudokrat" / "START.bat").parent.mkdir(parents=True)
     (tools / "Pseudokrat" / "START.bat").write_text("@echo off\n", encoding="utf-8")
     data = module.report(gemeinsam)
     assert data["text_modus"] == "noch Mistral"
+    assert data["text_start"] == "noch Streamlit"
     assert data["pseudokrat"] is not None
     blob = module.format_report(data)
     assert "noch Mistral" in blob
     assert "Foundry-Seite" in blob
+    assert "noch Streamlit" in blob
+    assert "Anwenden.bat" in blob
     assert module.text_foundry_ok(gemeinsam) is False
 
 
@@ -73,10 +80,40 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
         'return "rules+foundry", "substantial"\n',
         encoding="utf-8",
     )
+    ps1 = tools / "rephraser" / "scripts" / "start_windows.ps1"
+    ps1.parent.mkdir(parents=True)
+    ps1.write_text(
+        "# LLP-FOUNDRY-TOR\nStart-Process text_verbessern_foundry\\Starten.bat\n",
+        encoding="utf-8",
+    )
     data = module.report(gemeinsam)
     assert data["text_modus"] == "Foundry"
-    assert "noch Mistral" not in module.format_report(data)
+    assert data["text_start"] == "Foundry-Tor"
+    blob = module.format_report(data)
+    assert "noch Mistral" not in blob
+    assert "Foundry-Tor" in blob
     assert module.text_foundry_ok(gemeinsam) is True
+
+
+def test_report_foundry_desktop_aber_streamlit_start_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    desktop = tools / "rephraser" / "app" / "desktop.py"
+    desktop.parent.mkdir(parents=True)
+    desktop.write_text(
+        'MODE_STRONG = "Gründlich mit Foundry (Büro-KI)"\n'
+        'return "rules+foundry", "substantial"\n',
+        encoding="utf-8",
+    )
+    ps1 = tools / "rephraser" / "scripts" / "start_windows.ps1"
+    ps1.parent.mkdir(parents=True)
+    ps1.write_text('streamlit run "app/ui/streamlit_app.py"\n', encoding="utf-8")
+    data = module.report(gemeinsam)
+    assert data["text_modus"] == "Foundry"
+    assert data["text_start"] == "noch Streamlit"
+    assert module.text_foundry_ok(gemeinsam) is False
 
 
 def test_kurz_gibt_nur_statuszeile() -> None:
