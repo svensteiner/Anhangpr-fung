@@ -1,0 +1,10 @@
+Gemeinsamer Start der LLP-Tools
+===============================
+
+Doppelklick auf Start.bat in diesem Ordner.
+
+Das Programm selbst wird nicht kopiert. Jedes Tool bleibt
+in seinem Ordner neben _Gemeinsam.
+
+KI (wenn noetig): nur llp_ai, Microsoft Foundry.
+Pseudokrat bleibt lokal ohne Foundry.

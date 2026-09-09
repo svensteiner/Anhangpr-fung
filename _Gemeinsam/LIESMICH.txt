@@ -21,4 +21,9 @@ auf Ollama, OpenAI oder Anthropic.
 Ist Foundry aus oder nicht erreichbar, arbeiten die Tools
 ohne Modell weiter (Heuristik / Regeln).
 
-Pseudokrat bleibt lokal und nutzt diesen Ordner nicht.
+llp_start
+---------
+Gemeinsames Startmenue (Start.bat). Oeffnet die Tools
+im Nachbarordner, kopiert sie nicht.
+
+Pseudokrat bleibt lokal und nutzt llp_ai nicht.

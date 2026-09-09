@@ -7,9 +7,10 @@ Diese Datei dokumentiert, was wohin gehört. Bitte halten, nicht zumüllen.
 | Pfad | Zweck |
 |------|-------|
 | `app.py` | **Kanonische** Web-App (Flask). Eine App, drei Modi: Vorjahresvergleich, Detailzahlenvergleich (Belegprüfung), UGB-Inhaltsprüfung. Plus Mandanten-Fortschrittsübersicht der 3 Stufen. |
-| `Anhangspruefer.spec` | PyInstaller-Build-Definition für die eigenständige EXE (kein Python beim Anwender nötig). Bauen: `pyinstaller Anhangspruefer.spec --noconfirm`. |
-| `dist/` | Gebaute EXE: `dist\Anhangspruefer.exe` (Doppelklick genügt). Wird per Git ignoriert (regenerierbar). |
-| `Starten.bat` | Start für Entwickler (braucht Python). Anwender nutzen die EXE. |
+| `Anhangspruefer.spec` | Nur interne Build-Definition. Anwender kopieren keine EXE. |
+| `dist/` | Build-Ausgabe, gitignoriert. Nicht der Startweg für die Kanzlei. |
+| `Starten.bat` | **Start für Anwender** (Desktop-Verknüpfung zeigt hierher). Programm bleibt auf dem Server. |
+| `_Gemeinsam/` | Zentraler Foundry-Layer (`llp_ai`) und gemeinsamer Start (`llp_start`). Gehört auf `AI Tools\_Gemeinsam`. |
 | `Tests_starten.bat` | Führt die Pytest-Tests aus `_Programm/tests/` aus. |
 | `ANLEITUNG.txt` | Anwender-Kurzanleitung. |
 | `STRUKTUR.md` | Diese Datei. |
@@ -53,7 +54,7 @@ Diese Datei dokumentiert, was wohin gehört. Bitte halten, nicht zumüllen.
 |-------|------------|------------|--------|
 | 1 · Vorjahresvergleich | `vorjahresvergleich/` | `POST /compare` | `Ergebnisse/vergleich_*.xlsx` |
 | 2 · Detailzahlenvergleich | `pruefung/` | `POST /pruefen` (+ `/detect_type`) | `Ergebnisse/pruefung_*.xlsx` |
-| 3 · UGB-Inhaltsprüfung | `compliance/` | `POST /ugb_review` | `Ergebnisse/ugb_protokoll_*.md` |
+| 3 · UGB-Inhaltsprüfung | `compliance/` + `ugb_pipeline.py` | `POST /ugb_profil`, `POST /ugb_review` | `Ergebnisse/UGB-Checkliste_*.xlsx` |
 
 Health-Endpoint: `GET /healthz` → JSON mit Mode-Liste.
 

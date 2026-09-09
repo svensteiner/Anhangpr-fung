@@ -56,7 +56,7 @@ MODUS 3 - UGB-INHALTSPRUEFUNG (zwei Schritte)
 ---------------------------------------------
   Schritt 1: Anhang hochladen (PDF oder Word).
              Das Tool schlaegt Rechtsform und Groesse vor.
-             Bitte GmbH oder AG und klein / mittel / groes
+             Bitte GmbH oder AG und klein / mittel / gross
              bestaetigen. Ohne Auswahl startet nichts.
 
   Schritt 2: "Inhaltspruefung starten".

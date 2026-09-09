@@ -1,0 +1,37 @@
+Welche LLP-Tools wie starten und welche KI nutzen
+=================================================
+
+Regel: Braucht ein Tool ein Sprachmodell, geht der Aufruf
+NUR über llp_ai (Microsoft Foundry). Kein eigener OpenAI-
+oder Ollama-Zugang, kein stiller Wechsel.
+
+Schluessel nur in llp_ai\.env, niemals ins Programm.
+
+
+Anhangspruefer
+--------------
+Start:  Starten.bat  oder Desktop-Verknuepfung
+        (Installieren.bat legt nur die Verknuepfung an)
+KI:     Foundry ueber llp_ai. Sonst Heuristik.
+Modus 3: zuerst GmbH/AG und klein/mittel/gross, dann Rest.
+
+
+Text verbessern (rephraser / paraphraser)
+-----------------------------------------
+Start:  TEXT VERBESSERN.cmd im jeweiligen Ordner
+KI:     gruendliche Fassung ueber Foundry (llp_ai),
+        sonst die sichere lokale Regelfassung.
+        Nicht Ollama als Kanzlei-Standard.
+
+
+Pseudokrat
+----------
+Start:  START.bat im Pseudokrat-Ordner
+KI:     KEINE. Bleibt lokal, ohne Foundry.
+        Anonymisiert Texte, bevor sie irgendwohin gehen.
+
+
+Gemeinsamer Start
+-----------------
+llp_start\Start.bat  versucht, die Tools im Nachbarordner
+zu oeffnen. Fehlt ein Ordner, steht dort, wo er liegt.
