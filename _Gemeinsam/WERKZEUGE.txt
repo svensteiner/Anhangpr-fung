@@ -32,8 +32,8 @@ KI:     gruendliche Fassung ueber Foundry (llp_ai),
         bzw. die Foundry-Seite sagt klar Bescheid.
         Nicht Ollama als Kanzlei-Standard.
 Zeigt das Tool noch Mistral:
-        llp_start\Start.bat, Punkt 2, stellt das
-        selbst um. Oder einmal
+        Starten.bat und llp_start stellen das
+        leise bei jedem Start um. Oder einmal
         text_verbessern_foundry\Anwenden.bat
         Danach ist auch TEXT VERBESSERN.cmd ein Tor.
 

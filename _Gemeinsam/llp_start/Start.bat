@@ -11,6 +11,7 @@ popd >nul
 rem Derselbe Foundry-Zugang für jedes Tool, das ein Modell braucht.
 if exist "%ROOT%\..\_Gemeinsam\llp_ai" set "LLP_SHARED_AI_ROOT=%ROOT%\..\_Gemeinsam"
 if not defined LLP_SHARED_AI_ROOT if exist "%ROOT%\_Gemeinsam\llp_ai" set "LLP_SHARED_AI_ROOT=%ROOT%\_Gemeinsam"
+call :FOUNDRY_TEXT leise
 
 echo.
 echo  ===============================================
@@ -72,6 +73,10 @@ py -3 -c "import sys" >nul 2>&1 && set "PY=py -3"
 if not defined PY python -c "import sys" >nul 2>&1 && set "PY=python"
 if not defined PY python3 -c "import sys" >nul 2>&1 && set "PY=python3"
 if not defined PY goto :eof
+if /I "%~1"=="leise" (
+    %PY% "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\anwenden.py" --leise
+    goto :eof
+)
 echo  Foundry-Anbindung pruefen ...
 %PY% "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\anwenden.py"
 goto :eof

@@ -500,3 +500,12 @@ def test_anwenden_ohne_tool_gibt_hinweis(tmp_path: Path) -> None:
     leer = tmp_path / "_Gemeinsam" / "text_verbessern_foundry"
     leer.mkdir(parents=True)
     assert module.find_tool_root(leer) is None
+
+
+def test_main_leise_ohne_tool_bleibt_still(monkeypatch, capsys) -> None:
+    module = _load_anwenden()
+    monkeypatch.setattr(module, "find_tool_root", lambda start=None: None)
+    assert module.main(["--leise"]) == 0
+    assert capsys.readouterr().out == ""
+    assert module.main([]) == 2
+    assert "nicht gefunden" in capsys.readouterr().out

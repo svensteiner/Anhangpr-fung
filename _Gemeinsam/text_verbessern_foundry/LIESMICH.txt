@@ -10,7 +10,9 @@ der Text unverändert – kein Wechsel auf Mistral/Ollama.
 Wenn daneben noch der Ordner rephraser liegt und
 „Gründlich mit Mistral“ zeigt:
 
-1. Doppelklick auf  Anwenden.bat  in diesem Ordner.
+1. Doppelklick auf  Anwenden.bat  in diesem Ordner
+   (Starten.bat und das Startmenue tun das leise
+   von selbst).
 2. Das Programm findet den Nachbarordner rephraser
    oder paraphraser und stellt die gründliche Fassung
    auf Microsoft Foundry (llp_ai) um.

@@ -8,6 +8,7 @@ Gründlich nur bei Foundry – kein stiller Wechsel auf Mistral/Ollama.
 from __future__ import annotations
 
 import shutil
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -749,10 +750,14 @@ def _patch_streamlit(path: Path) -> None:
     path.write_text(st, encoding="utf-8")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    leise = "--leise" in args
     try:
         root = find_tool_root()
         if root is None:
+            if leise:
+                return 0
             print(
                 "Text verbessern nicht gefunden. Bitte Anwenden.bat "
                 "im Ordner AI Tools\\_Gemeinsam\\text_verbessern_foundry starten."
@@ -760,8 +765,12 @@ def main() -> int:
             return 2
         ok, msg = apply_foundry(root)
     except (FileNotFoundError, ValueError) as exc:
+        if leise:
+            return 0
         print(str(exc))
         return 2
+    if leise:
+        return 0
     print(msg)
     print("Kein stiller Wechsel auf Mistral/Ollama.")
     print("Ordner:", root)

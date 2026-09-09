@@ -96,6 +96,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "anwenden.bat" in text
     assert "daneben" in text
     assert "kein ollama-rest" in text
+    assert "bei jedem start" in text
     assert "healthz" not in text
     lies = (ROOT / "_Gemeinsam" / "LIESMICH.txt").read_text(encoding="utf-8").lower()
     assert "anleitung.txt" in lies
@@ -123,6 +124,14 @@ def test_starten_zeigt_foundry_kurz():
     text = (ROOT / "Starten.bat").read_text(encoding="utf-8")
     assert "--kurz" in text
     assert "pruefen_tools.py" in text
+
+
+def test_starten_wendet_foundry_an():
+    text = (ROOT / "Starten.bat").read_text(encoding="utf-8")
+    assert "anwenden.py" in text
+    assert "--leise" in text
+    assert "text_verbessern_foundry" in text.lower()
+    assert text.find("anwenden.py") < text.find("%PY% app.py")
 
 
 def test_installieren_wendet_foundry_an():
@@ -197,10 +206,17 @@ def test_text_verbessern_foundry_kit_liegt_bereit():
     assert "liesmich-foundry.txt" in lies
     assert "wie gewohnt" not in lies
     assert "foundry-seite" in lies
+    kit_start = (kit / "Starten.bat").read_text(encoding="utf-8").lower()
+    assert "anwenden.py" in kit_start
+    assert "--leise" in kit_start
     start = (ROOT / "_Gemeinsam" / "llp_start" / "Start.bat").read_text(encoding="utf-8")
     low = start.lower()
     assert "anwenden.py" in low
     assert "foundry_text" in low
+    assert "call :foundry_text leise" in low
+    start_pos = start.lower().find("call :foundry_text leise")
+    wahl_pos = start.lower().find("set /p wahl")
+    assert start_pos != -1 and wahl_pos != -1 and start_pos < wahl_pos
     assert "llp_shared_ai_root" in low
     assert "text_verbessern_foundry" in low
     assert "text_verbessern_foundry\" \"starten.bat" in low or "text_verbessern_foundry\\starten.bat" in low

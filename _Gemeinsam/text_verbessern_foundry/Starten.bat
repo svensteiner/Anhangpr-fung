@@ -18,6 +18,7 @@ echo  Text verbessern startet. Der Browser oeffnet sich.
 echo  Nur Foundry, kein Mistral/Ollama.
 echo  Zum Beenden: Knopf Beenden in der Oberflaeche.
 echo.
+if exist "%~dp0anwenden.py" %PY% "%~dp0anwenden.py" --leise
 %PY% server.py
 if errorlevel 1 (
     echo  Start fehlgeschlagen. Bitte die IT rufen.

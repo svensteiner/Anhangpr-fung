@@ -59,6 +59,11 @@ if errorlevel 1 (
     )
 )
 
+rem Text verbessern nebenan auf Foundry halten, auch ohne Anwenden.bat.
+if defined LLP_SHARED_AI_ROOT if exist "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\anwenden.py" (
+    %PY% "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\anwenden.py" --leise
+)
+
 echo  Starte die Oberflaeche. Der Browser oeffnet sich.
 echo  Zum Beenden: Knopf "Beenden" oben rechts.
 if defined LLP_SHARED_AI_ROOT if exist "%LLP_SHARED_AI_ROOT%\pruefen_tools.py" (
