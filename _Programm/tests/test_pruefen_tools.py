@@ -101,6 +101,7 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert data["text_runtime_modus"] == "nicht gefunden"
     assert data["text_mistral_modus"] == "nicht gefunden"
     assert data["text_streamlit_modus"] == "nicht gefunden"
+    assert data["text_api_modus"] == "nicht gefunden"
     blob = module.format_report(data)
     assert "noch Mistral" not in blob
     assert "Foundry-Tor" in blob
@@ -108,6 +109,7 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert "Ollama-Rest:" in blob
     assert "Mistral-Client:" in blob
     assert "Streamlit-Datei:" in blob
+    assert "Alte API:" in blob
     assert module.text_foundry_ok(gemeinsam) is True
 
 
@@ -196,6 +198,44 @@ def test_report_foundry_aber_streamlit_datei_ist_nicht_ok(tmp_path: Path) -> Non
     assert data["text_streamlit_modus"] == "noch Streamlit"
     blob = module.format_report(data)
     assert "streamlit_app.py" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+
+
+def test_report_foundry_aber_fastapi_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    desktop = tools / "rephraser" / "app" / "desktop.py"
+    desktop.parent.mkdir(parents=True)
+    desktop.write_text(
+        'MODE_STRONG = "Gründlich mit Foundry (Büro-KI)"\n'
+        'return "rules+foundry", "substantial"\n',
+        encoding="utf-8",
+    )
+    provider = tools / "rephraser" / "app" / "providers" / "foundry_provider.py"
+    provider.parent.mkdir(parents=True, exist_ok=True)
+    provider.write_text("def foundry_ready():\n    return True\n", encoding="utf-8")
+    (tools / "rephraser" / "TEXT VERBESSERN.cmd").write_text(
+        "rem LLP-FOUNDRY-TOR\n", encoding="utf-8"
+    )
+    ps1 = tools / "rephraser" / "scripts" / "start_windows.ps1"
+    ps1.parent.mkdir(parents=True)
+    ps1.write_text(
+        "# LLP-FOUNDRY-TOR\nStart-Process text_verbessern_foundry\\Starten.bat\n",
+        encoding="utf-8",
+    )
+    (tools / "rephraser" / "app" / "main.py").write_text(
+        "from fastapi import FastAPI\n"
+        "app = FastAPI()\n"
+        "def health() -> dict[str, str]:\n"
+        '    return {"status": "ok", "default_provider": "fast-editor"}\n',
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_api_modus"] == "noch API"
+    blob = module.format_report(data)
+    assert "FastAPI" in blob or "uvicorn" in blob
     assert module.text_foundry_ok(gemeinsam) is False
 
 

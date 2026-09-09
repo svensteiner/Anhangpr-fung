@@ -256,6 +256,7 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     (tool / "pyproject.toml").write_text(
+        "dependencies = [\"fastapi>=0.115\", \"pydantic>=2.8\", \"uvicorn>=0.30\"]\n"
         "[project.optional-dependencies]\nui = [\"streamlit>=1.37\"]\n",
         encoding="utf-8",
     )
@@ -406,7 +407,10 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     pyproject = (tool / "pyproject.toml").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" in pyproject
     assert "kein Streamlit" in pyproject
+    assert "kein uvicorn" in pyproject
     assert "streamlit>=" not in pyproject
+    assert "uvicorn>=" not in pyproject
+    assert "fastapi>=" not in pyproject
     assert not (tool / "dist" / "TextVerbessern" / "TextVerbessern.exe").is_file()
     assert (tool / "dist" / "TextVerbessern" / "TextVerbessern.exe.llp-alt").is_file()
     assert not (tool / ".github" / "workflows" / "windows-portable.yml").is_file()

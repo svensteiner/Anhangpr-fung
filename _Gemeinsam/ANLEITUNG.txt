@@ -19,7 +19,8 @@ EINMALIG
   tun dasselbe leise bei jedem Start, falls jemand
   rephraser neu kopiert. Installieren.bat zeigt danach
   denselben Stand wie Pruefen.bat: kein Streamlit,
-  keine Streamlit-Datei, keine alte EXE, kein Ollama-Rest.
+  keine Streamlit-Datei, keine alte EXE, kein Ollama-Rest,
+  keine alte API.
   Bleibt ein alter Weg, sagt Installieren das klar.
 
 TAEGLICH

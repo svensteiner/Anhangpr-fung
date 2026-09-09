@@ -106,6 +106,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "daneben" in text
     assert "kein ollama-rest" in text
     assert "keine streamlit-datei" in text
+    assert "keine alte api" in text
     assert "bei jedem start" in text
     assert "sagt installieren das klar" in text
     assert "healthz" not in text

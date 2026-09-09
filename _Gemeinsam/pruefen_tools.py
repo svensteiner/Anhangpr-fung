@@ -181,6 +181,29 @@ def text_startskript_modus(path: Path | None) -> str:
     return "nicht erkannt"
 
 
+def find_text_api(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "app/main.py")
+        if found is not None:
+            return found
+    return None
+
+
+def text_api_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "LLP-FOUNDRY-TOR" in text and "uvicorn startet nicht" in text:
+        if 'default_provider": "fast-editor"' in text:
+            return "noch API"
+        if "return run_pipeline(request.text, request.options)" in text:
+            return "noch API"
+        return "abgeschaltet"
+    if "FastAPI" in text or "uvicorn" in text or "default_provider" in text:
+        return "noch API"
+    return "nicht erkannt"
+
+
 def find_pseudokrat(roots: list[Path]) -> Path | None:
     for root in roots:
         found = _first_existing(root, TOOL_NAMES["pseudo"], "START.bat")
@@ -212,12 +235,14 @@ def report(start: Path | None = None) -> dict[str, object]:
     runtime = find_local_runtime(roots)
     mistral_provider = find_mistral_provider(roots)
     streamlit_app = find_streamlit_app(roots)
+    api = find_text_api(roots)
     modus = text_verbessern_modus(desktop)
     start_modus = text_startskript_modus(startskript)
     cmd_modus = text_cmd_modus(cmd)
     runtime_modus = local_runtime_modus(runtime)
     mistral_modus = mistral_provider_modus(mistral_provider)
     streamlit_modus = streamlit_app_modus(streamlit_app)
+    api_modus = text_api_modus(api)
     return {
         "foundry": describe_status(),
         "anhang": find_anhang(roots),
@@ -235,6 +260,8 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_mistral_modus": mistral_modus,
         "text_streamlit": streamlit_app,
         "text_streamlit_modus": streamlit_modus,
+        "text_api": api,
+        "text_api_modus": api_modus,
         "pseudokrat": find_pseudokrat(roots),
     }
 
@@ -264,6 +291,7 @@ def format_report(data: dict[str, object]) -> str:
         "  Ollama-Rest:     " + str(data["text_runtime_modus"]),
         "  Mistral-Client:  " + str(data["text_mistral_modus"]),
         "  Streamlit-Datei: " + str(data["text_streamlit_modus"]),
+        "  Alte API:        " + str(data["text_api_modus"]),
         "  Alte EXE:        "
         + ("noch da – Anwenden.bat" if data["text_exe"] else "beiseite"),
         "  Pseudokrat:      "
@@ -308,6 +336,11 @@ def format_report(data: dict[str, object]) -> str:
             "  streamlit_app.py ist noch die alte Oberflaeche."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_api_modus"] == "noch API":
+        lines.append(
+            "  app/main.py bietet noch eine FastAPI/uvicorn-Route."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     lines.append("  Keine Schluessel in dieser Anzeige.")
     lines.append("  Anleitung: ANLEITUNG.txt in diesem Ordner.")
     return "\n".join(lines)
@@ -322,6 +355,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     runtime_ok = data["text_runtime_modus"] in {"kein Ollama", "nicht gefunden"}
     mistral_ok = data["text_mistral_modus"] in {"abgeschaltet", "nicht gefunden"}
     streamlit_ok = data["text_streamlit_modus"] in {"abgeschaltet", "nicht gefunden"}
+    api_ok = data["text_api_modus"] in {"abgeschaltet", "nicht gefunden"}
     return (
         data["text_modus"] == "Foundry"
         and start_ok
@@ -331,6 +365,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and runtime_ok
         and mistral_ok
         and streamlit_ok
+        and api_ok
     )
 
 
@@ -353,6 +388,7 @@ def main(argv: list[str] | None = None) -> int:
         or data["text_runtime_modus"] == "noch Ollama"
         or data["text_mistral_modus"] == "noch Ollama"
         or data["text_streamlit_modus"] == "noch Streamlit"
+        or data["text_api_modus"] == "noch API"
         or (data["text_desktop"] is not None and data["text_provider"] is None)
     )
     if leftover:

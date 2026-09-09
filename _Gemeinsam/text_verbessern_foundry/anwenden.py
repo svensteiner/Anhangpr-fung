@@ -788,14 +788,17 @@ def _disable_streamlit(path: Path) -> None:
 
 
 def _patch_pyproject(path: Path) -> None:
-    """pip install -e .[ui] darf Streamlit nicht nachziehen."""
+    """pip install darf Streamlit und uvicorn nicht nachziehen."""
     text = path.read_text(encoding="utf-8")
-    if "LLP-FOUNDRY-TOR" in text and "kein Streamlit" in text:
-        return
     text = _replace_all_if_present(
         text,
         'ui = ["streamlit>=1.37"]',
         'ui = []  # LLP-FOUNDRY-TOR: kein Streamlit',
+    )
+    text = _replace_all_if_present(
+        text,
+        'dependencies = ["fastapi>=0.115", "pydantic>=2.8", "uvicorn>=0.30"]',
+        'dependencies = ["pydantic>=2.8"]  # LLP-FOUNDRY-TOR: kein uvicorn',
     )
     path.write_text(text, encoding="utf-8")
 
