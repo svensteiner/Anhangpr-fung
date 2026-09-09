@@ -270,16 +270,20 @@ def _size_class_applicable(
 ) -> bool:
     """True = Punkt ist anwendbar (nicht filtern).
 
-    legal_form ('gmbh'/'ag') UND size_class ('klein'/'mittel'/'gross') müssen
-    beide bekannt sein, sonst wird konservativ NICHT gefiltert (unbekannt =>
-    immer anwendbar). Ebenso, wenn die Spalte keine auswertbaren Einträge hat.
+    Ohne Rechtsform und Größenklasse gilt ein größengebundener Punkt nicht
+    als anwendbar (kein stilles „unbekannt“ = alles prüfen). Punkte ohne
+    auswertbare Größenklasse-Spalte bleiben anwendbar.
     """
-    if not item.size_classes or legal_form is None or size_class is None:
+    if not item.size_classes:
         return True
+    form = (legal_form or "").strip().lower() or None
+    size = (size_class or "").strip().lower() or None
+    if form is None or size is None:
+        return False
     parsed = _parse_size_classes(item.size_classes)
     if not parsed:
         return True
-    return (legal_form, size_class) in parsed
+    return (form, size) in parsed
 
 
 def _item_applicable_ex(
@@ -345,6 +349,7 @@ def apply_company_scope(
     size_class: str | None,
 ) -> dict:
     """Teil 1: nur Rechtsgrund (Blatt Start, Größenklasse)."""
+    legal_form, size_class = require_company_profile(legal_form, size_class)
     item_of = {it.item_id: it for it in checklist.items}
     umgestellt = 0
     for f in result.findings:
@@ -419,8 +424,8 @@ def apply_relevance(
     result: ReviewResult,
     checklist: Checklist,
     document_text: str,
-    legal_form: str | None = None,
-    size_class: str | None = None,
+    legal_form: str,
+    size_class: str,
 ) -> dict:
     """Zuerst Gesellschaft (Teil 1), danach Themen/Positionen (Teil 2a)."""
     teil1 = apply_company_scope(result, checklist, legal_form, size_class)

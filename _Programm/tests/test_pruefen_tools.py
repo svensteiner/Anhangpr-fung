@@ -76,3 +76,8 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert data["text_modus"] == "Foundry"
     assert "noch Mistral" not in module.format_report(data)
     assert module.text_foundry_ok(gemeinsam) is True
+
+
+def test_kurz_gibt_nur_statuszeile() -> None:
+    module = _load()
+    assert module.main(["--kurz"]) == 0

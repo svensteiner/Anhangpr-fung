@@ -72,7 +72,10 @@ def test_apply_relevance_marks_absent_positions_not_applicable():
     for iid in ("A1", "B1", "C1"):
         res.add_finding(_finding(iid))
 
-    summary = apply_relevance(res, cl, "Die Vorräte werden zu Anschaffungskosten bewertet.")
+    summary = apply_relevance(
+        res, cl, "Die Vorräte werden zu Anschaffungskosten bewertet.",
+        legal_form="gmbh", size_class="klein",
+    )
     st = {f.checklist_item_id: f.status for f in res.findings}
 
     assert st["A1"] == ComplianceStatus.PARTIALLY_COMPLIANT   # Vorräte vorhanden -> bleibt
@@ -116,8 +119,22 @@ def test_size_class_excludes_ag_only_items_for_gmbh():
     assert _size_class_applicable(ag_only, "gmbh", "gross") is False
     assert _size_class_applicable(mixed, "gmbh", "gross") is True
     assert _size_class_applicable(unrestricted, "gmbh", "gross") is True
-    assert _size_class_applicable(ag_only, None, "gross") is True      # Rechtsform unklar -> nicht filtern
-    assert _size_class_applicable(ag_only, "gmbh", None) is True       # Größenklasse unklar -> nicht filtern
+    assert _size_class_applicable(ag_only, None, "gross") is False     # kein stilles unbekannt
+    assert _size_class_applicable(ag_only, "gmbh", None) is False      # kein stilles unbekannt
+
+
+def test_apply_company_scope_ohne_profil_wirft():
+    cl = Checklist(name="t", version="")
+    cl.add_item(ChecklistItem(
+        item_id="K044", category="Allgemein", description="Aktiengattungen",
+        size_classes=["AG groß", "AG mittel"],
+    ))
+    res = ReviewResult(document_name="d", checklist_name="t", review_timestamp=datetime(2026, 1, 1))
+    res.add_finding(_finding("K044"))
+    with pytest.raises(ValueError, match="Rechtsform"):
+        apply_company_scope(res, cl, None, None)
+    with pytest.raises(ValueError, match="Größenklasse"):
+        apply_company_scope(res, cl, "gmbh", "unbekannt")
 
 
 def test_size_class_parser_all_combinations():
@@ -351,7 +368,8 @@ def test_machine_na_reason_carries_prefix():
     res = ReviewResult(document_name="d", checklist_name="t", review_timestamp=datetime(2026, 1, 1))
     res.add_finding(_finding("B1"))
 
-    apply_relevance(res, cl, "text ohne solche instrumente")
+    apply_relevance(res, cl, "text ohne solche instrumente",
+                    legal_form="gmbh", size_class="klein")
     f = res.findings[0]
     assert f.status == ComplianceStatus.NOT_APPLICABLE
     assert f.technical_reasoning.startswith("Maschinell n. a. – bitte stichprobenweise prüfen:")
@@ -562,7 +580,7 @@ def test_rechtsgrund_na_reason_has_no_machine_prefix():
     res = ReviewResult(document_name="d", checklist_name="t", review_timestamp=datetime(2026, 1, 1))
     res.add_finding(_finding("K001"))
 
-    apply_relevance(res, cl, "beliebiger text")
+    apply_relevance(res, cl, "beliebiger text", legal_form="gmbh", size_class="klein")
     f = res.findings[0]
     assert f.status == ComplianceStatus.NOT_APPLICABLE
     assert not f.technical_reasoning.startswith("Maschinell n. a.")

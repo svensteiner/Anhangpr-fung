@@ -70,6 +70,18 @@ def test_klienten_liesmich_ohne_healthz():
     assert "startseite" in text
 
 
+def test_starten_zeigt_foundry_kurz():
+    text = (ROOT / "Starten.bat").read_text(encoding="utf-8")
+    assert "--kurz" in text
+    assert "pruefen_tools.py" in text
+
+
+def test_installieren_wendet_foundry_an():
+    text = (ROOT / "Installieren.bat").read_text(encoding="utf-8", errors="replace").lower()
+    assert "anwenden.py" in text
+    assert "text verbessern auf foundry" in text
+
+
 def test_llp_start_setzt_foundry_root():
     text = (ROOT / "_Gemeinsam" / "llp_start" / "Start.bat").read_text(encoding="utf-8")
     assert "LLP_SHARED_AI_ROOT" in text
@@ -90,6 +102,8 @@ def test_werkzeuge_pseudokrat_ohne_foundry():
     assert "anwenden.bat" in text
     assert "pruefen.bat" in text
     assert "tools_starten.bat" in text
+    assert "foundry-tor" in text
+    assert "nicht mistral" in text
 
 
 def test_tools_starten_ruft_llp_start_auf():

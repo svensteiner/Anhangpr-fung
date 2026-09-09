@@ -61,6 +61,9 @@ if errorlevel 1 (
 
 echo  Starte die Oberflaeche. Der Browser oeffnet sich.
 echo  Zum Beenden: Knopf "Beenden" oben rechts.
+if defined LLP_SHARED_AI_ROOT if exist "%LLP_SHARED_AI_ROOT%\pruefen_tools.py" (
+    %PY% "%LLP_SHARED_AI_ROOT%\pruefen_tools.py" --kurz
+)
 echo.
 
 set PYTHONIOENCODING=utf-8

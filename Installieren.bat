@@ -42,6 +42,16 @@ if exist "%TOOLS%" (
       "$d=[Environment]::GetFolderPath('Desktop'); $w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut(\"$d\LLP AI Tools.lnk\"); $s.TargetPath='%TOOLS%'; $s.WorkingDirectory='%~dp0'; $s.Description='LLP AI Tools'; $s.Save()"
 )
 
+set "PY="
+py -3 -c "import sys" >nul 2>&1 && set "PY=py -3"
+if not defined PY python -c "import sys" >nul 2>&1 && set "PY=python"
+if not defined PY python3 -c "import sys" >nul 2>&1 && set "PY=python3"
+set "ANWENDEN=%~dp0_Gemeinsam\text_verbessern_foundry\anwenden.py"
+if exist "%ANWENDEN%" if defined PY (
+    echo   Stelle Text verbessern auf Foundry um ...
+    %PY% "%ANWENDEN%"
+)
+
 echo.
 echo ============================================================
 echo   FERTIG!

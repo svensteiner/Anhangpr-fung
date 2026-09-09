@@ -24,6 +24,8 @@ SO STARTEN SIE:
     Text verbessern: Desktop-Verknuepfung nach Installieren.bat
     (nur Foundry, nicht Mistral) oder
     _Gemeinsam\text_verbessern_foundry\Starten.bat
+    TEXT VERBESSERN.cmd oeffnet dasselbe Foundry-Tor,
+    nicht Mistral.
     Status ohne Schluessel:  _Gemeinsam\Pruefen.bat
 
   Entwickler: Starten.bat braucht Python 3.11+

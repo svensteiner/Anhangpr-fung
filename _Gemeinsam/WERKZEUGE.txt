@@ -18,8 +18,11 @@ Modus 3: zuerst GmbH/AG und klein/mittel/gross, dann Rest.
 
 Text verbessern (rephraser / paraphraser)
 -----------------------------------------
-Start:  TEXT VERBESSERN.cmd im jeweiligen Ordner
+Start:  Tools_starten.bat, Punkt 2
+        oder Desktop "Text verbessern"
         oder text_verbessern_foundry\Starten.bat
+        TEXT VERBESSERN.cmd im Tool-Ordner oeffnet
+        dasselbe Foundry-Tor, nicht Mistral.
 KI:     gruendliche Fassung ueber Foundry (llp_ai),
         sonst die sichere lokale Regelfassung
         bzw. die Foundry-Seite sagt klar Bescheid.
@@ -28,6 +31,7 @@ Zeigt das Tool noch Mistral:
         llp_start\Start.bat, Punkt 2, stellt das
         selbst um. Oder einmal
         text_verbessern_foundry\Anwenden.bat
+        Danach ist auch TEXT VERBESSERN.cmd ein Tor.
 
 
 Pseudokrat

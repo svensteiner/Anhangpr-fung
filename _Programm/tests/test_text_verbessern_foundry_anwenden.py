@@ -181,6 +181,10 @@ def _fake_rephraser(tmp_path: Path) -> Path:
     (tool / "app" / "pipeline.py").write_text(PIPELINE_MAIN, encoding="utf-8")
     (tool / "app" / "desktop.py").write_text(DESKTOP_MAIN, encoding="utf-8")
     (tool / "app" / "ui" / "streamlit_app.py").write_text(STREAMLIT_MAIN, encoding="utf-8")
+    (tool / "TEXT VERBESSERN.cmd").write_text(
+        "@echo off\r\nstart TextVerbessern.exe\r\n",
+        encoding="utf-8",
+    )
     return tool
 
 
@@ -228,9 +232,19 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert '"foundry" in provider' in streamlit
     assert '"mistral" in provider' not in streamlit
 
+    launcher = (tool / "TEXT VERBESSERN.cmd").read_text(encoding="utf-8")
+    assert "LLP-FOUNDRY-TOR" in launcher
+    assert "--text-foundry" in launcher
+    assert "mistral-rephraser wird nicht gestartet" in launcher.lower()
+    backup = (tool / "TEXT VERBESSERN.original.cmd").read_text(encoding="utf-8")
+    assert "TextVerbessern.exe" in backup
+    assert "LLP-FOUNDRY-TOR" not in backup
+
     ok2, msg2 = module.apply_foundry(tool)
     assert ok2, msg2
     assert "bereits auf Foundry" in msg2
+    backup2 = (tool / "TEXT VERBESSERN.original.cmd").read_text(encoding="utf-8")
+    assert backup2 == backup
 
 
 def test_anwenden_findet_geschwisterordner(tmp_path: Path) -> None:

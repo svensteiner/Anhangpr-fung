@@ -101,7 +101,84 @@ def apply(tool_root: Path) -> list[str]:
         _patch_streamlit(streamlit)
         done.append(str(streamlit))
 
+    launcher = _patch_launcher(tool_root)
+    if launcher is not None:
+        done.append(str(launcher))
+
     return done
+
+
+LAUNCHER_NAME = "TEXT VERBESSERN.cmd"
+LAUNCHER_BACKUP = "TEXT VERBESSERN.original.cmd"
+LAUNCHER_MARK = "LLP-FOUNDRY-TOR"
+
+LAUNCHER_CMD = r"""@echo off
+chcp 65001 >nul
+rem LLP-FOUNDRY-TOR
+title LLP - Text verbessern
+cd /d "%~dp0"
+
+if exist "%~dp0..\_Gemeinsam\llp_ai" set "LLP_SHARED_AI_ROOT=%~dp0..\_Gemeinsam"
+if not defined LLP_SHARED_AI_ROOT if exist "%~dp0_Gemeinsam\llp_ai" set "LLP_SHARED_AI_ROOT=%~dp0_Gemeinsam"
+
+set "PY="
+py -3 -c "import sys" >nul 2>&1 && set "PY=py -3"
+if not defined PY python -c "import sys" >nul 2>&1 && set "PY=python"
+if not defined PY python3 -c "import sys" >nul 2>&1 && set "PY=python3"
+if not defined PY (
+    echo  Python wurde nicht gefunden. Bitte die IT rufen.
+    pause
+    exit /b 1
+)
+
+if defined LLP_SHARED_AI_ROOT if exist "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\anwenden.py" (
+    %PY% "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\anwenden.py"
+)
+
+if defined LLP_SHARED_AI_ROOT if exist "%LLP_SHARED_AI_ROOT%\pruefen_tools.py" (
+    %PY% "%LLP_SHARED_AI_ROOT%\pruefen_tools.py" --text-foundry
+    if not errorlevel 1 goto FOUNDRY_DESKTOP
+)
+
+echo  Oeffne Foundry-Seite. Ein Mistral-rephraser wird nicht gestartet.
+if defined LLP_SHARED_AI_ROOT if exist "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\Starten.bat" (
+    start "" "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\Starten.bat"
+    exit /b 0
+)
+echo  Text verbessern (Foundry) nicht gefunden.
+echo  Bitte _Gemeinsam\text_verbessern_foundry\Starten.bat doppelklicken.
+pause
+exit /b 1
+
+:FOUNDRY_DESKTOP
+if exist "%~dp0TEXT VERBESSERN.original.cmd" (
+    call "%~dp0TEXT VERBESSERN.original.cmd"
+    exit /b %ERRORLEVEL%
+)
+if exist "%~dp0app\desktop.py" (
+    %PY% -c "from app.desktop import main; main()"
+    exit /b %ERRORLEVEL%
+)
+if defined LLP_SHARED_AI_ROOT if exist "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\Starten.bat" (
+    start "" "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\Starten.bat"
+    exit /b 0
+)
+echo  Text verbessern nicht gefunden.
+pause
+exit /b 1
+"""
+
+
+def _patch_launcher(tool_root: Path) -> Path | None:
+    """Direktklick auf TEXT VERBESSERN.cmd: Foundry-Tor, kein Mistral."""
+    cmd = tool_root / LAUNCHER_NAME
+    backup = tool_root / LAUNCHER_BACKUP
+    if cmd.is_file():
+        current = cmd.read_text(encoding="utf-8", errors="replace")
+        if LAUNCHER_MARK not in current and not backup.is_file():
+            backup.write_text(current, encoding="utf-8")
+    cmd.write_text(LAUNCHER_CMD, encoding="utf-8")
+    return cmd
 
 
 def _patch_pipeline(path: Path) -> None:

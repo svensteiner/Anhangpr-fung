@@ -129,6 +129,9 @@ def text_foundry_ok(start: Path | None = None) -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
+    if "--kurz" in args:
+        print(describe_status()["kurz"])
+        return 0
     if "--text-foundry" in args:
         return 0 if text_foundry_ok() else 1
     data = report()
