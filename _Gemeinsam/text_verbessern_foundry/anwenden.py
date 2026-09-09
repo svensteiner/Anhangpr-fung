@@ -113,6 +113,7 @@ def apply(tool_root: Path) -> list[str]:
     done.extend(_park_exe(tool_root))
     done.extend(_park_packaging(tool_root))
     done.extend(_park_portable_workflow(tool_root))
+    done.extend(_park_build_scripts(tool_root))
     ps1 = _patch_windows_start(tool_root)
     if ps1 is not None:
         done.append(str(ps1))
@@ -123,6 +124,10 @@ def apply(tool_root: Path) -> list[str]:
     if hybrid.is_file():
         _patch_hybrid(hybrid)
         done.append(str(hybrid))
+    providers_init = tool_root / "app" / "providers" / "__init__.py"
+    if providers_init.is_file():
+        _patch_providers_init(providers_init)
+        done.append(str(providers_init))
     runtime = tool_root / "app" / "local_runtime.py"
     if runtime.is_file():
         _patch_local_runtime(runtime)
@@ -181,6 +186,9 @@ EXE_NAMES = (
 
 SPEC_REL = Path("packaging") / "TextVerbessern.spec"
 WORKFLOW_REL = Path(".github") / "workflows" / "windows-portable.yml"
+BUILD_RELS = (
+    Path("scripts") / "build_browser_standalone.py",
+)
 EXE_REL_DIRS = (
     Path("."),
     Path("dist"),
@@ -321,11 +329,21 @@ def _patch_leftover_docs(tool_root: Path) -> list[str]:
     return written
 
 
+FOUNDRY_UVICORN_HINT = (
+    "    raise HTTPException(\n"
+    "        status_code=503,\n"
+    "        detail=(\n"
+    '            "Bitte Desktop Text verbessern oder "\n'
+    '            "_Gemeinsam\\\\text_verbessern_foundry\\\\Starten.bat. "\n'
+    '            "uvicorn startet nicht. Nur Foundry, kein Mistral."\n'
+    "        ),\n"
+    "    )  # LLP-FOUNDRY-TOR"
+)
+
+
 def _disable_fastapi(text: str) -> str:
-    """uvicorn app.main:app darf keine Mistral-API mehr anbieten."""
-    if "LLP-FOUNDRY-TOR" in text and "uvicorn startet nicht" in text:
-        return text
-    return _replace_all_if_present(
+    """uvicorn app.main:app darf keine API mehr anbieten."""
+    text = _replace_all_if_present(
         text,
         "def transform(request: TransformRequest) -> TransformResult:\n"
         "    try:\n"
@@ -333,15 +351,23 @@ def _disable_fastapi(text: str) -> str:
         "    except ProviderError as error:\n"
         "        raise HTTPException(status_code=503, detail=str(error)) from error",
         "def transform(request: TransformRequest) -> TransformResult:\n"
-        "    raise HTTPException(\n"
-        "        status_code=503,\n"
-        "        detail=(\n"
-        '            "Bitte Desktop Text verbessern oder "\n'
-        '            "_Gemeinsam\\\\text_verbessern_foundry\\\\Starten.bat. "\n'
-        '            "uvicorn startet nicht. Nur Foundry, kein Mistral."\n'
-        "        ),\n"
-        "    )  # LLP-FOUNDRY-TOR",
+        + FOUNDRY_UVICORN_HINT,
     )
+    text = _replace_all_if_present(
+        text,
+        "def transform_text(request: TransformRequest) -> str:\n"
+        "    return transform(request).rewritten_text",
+        "def transform_text(request: TransformRequest) -> str:\n"
+        + FOUNDRY_UVICORN_HINT,
+    )
+    text = _replace_all_if_present(
+        text,
+        "def health() -> dict[str, str]:\n"
+        '    return {"status": "ok", "default_provider": "fast-editor"}',
+        "def health() -> dict[str, str]:\n"
+        + FOUNDRY_UVICORN_HINT,
+    )
+    return text
 
 
 WEB_HTML_NAMES = (
@@ -420,6 +446,21 @@ def _park_portable_workflow(tool_root: Path) -> list[str]:
     return [str(dest)]
 
 
+def _park_build_scripts(tool_root: Path) -> list[str]:
+    """Offline-Build darf keine neue Mistral-HTML als Startweg erzeugen."""
+    parked: list[str] = []
+    for rel in BUILD_RELS:
+        path = tool_root / rel
+        if not path.is_file():
+            continue
+        dest = path.with_name(path.name + ".llp-alt")
+        if dest.exists():
+            continue
+        path.rename(dest)
+        parked.append(str(dest))
+    return parked
+
+
 def _patch_local_runtime(path: Path) -> None:
     """Übrige Aufrufe dürfen Ollama nicht mehr anpingen."""
     text = path.read_text(encoding="utf-8")
@@ -485,11 +526,15 @@ def _patch_hybrid(path: Path) -> None:
 
 def _patch_pipeline(path: Path) -> None:
     pipe = path.read_text(encoding="utf-8")
-    pipe = _ensure_line_after(
-        pipe,
-        "from .providers.mistral_provider import LocalMistralProvider",
-        "from .providers.foundry_provider import FoundryEditorialProvider, HybridFoundryProvider",
+    foundry_imp = (
+        "from .providers.foundry_provider import FoundryEditorialProvider, HybridFoundryProvider"
     )
+    if foundry_imp not in pipe:
+        pipe = _ensure_line_after(
+            pipe,
+            "from .providers.mistral_provider import LocalMistralProvider",
+            foundry_imp,
+        )
     pipe = _ensure_line_after(
         pipe,
         "    if normalized in {\"fast\", \"fast-rules\", \"fast-editor\"}:\n"
@@ -524,7 +569,37 @@ def _patch_pipeline(path: Path) -> None:
         "    except ProviderError as error:\n"
         "        raise\n",
     )
+    pipe = _replace_all_if_present(
+        pipe,
+        "from .providers.mistral_provider import LocalMistralProvider\n",
+        "",
+    )
+    pipe = _replace_all_if_present(
+        pipe,
+        "from .providers.hybrid import HybridLocalProvider\n",
+        "",
+    )
     path.write_text(pipe, encoding="utf-8")
+
+
+def _patch_providers_init(path: Path) -> None:
+    """from app.providers import LocalMistralProvider darf nicht mehr gehen."""
+    text = path.read_text(encoding="utf-8")
+    if "FoundryEditorialProvider" in text and "LocalMistralProvider" not in text:
+        return
+    text = _replace_all_if_present(
+        text,
+        "from .mistral_provider import LocalMistralProvider\n",
+        "from .foundry_provider import FoundryEditorialProvider, HybridFoundryProvider\n",
+    )
+    text = _replace_all_if_present(
+        text,
+        "from .hybrid import HybridLocalProvider\n",
+        "",
+    )
+    text = _replace_all_if_present(text, '    "LocalMistralProvider",\n', '    "FoundryEditorialProvider",\n')
+    text = _replace_all_if_present(text, '    "HybridLocalProvider",\n', '    "HybridFoundryProvider",\n')
+    path.write_text(text, encoding="utf-8")
 
 
 def _patch_desktop(path: Path) -> None:

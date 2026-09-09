@@ -270,11 +270,28 @@ def _fake_rephraser(tmp_path: Path) -> Path:
     (dist / "TextVerbessern.exe").write_bytes(b"mz-dist")
     (tool / "app" / "main.py").write_text(
         'parser.add_argument("--provider", choices=["fast-editor", "rules", "mistral-local"])\n'
+        "def health() -> dict[str, str]:\n"
+        '    return {"status": "ok", "default_provider": "fast-editor"}\n'
         "def transform(request: TransformRequest) -> TransformResult:\n"
         "    try:\n"
         "        return run_pipeline(request.text, request.options)\n"
         "    except ProviderError as error:\n"
-        "        raise HTTPException(status_code=503, detail=str(error)) from error\n",
+        "        raise HTTPException(status_code=503, detail=str(error)) from error\n"
+        "def transform_text(request: TransformRequest) -> str:\n"
+        "    return transform(request).rewritten_text\n",
+        encoding="utf-8",
+    )
+    (tool / "app" / "providers" / "__init__.py").write_text(
+        "from .mistral_provider import LocalMistralProvider\n"
+        "from .hybrid import HybridLocalProvider\n"
+        "__all__ = [\n"
+        '    "LocalMistralProvider",\n'
+        '    "HybridLocalProvider",\n'
+        "]\n",
+        encoding="utf-8",
+    )
+    (tool / "scripts" / "build_browser_standalone.py").write_text(
+        "OUTPUT_PATH = WEB_ROOT / 'TextVerbessern-Browser.html'\n",
         encoding="utf-8",
     )
     (tool / "app" / "local_runtime.py").write_text(
@@ -317,6 +334,8 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
 
     pipeline = (tool / "app" / "pipeline.py").read_text(encoding="utf-8")
     assert "from .providers.foundry_provider import FoundryEditorialProvider, HybridFoundryProvider" in pipeline
+    assert "from .providers.mistral_provider import LocalMistralProvider" not in pipeline
+    assert "from .providers.hybrid import HybridLocalProvider" not in pipeline
     assert '"foundry", "company-ai"' in pipeline
     assert '"rules+foundry"' in pipeline
     assert "return FoundryEditorialProvider()" in pipeline
@@ -455,6 +474,14 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "uvicorn startet nicht" in cli
     assert "LLP-FOUNDRY-TOR" in cli
     assert "return run_pipeline(request.text, request.options)" not in cli
+    assert 'return {"status": "ok", "default_provider": "fast-editor"}' not in cli
+    assert "return transform(request).rewritten_text" not in cli
+    providers_init = (tool / "app" / "providers" / "__init__.py").read_text(encoding="utf-8")
+    assert "FoundryEditorialProvider" in providers_init
+    assert "LocalMistralProvider" not in providers_init
+    assert "HybridLocalProvider" not in providers_init
+    assert not (tool / "scripts" / "build_browser_standalone.py").is_file()
+    assert (tool / "scripts" / "build_browser_standalone.py.llp-alt").is_file()
 
     ok2, msg2 = module.apply_foundry(tool)
     assert ok2, msg2
