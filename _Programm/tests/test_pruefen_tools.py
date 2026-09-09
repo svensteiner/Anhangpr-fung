@@ -29,6 +29,8 @@ def test_report_findet_diesen_anhangspruefer() -> None:
     assert Path(data["anhang"]).name == "Starten.bat"
     text = module.format_report(data)
     assert "Anhangspruefer:  gefunden" in text
+    assert data["anhang_ollama"] is None
+    assert "Anhang-Ollama:   beiseite" in text
     assert "Startskript:" in text
     assert "ANLEITUNG.txt" in text
     assert "Schluessel" in text
@@ -718,6 +720,34 @@ def test_report_foundry_aber_alte_anleitung_sicherung_ist_nicht_ok(tmp_path: Pat
     assert data["text_launchable_backup"] is not None
     assert module.text_has_leftovers(data) is True
     assert "Sicherung-startbar" in module.leftovers_in_tool(tools / "rephraser")
+
+
+def test_report_foundry_aber_anhang_ollama_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    anhang = tools / "Anhangpr-fung"
+    (anhang / "_Programm" / "anhangspruefer" / "compliance" / "knowledge").mkdir(parents=True)
+    (anhang / "Starten.bat").write_text("@echo off\n", encoding="utf-8")
+    matcher = (
+        anhang
+        / "_Programm"
+        / "anhangspruefer"
+        / "compliance"
+        / "knowledge"
+        / "llm_matcher.py"
+    )
+    matcher.write_text(
+        'req = urllib.request.Request(self.base_url + "/api/generate", body)\n',
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["anhang_ollama"] is not None
+    blob = module.format_report(data)
+    assert "Anhang-Ollama" in blob
+    assert "Ollama-Client" in blob
+    assert module.text_has_leftovers(data) is True
 
 
 def test_report_foundry_aber_tests_ci_ist_nicht_ok(tmp_path: Path) -> None:

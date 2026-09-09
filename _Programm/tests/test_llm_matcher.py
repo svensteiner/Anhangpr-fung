@@ -319,6 +319,14 @@ def test_refine_lehnt_localllm_ab():
         refine_findings(res, cl, paras, llm=local)
 
 
+def test_localllm_ruft_ollama_nicht_mehr_an():
+    local = LocalLLM(base_url="http://127.0.0.1:11434")
+    with pytest.raises(RuntimeError, match="LocalLLM ist abgeschaltet"):
+        local.is_available()
+    with pytest.raises(RuntimeError, match="LocalLLM ist abgeschaltet"):
+        local.generate_json("egal")
+
+
 def test_foundry_llm_unavailable_without_layer():
     llm = FoundryLLM()
     assert llm.is_available() is False

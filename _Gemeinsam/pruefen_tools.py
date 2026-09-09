@@ -46,6 +46,32 @@ def find_anhang(roots: list[Path]) -> Path | None:
     return None
 
 
+ANHANG_MATCHER_RELS = (
+    Path("_Programm") / "anhangspruefer" / "compliance" / "knowledge" / "llm_matcher.py",
+    Path("anhangspruefer") / "compliance" / "knowledge" / "llm_matcher.py",
+)
+
+
+def anhang_ollama_live(path: Path | None) -> bool:
+    """True, wenn LocalLLM noch den Ollama-Endpunkt aufrufen kann."""
+    if path is None or not path.is_file():
+        return False
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return "/api/generate" in text
+
+
+def find_anhang_ollama(roots: list[Path]) -> Path | None:
+    start = find_anhang(roots)
+    if start is None:
+        return None
+    tool = start.parent
+    for rel in ANHANG_MATCHER_RELS:
+        matcher = tool / rel
+        if anhang_ollama_live(matcher):
+            return matcher
+    return None
+
+
 def find_text_desktop(roots: list[Path]) -> Path | None:
     for root in roots:
         found = _first_existing(root, TOOL_NAMES["text"], "app/desktop.py")
@@ -722,9 +748,11 @@ def report(start: Path | None = None) -> dict[str, object]:
     spec = find_live_spec(roots)
     build = find_live_build_script(roots)
     workflow = find_live_portable_workflow(roots)
+    anhang_ollama = find_anhang_ollama(roots)
     return {
         "foundry": describe_status(),
         "anhang": find_anhang(roots),
+        "anhang_ollama": anhang_ollama,
         "text_desktop": desktop,
         "text_modus": modus,
         "text_startskript": startskript,
@@ -782,6 +810,8 @@ def format_report(data: dict[str, object]) -> str:
         "",
         "  Anhangspruefer:  "
         + ("gefunden" if data["anhang"] else "nicht gefunden"),
+        "  Anhang-Ollama:   "
+        + ("noch da – nur Foundry" if data["anhang_ollama"] else "beiseite"),
         "  Text verbessern: "
         + (
             f"gefunden, gruendlich = {data['text_modus']}"
@@ -833,6 +863,11 @@ def format_report(data: dict[str, object]) -> str:
         ),
         "",
     ]
+    if data["anhang_ollama"] is not None:
+        lines.append(
+            "  Der Anhangspruefer hat noch einen Ollama-Client."
+            " Nur Foundry (llp_ai), kein lokales Modell."
+        )
     if data["text_modus"] == "noch Mistral":
         lines.append(
             "  Text verbessern zeigt noch Mistral."
@@ -1098,6 +1133,7 @@ def text_has_leftovers(
         or data["text_spec"] is not None
         or data["text_build"] is not None
         or data["text_workflow"] is not None
+        or data["anhang_ollama"] is not None
         or (data["text_desktop"] is not None and data["text_provider"] is None)
     )
 

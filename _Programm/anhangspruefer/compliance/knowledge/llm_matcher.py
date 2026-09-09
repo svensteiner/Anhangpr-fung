@@ -5,7 +5,8 @@ Produktionsweg: zentraler Microsoft-Foundry-Layer (llp_ai). Kein stiller
 Wechsel auf Ollama oder einen anderen Anbieter. Ist Foundry aus oder nicht
 erreichbar, bleibt das Heuristik-Ergebnis stehen.
 
-LocalLLM (Ollama, nur localhost) bleibt für Tests und bewusste lokale Läufe.
+LocalLLM darf keinen Ollama-Aufruf mehr machen. Der Konstruktor prüft
+weiter nur localhost, generate_json ist aus.
 """
 
 from __future__ import annotations
@@ -13,10 +14,10 @@ from __future__ import annotations
 import json
 import re
 import time
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional, Protocol
+from urllib.parse import urlsplit
 
 from ...models.checklist import Checklist, ChecklistItem
 from ...models.enums import ComplianceStatus
@@ -26,8 +27,6 @@ from ...services.company_ai import CompanyAIError, ask_json, is_ai_ready
 from ...utils.logging_config import get_logger
 
 logger = get_logger("llm_matcher")
-
-_ALLOWED_HOSTS = ("http://127.0.0.1:", "http://localhost:")
 
 DEFAULT_BASE_URL = "http://127.0.0.1:11434"
 DEFAULT_MODEL = "mistral"
@@ -223,17 +222,16 @@ def select_candidates(
 
 
 # ---------------------------------------------------------------------------
-# Lokaler Ollama-Client (nur localhost!)
+# LocalLLM: nur noch Guard-Tests. Kein Ollama-Aufruf.
 # ---------------------------------------------------------------------------
 class LocalLLM:
-    """Minimaler Client für die lokale Ollama-API. Verweigert Nicht-localhost."""
+    """Abgeschaltet. Konstruktor prüft weiter localhost; Aufrufe sind aus."""
 
     def __init__(self, base_url: str = DEFAULT_BASE_URL, model: str = DEFAULT_MODEL,
                  timeout: int = 300):
         # Vertraulichkeits-Guard: URL echt PARSEN (nicht startswith – sonst per
         # 'http://127.0.0.1:11434@fremd.example' umgehbar). Host MUSS localhost
         # sein, keine userinfo, Schema http.
-        from urllib.parse import urlsplit
         sp = urlsplit(base_url.rstrip("/"))
         if (sp.scheme != "http"
                 or sp.hostname not in ("127.0.0.1", "localhost", "::1")
@@ -247,30 +245,14 @@ class LocalLLM:
         self.timeout = timeout
 
     def is_available(self) -> bool:
-        try:
-            with urllib.request.urlopen(self.base_url + "/api/tags", timeout=3) as r:
-                names = [m.get("name", "") for m in json.loads(r.read()).get("models", [])]
-            return any(n == self.model or n.startswith(self.model + ":") for n in names)
-        except Exception:
-            return False
+        raise RuntimeError(
+            "LocalLLM ist abgeschaltet. Modus 3 nutzt nur Foundry (llp_ai)."
+        )  # LLP-FOUNDRY-TOR
 
     def generate_json(self, prompt: str, num_predict: int = 120) -> Optional[dict]:
-        body = json.dumps({
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False,
-            "format": "json",
-            "options": {"temperature": 0, "num_predict": num_predict},
-        }).encode()
-        req = urllib.request.Request(
-            self.base_url + "/api/generate", body, {"Content-Type": "application/json"})
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
-                resp = json.loads(r.read()).get("response", "")
-            return json.loads(resp)
-        except Exception:
-            logger.exception("Ollama-Aufruf fehlgeschlagen")
-            return None
+        raise RuntimeError(
+            "LocalLLM ist abgeschaltet. Modus 3 nutzt nur Foundry (llp_ai)."
+        )  # LLP-FOUNDRY-TOR
 
 
 class FoundryLLM:
