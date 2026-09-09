@@ -58,8 +58,8 @@ pip install -e .
 # Optional: alle Extras (inkl. RTF-Support, Tests)
 pip install -e ".[all,dev]"
 
-# GUI starten
-python run_gui.py
+# Anwender: Starten.bat  (run_gui.py ist abgeschaltet)
+python app.py
 ```
 
 **Pflicht-Abhängigkeiten** (siehe `pyproject.toml`):

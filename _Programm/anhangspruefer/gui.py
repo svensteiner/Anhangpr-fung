@@ -500,18 +500,20 @@ class AnhangsprueferGUI:
 
 
 def main():
-    root = tk.Tk()
-    try:
-        if hasattr(sys, "_MEIPASS"):
-            icon_path = Path(sys._MEIPASS) / "icon.ico"
-        else:
-            icon_path = Path(__file__).parent / "icon.ico"
-        if icon_path.exists():
-            root.iconbitmap(str(icon_path))
-    except Exception:
-        pass
-    AnhangsprueferGUI(root)
-    root.mainloop()
+    """Alte Desktop-GUI: umgeht Modus 3. Anwender starten über Starten.bat."""
+    print(
+        "============================================================\n"
+        "  LLP Anhangspruefer\n"
+        "============================================================\n"
+        "\n"
+        "  Die alte Desktop-Oberflaeche ist abgeschaltet.\n"
+        "  Sie prueft ohne Gesellschaft (stilles unbekannt).\n"
+        "\n"
+        "  Bitte Starten.bat doppelklicken.\n"
+        "  Modus 3: GmbH/AG und Groesse waehlen und bestaetigen.\n"
+        "============================================================"
+    )
+    return 2
 
 
 if __name__ == "__main__":

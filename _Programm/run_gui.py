@@ -1,15 +1,26 @@
 #!/usr/bin/env python3
-"""
-Alte Desktop-GUI (nur für Entwicklung). Anwender starten über Starten.bat.
-"""
+"""Alte Desktop-GUI ist abgeschaltet. Anwender starten über Starten.bat."""
 
 import sys
-from pathlib import Path
 
-# Add the package to path
-sys.path.insert(0, str(Path(__file__).parent))
+HINWEIS = """
+============================================================
+  LLP Anhangspruefer
+============================================================
 
-from anhangspruefer.gui import main
+  Die alte Desktop-Oberflaeche ist abgeschaltet.
+  Sie prueft ohne Gesellschaft (stilles unbekannt).
+
+  Bitte Starten.bat doppelklicken.
+  Modus 3: GmbH/AG und Groesse waehlen und bestaetigen.
+============================================================
+"""
+
+
+def main() -> int:
+    print(HINWEIS.strip())
+    return 2
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

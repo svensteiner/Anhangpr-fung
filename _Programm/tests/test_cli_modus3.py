@@ -28,6 +28,21 @@ def test_run_review_is_disabled():
     assert "starten.bat" in proc.stdout.lower()
 
 
+def test_run_gui_is_disabled():
+    text = (PROG / "run_gui.py").read_text(encoding="utf-8")
+    assert "Starten.bat" in text
+    proc = subprocess.run(
+        [sys.executable, str(PROG / "run_gui.py")],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 2
+    out = (proc.stdout + proc.stderr).lower()
+    assert "starten.bat" in out
+    assert "unbekannt" in out
+
+
 def test_cli_review_requires_company_profile():
     proc = subprocess.run(
         [sys.executable, "-m", "anhangspruefer", "review", "anhang.pdf"],

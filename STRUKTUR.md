@@ -27,7 +27,7 @@ Diese Datei dokumentiert, was wohin gehört. Bitte halten, nicht zumüllen.
 |------|-------|
 | `anhangspruefer/` | Hauptpaket. Siehe Unterstruktur. |
 | `pyproject.toml` | Paketdefinition, Dependencies. |
-| `run_gui.py` / `run_review.py` | Nicht für Anwender. `run_review.py` ist abgeschaltet (alte Engine). Start: `Starten.bat`. |
+| `run_gui.py` / `run_review.py` | Abgeschaltet (alte Engine ohne Gesellschaft). Start: `Starten.bat`. |
 | `README_entwickler.md` | Entwicklerdoku. |
 | `tests/` | Pytest-Tests (Smoke + Unit). |
 | `README_entwickler.md` | Entwicklerdoku. |
