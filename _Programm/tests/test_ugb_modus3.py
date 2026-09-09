@@ -411,11 +411,24 @@ def test_ugb_review_requires_anhang_and_profile():
     assert missing_profil.status_code == 400
     assert "Rechtsform" in missing_profil.get_json()["error"]
 
+    unconfirmed = client.post(
+        "/ugb_review",
+        data={
+            "rechtsform": "gmbh",
+            "groessenklasse": "klein",
+            "anhang": (io.BytesIO(b"kein pdf"), "anhang.pdf"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert unconfirmed.status_code == 400
+    assert "bestätigen" in unconfirmed.get_json()["error"].lower() or "bestaetig" in unconfirmed.get_json()["error"].lower()
+
     wrong = client.post(
         "/ugb_review",
         data={
             "rechtsform": "gmbh",
             "groessenklasse": "klein",
+            "bestaetigt": "ja",
             "anhang": (io.BytesIO(b"nope"), "anhang.txt"),
         },
         content_type="multipart/form-data",
@@ -434,7 +447,9 @@ def test_mode3_ui_uses_excel_labels_and_confirm():
     assert "Offen – Angabe gefunden" in html
     assert "Offen – kein Hinweis" in html
     assert "ug-bestaetigt" in html
+    assert "bestaetigt" in html
     assert "ug-pp-warn" in html
+    assert "fd.append('bestaetigt'" in html or 'fd.append("bestaetigt"' in html or "fd.append('bestaetigt', 'ja')" in html
     assert "localhost:5555" not in (root / "Starten.bat").read_text(encoding="utf-8")
 
 
@@ -476,6 +491,7 @@ def test_ugb_web_e2e_docx_gmbh_klein(tmp_path):
                 "anhang": (fh, "anhang.docx"),
                 "rechtsform": "gmbh",
                 "groessenklasse": "klein",
+                "bestaetigt": "ja",
             },
             content_type="multipart/form-data",
         )

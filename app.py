@@ -1008,10 +1008,11 @@ async function ugRun() {
   fd.append('mandant', currentMandant);
   fd.append('rechtsform', form);
   fd.append('groessenklasse', size);
+  fd.append('bestaetigt', 'ja');
   try {
     const resp = await fetch('/ugb_review', { method:'POST', body:fd });
     clearInterval(iv); bar.style.width = '100%';
-    if (!resp.ok) { const e = await resp.json(); ugError(e.error || 'Unbekannter Fehler'); return; }
+    if (!resp.ok) { const e = await resp.json(); ugError(e.error || 'Die Prüfung ist fehlgeschlagen.'); return; }
     const data = await resp.json();
     setTimeout(() => ugShowResult(data), 400);
   } catch (e) { clearInterval(iv); ugError('Verbindungsfehler: ' + e.message); }
@@ -1495,6 +1496,11 @@ def _pflicht_profil() -> tuple[str, str] | None:
     return form, size
 
 
+def _profil_bestaetigt() -> bool:
+    raw = (request.form.get("bestaetigt") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on", "ja"}
+
+
 # ---------- Modus 3: UGB-Inhaltsprüfung ----------
 @app.route("/ugb_profil", methods=["POST"])
 def ugb_profil_route():
@@ -1530,6 +1536,10 @@ def ugb_review_route():
     if profil is None:
         return jsonify({
             "error": "Bitte Rechtsform (GmbH oder AG) und Größenklasse (klein, mittel oder groß) wählen.",
+        }), 400
+    if not _profil_bestaetigt():
+        return jsonify({
+            "error": "Bitte bestätigen, dass Rechtsform und Größe stimmen.",
         }), 400
     legal_form, size_class = profil
 
