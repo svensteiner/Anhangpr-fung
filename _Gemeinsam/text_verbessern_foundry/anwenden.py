@@ -685,6 +685,7 @@ def _patch_mistral_provider(path: Path) -> None:
         )
     if "/api/generate" in text:
         text = text.replace("/api/generate", "/api/abgeschaltet")
+    text = text.replace("http://127.0.0.1:11434", "http://127.0.0.1:0")
     path.write_text(text, encoding="utf-8")
 
 

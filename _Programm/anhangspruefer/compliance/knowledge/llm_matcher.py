@@ -28,7 +28,7 @@ from ...utils.logging_config import get_logger
 
 logger = get_logger("llm_matcher")
 
-DEFAULT_BASE_URL = "http://127.0.0.1:11434"
+DEFAULT_BASE_URL = "http://127.0.0.1:0"
 DEFAULT_MODEL = "abgeschaltet"
 
 # deutsche Stoppwörter + generische Checklisten-Wörter (tragen nichts zur
@@ -230,7 +230,7 @@ class LocalLLM:
     def __init__(self, base_url: str = DEFAULT_BASE_URL, model: str = DEFAULT_MODEL,
                  timeout: int = 300):
         # Vertraulichkeits-Guard: URL echt PARSEN (nicht startswith – sonst per
-        # 'http://127.0.0.1:11434@fremd.example' umgehbar). Host MUSS localhost
+        # 'http://127.0.0.1:0@fremd.example' umgehbar). Host MUSS localhost
         # sein, keine userinfo, Schema http.
         sp = urlsplit(base_url.rstrip("/"))
         if (sp.scheme != "http"

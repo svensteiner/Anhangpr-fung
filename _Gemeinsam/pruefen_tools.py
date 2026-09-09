@@ -57,7 +57,11 @@ def anhang_ollama_live(path: Path | None) -> bool:
     if path is None or not path.is_file():
         return False
     text = path.read_text(encoding="utf-8", errors="replace")
-    return "/api/generate" in text or 'DEFAULT_MODEL = "mistral"' in text
+    return (
+        "/api/generate" in text
+        or 'DEFAULT_MODEL = "mistral"' in text
+        or "11434" in text
+    )
 
 
 def find_anhang_ollama(roots: list[Path]) -> Path | None:
@@ -158,12 +162,10 @@ def mistral_provider_modus(path: Path | None) -> str:
     if path is None:
         return "nicht gefunden"
     text = path.read_text(encoding="utf-8", errors="replace")
-    if "/api/generate" in text:
+    if "/api/generate" in text or "11434" in text:
         return "noch Ollama"
     if "LLP-FOUNDRY-TOR" in text and "LocalMistralProvider ist abgeschaltet" in text:
         return "abgeschaltet"
-    if "11434" in text:
-        return "noch Ollama"
     return "nicht erkannt"
 
 

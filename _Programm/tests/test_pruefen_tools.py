@@ -321,6 +321,25 @@ def test_report_foundry_aber_mistral_generate_ist_nicht_ok(tmp_path: Path) -> No
     assert "Mistral-Client" in module.leftovers_in_tool(tools / "rephraser")
 
 
+def test_report_foundry_aber_mistral_port_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    (tools / "rephraser" / "app" / "providers" / "mistral_provider.py").write_text(
+        "class LocalMistralProvider:\n"
+        "    def __init__(self, base_url: str | None = None, model: str | None = None) -> None:\n"
+        '        raise RuntimeError("LocalMistralProvider ist abgeschaltet. Nur Foundry (llp_ai).")  # LLP-FOUNDRY-TOR\n'
+        "        self.base_url = 'http://127.0.0.1:11434'\n",
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_mistral_modus"] == "noch Ollama"
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert "Mistral-Client" in module.leftovers_in_tool(tools / "rephraser")
+
+
 def test_report_foundry_aber_ollama_probe_ist_nicht_ok(tmp_path: Path) -> None:
     module = _load()
     tools = tmp_path / "AI Tools"
@@ -818,6 +837,28 @@ def test_report_foundry_aber_anhang_mistral_default_ist_nicht_ok(tmp_path: Path)
         / "llm_matcher.py"
     )
     matcher.write_text('DEFAULT_MODEL = "mistral"\n', encoding="utf-8")
+    data = module.report(gemeinsam)
+    assert data["anhang_ollama"] is not None
+    assert module.text_has_leftovers(data) is True
+
+
+def test_report_foundry_aber_anhang_ollama_port_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    anhang = tools / "Anhangpr-fung"
+    (anhang / "_Programm" / "anhangspruefer" / "compliance" / "knowledge").mkdir(parents=True)
+    (anhang / "Starten.bat").write_text("@echo off\n", encoding="utf-8")
+    matcher = (
+        anhang
+        / "_Programm"
+        / "anhangspruefer"
+        / "compliance"
+        / "knowledge"
+        / "llm_matcher.py"
+    )
+    matcher.write_text('DEFAULT_BASE_URL = "http://127.0.0.1:11434"\n', encoding="utf-8")
     data = module.report(gemeinsam)
     assert data["anhang_ollama"] is not None
     assert module.text_has_leftovers(data) is True

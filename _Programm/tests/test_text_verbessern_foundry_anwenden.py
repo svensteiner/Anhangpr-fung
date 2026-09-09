@@ -448,6 +448,7 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "LocalMistralProvider ist abgeschaltet" in mistral
     assert "Nur Foundry" in mistral
     assert "/api/generate" not in mistral
+    assert "11434" not in mistral
     lines = [ln.rstrip() for ln in mistral.splitlines()]
     init_idx = next(i for i, ln in enumerate(lines) if "def __init__" in ln)
     assert "raise RuntimeError" in lines[init_idx + 1]
@@ -754,6 +755,7 @@ def test_anwenden_entfernt_ollama_generate(tmp_path: Path) -> None:
     ok, msg = module.apply_foundry(tool)
     assert ok, msg
     assert "/api/generate" not in path.read_text(encoding="utf-8")
+    assert "11434" not in path.read_text(encoding="utf-8")
     assert module.leftovers_in_tool(tool) == []
 
 

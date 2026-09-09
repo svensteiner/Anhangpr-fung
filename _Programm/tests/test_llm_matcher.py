@@ -12,6 +12,7 @@ from anhangspruefer.models.checklist import Checklist, ChecklistItem
 from anhangspruefer.models.enums import ComplianceStatus
 from anhangspruefer.models.finding import Finding, ReviewResult
 from anhangspruefer.compliance.knowledge.llm_matcher import (
+    DEFAULT_BASE_URL,
     DEFAULT_MODEL,
     FoundryLLM,
     LocalLLM,
@@ -39,8 +40,10 @@ def test_localllm_accepts_localhost():
 
 def test_localllm_default_ist_kein_mistral():
     assert DEFAULT_MODEL != "mistral"
-    local = LocalLLM(base_url="http://127.0.0.1:11434")
+    assert "11434" not in DEFAULT_BASE_URL
+    local = LocalLLM()
     assert local.model != "mistral"
+    assert "11434" not in local.base_url
 
 
 def test_localllm_rejects_userinfo_bypass():
