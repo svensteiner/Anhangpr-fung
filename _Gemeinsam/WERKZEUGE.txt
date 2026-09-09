@@ -27,10 +27,10 @@ Start:  Tools_starten.bat, Punkt 2
         TEXT VERBESSERN.cmd und start_windows.ps1
         im Tool-Ordner oeffnen dasselbe Foundry-Tor,
         nicht Mistral und nicht Streamlit.
-KI:     gruendliche Fassung ueber Foundry (llp_ai),
-        sonst die sichere lokale Regelfassung
-        bzw. die Foundry-Seite sagt klar Bescheid.
-        Nicht Ollama als Kanzlei-Standard.
+KI:     gruendliche Fassung nur ueber Foundry (llp_ai).
+        Ist Foundry aus, bleibt der Text unveraendert.
+        Die Foundry-Seite sagt das klar (Knopf gesperrt).
+        Keine lokale Regelfassung, kein Mistral, kein Ollama.
 Zeigt das Tool noch Mistral:
         Starten.bat und llp_start stellen das
         bei jedem Start um. Bleibt ein alter Weg,

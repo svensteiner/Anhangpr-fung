@@ -79,6 +79,25 @@ def test_seite_nennt_nur_foundry() -> None:
     assert "run').disabled" in html or 'run").disabled' in html
 
 
+def test_status_ohne_foundry_sagt_nicht_heuristik(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = _load()
+    monkeypatch.setattr(
+        module,
+        "describe_status",
+        lambda: {"kurz": "KI: aus – Heuristik", "bereit": False},
+    )
+    server, base = _serve(module)
+    try:
+        code, status = _json(base + "/status")
+    finally:
+        server.shutdown()
+    assert code == 200
+    assert status["bereit"] is False
+    assert status["kurz"] == "KI: aus – Text bleibt unverändert"
+    assert "heuristik" not in status["kurz"].lower()
+    assert "regelfassung" not in status["kurz"].lower()
+
+
 def test_umschreiben_ohne_foundry_ohne_stillen_wechsel(monkeypatch: pytest.MonkeyPatch) -> None:
     module = _load()
     monkeypatch.setattr(module, "is_ai_ready", lambda: False)

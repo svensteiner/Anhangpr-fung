@@ -134,6 +134,9 @@ def test_share_anleitung_fuer_kollegen():
     assert "bitte pruefen.bat" in lies
     assert "bei jedem start" in lies
     assert "wie gewohnt" not in lies
+    assert "heuristik / regeln" not in lies
+    assert "text verbessern" in lies
+    assert "aendert den text nicht" in lies or "ändert den text nicht" in lies
 
 
 def test_entwicklerdoku_verweist_auf_browser_nicht_alte_gui():
@@ -223,6 +226,10 @@ def test_werkzeuge_pseudokrat_ohne_foundry():
     assert "offline-editor" in text
     assert "startbare" in text
     assert "kommandozeile" in text
+    assert "sonst die sichere lokale" not in text
+    assert "keine lokale regelfassung" in text
+    assert "unveraendert" in text or "unverändert" in text
+    assert "knopf gesperrt" in text
 
 
 def test_tools_starten_ruft_llp_start_auf():

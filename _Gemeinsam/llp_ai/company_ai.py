@@ -189,7 +189,10 @@ def describe_status() -> dict[str, Any]:
     bereit = is_ai_ready()
     irgendetwas = endpoint_ok or deployment_ok or key_ok
     if _explicitly_disabled():
-        hinweis = "Foundry ist bewusst ausgeschaltet. Die Tools arbeiten ohne Modell (Heuristik/Regeln)."
+        hinweis = (
+            "Foundry ist bewusst ausgeschaltet. Anhangsprüfer: ohne Modell (Heuristik). "
+            "Text verbessern ändert den Text nicht."
+        )
     elif not provider_ok:
         hinweis = "Anbieter ist nicht Foundry. Es findet kein stiller Wechsel statt."
     elif irgendetwas and not (endpoint_ok and deployment_ok and key_ok):

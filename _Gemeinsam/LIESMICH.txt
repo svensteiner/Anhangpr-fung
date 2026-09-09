@@ -25,10 +25,13 @@ auf Ollama, OpenAI oder Anthropic.
 4. Status ohne Schlüssel: Pruefen.bat in diesem Ordner
    doppelklicken (Foundry und Nachbar-Tools, keine Schlüssel).
 5. Anderes Tool anbinden: `from llp_ai.company_ai import ask_ai, is_ai_ready`.
-   Kein eigener OpenAI-/Ollama-Client. Ist Foundry aus: Heuristik/Regeln.
+   Kein eigener OpenAI-/Ollama-Client.
+   Ist Foundry aus: Anhangspruefer Heuristik,
+   Text verbessern sagt Bescheid und aendert den Text nicht.
 
-Ist Foundry aus oder nicht erreichbar, arbeiten die Tools
-ohne Modell weiter (Heuristik / Regeln).
+Ist Foundry aus oder nicht erreichbar:
+  Anhangspruefer arbeitet ohne Modell (Heuristik).
+  Text verbessern aendert den Text nicht.
 
 llp_start
 ---------

@@ -148,7 +148,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/status":
             status = describe_status()
-            payload = json.dumps({"kurz": status["kurz"], "bereit": status["bereit"]})
+            kurz = status["kurz"]
+            if not status["bereit"]:
+                kurz = "KI: aus – Text bleibt unverändert"
+            payload = json.dumps({"kurz": kurz, "bereit": status["bereit"]})
             self._send(200, payload.encode("utf-8"), "application/json")
             return
         self._send(404, b"nicht gefunden", "text/plain; charset=utf-8")
