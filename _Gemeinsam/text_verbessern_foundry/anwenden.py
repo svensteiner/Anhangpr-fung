@@ -105,6 +105,8 @@ def apply(tool_root: Path) -> list[str]:
     if launcher is not None:
         done.append(str(launcher))
 
+    done.extend(_park_exe(tool_root))
+
     return done
 
 
@@ -151,10 +153,7 @@ pause
 exit /b 1
 
 :FOUNDRY_DESKTOP
-if exist "%~dp0TEXT VERBESSERN.original.cmd" (
-    call "%~dp0TEXT VERBESSERN.original.cmd"
-    exit /b %ERRORLEVEL%
-)
+rem Nur die gepatchte Python-Oberflaeche, nie die alte Desktop-EXE.
 if exist "%~dp0app\desktop.py" (
     %PY% -c "from app.desktop import main; main()"
     exit /b %ERRORLEVEL%
@@ -168,6 +167,12 @@ pause
 exit /b 1
 """
 
+EXE_NAMES = (
+    "TextVerbessern.exe",
+    "TEXT VERBESSERN.exe",
+    "rephraser.exe",
+)
+
 
 def _patch_launcher(tool_root: Path) -> Path | None:
     """Direktklick auf TEXT VERBESSERN.cmd: Foundry-Tor, kein Mistral."""
@@ -179,6 +184,21 @@ def _patch_launcher(tool_root: Path) -> Path | None:
             backup.write_text(current, encoding="utf-8")
     cmd.write_text(LAUNCHER_CMD, encoding="utf-8")
     return cmd
+
+
+def _park_exe(tool_root: Path) -> list[str]:
+    """Alte Desktop-EXE zur Seite legen, damit Mistral nicht per Doppelklick startet."""
+    parked: list[str] = []
+    for name in EXE_NAMES:
+        exe = tool_root / name
+        if not exe.is_file():
+            continue
+        dest = tool_root / (exe.name + ".llp-alt")
+        if dest.exists():
+            continue
+        exe.rename(dest)
+        parked.append(str(dest))
+    return parked
 
 
 def _patch_pipeline(path: Path) -> None:

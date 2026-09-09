@@ -236,6 +236,9 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "LLP-FOUNDRY-TOR" in launcher
     assert "--text-foundry" in launcher
     assert "mistral-rephraser wird nicht gestartet" in launcher.lower()
+    assert "TEXT VERBESSERN.original.cmd" not in launcher
+    assert "TextVerbessern.exe" not in launcher
+    assert "from app.desktop import main" in launcher
     backup = (tool / "TEXT VERBESSERN.original.cmd").read_text(encoding="utf-8")
     assert "TextVerbessern.exe" in backup
     assert "LLP-FOUNDRY-TOR" not in backup
@@ -245,6 +248,21 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "bereits auf Foundry" in msg2
     backup2 = (tool / "TEXT VERBESSERN.original.cmd").read_text(encoding="utf-8")
     assert backup2 == backup
+
+
+def test_anwenden_legt_alte_exe_beiseite(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    exe = tool / "TextVerbessern.exe"
+    exe.write_bytes(b"mz-fake")
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    assert not exe.is_file()
+    parked = tool / "TextVerbessern.exe.llp-alt"
+    assert parked.is_file()
+    assert parked.read_bytes() == b"mz-fake"
+    launcher = (tool / "TEXT VERBESSERN.cmd").read_text(encoding="utf-8")
+    assert "TextVerbessern.exe" not in launcher
 
 
 def test_anwenden_findet_geschwisterordner(tmp_path: Path) -> None:
