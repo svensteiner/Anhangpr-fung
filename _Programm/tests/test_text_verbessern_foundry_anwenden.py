@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 from pathlib import Path
 
@@ -247,6 +248,12 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         "<html><body><p>kein Mistral-Modell</p></body></html>\n",
         encoding="utf-8",
     )
+    pack = tool / "packaging"
+    pack.mkdir(parents=True, exist_ok=True)
+    (pack / "TextVerbessern.spec").write_text(
+        'name="TextVerbessern"\nanalysis = Analysis(["app/desktop.py"])\n',
+        encoding="utf-8",
+    )
     (tool / "app" / "main.py").write_text(
         'parser.add_argument("--provider", choices=["fast-editor", "rules", "mistral-local"])\n',
         encoding="utf-8",
@@ -322,6 +329,10 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "DesktopApp().run()" not in desktop
     assert "alte Oberflaeche startet nicht" in desktop
     assert "Nur Foundry, kein Mistral" in desktop
+    ast.parse(desktop)
+    assert "    try:\n    print(" not in desktop
+    assert not (tool / "packaging" / "TextVerbessern.spec").is_file()
+    assert (tool / "packaging" / "TextVerbessern.spec.llp-alt").is_file()
     assert "self.mistral_ready = local_mistral_ready()" not in desktop
     assert '"mistral_available": foundry_ready()' in desktop
     assert "local_mistral_ready()" not in desktop
@@ -432,6 +443,16 @@ def test_anwenden_ohne_windows_startskript_bleibt_ok(tmp_path: Path) -> None:
     ok, msg = module.apply_foundry(tool)
     assert ok, msg
     assert not (tool / "scripts" / "start_windows.ps1").is_file()
+
+
+def test_replace_desktop_main_repariert_haengendes_try() -> None:
+    module = _load_anwenden()
+    broken = "def main():\n    try:\n" + module.DESKTOP_MAIN_HINT + "\n"
+    fixed = module._replace_desktop_main(broken)
+    ast.parse(fixed)
+    assert "    try:\n    print(" not in fixed
+    assert "alte Oberflaeche startet nicht" in fixed
+    assert module._replace_desktop_main(fixed) == fixed
 
 
 def test_anwenden_legt_alte_exe_beiseite(tmp_path: Path) -> None:

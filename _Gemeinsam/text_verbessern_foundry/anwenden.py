@@ -106,6 +106,7 @@ def apply(tool_root: Path) -> list[str]:
         done.append(str(launcher))
 
     done.extend(_park_exe(tool_root))
+    done.extend(_park_packaging(tool_root))
     ps1 = _patch_windows_start(tool_root)
     if ps1 is not None:
         done.append(str(ps1))
@@ -167,6 +168,8 @@ EXE_NAMES = (
     "TEXT VERBESSERN.exe",
     "rephraser.exe",
 )
+
+SPEC_REL = Path("packaging") / "TextVerbessern.spec"
 
 
 def _patch_launcher(tool_root: Path) -> Path | None:
@@ -338,6 +341,18 @@ def _park_exe(tool_root: Path) -> list[str]:
         exe.rename(dest)
         parked.append(str(dest))
     return parked
+
+
+def _park_packaging(tool_root: Path) -> list[str]:
+    """PyInstaller-Rezept nicht mehr als Startweg liegen lassen."""
+    spec = tool_root / SPEC_REL
+    if not spec.is_file():
+        return []
+    dest = spec.with_name(spec.name + ".llp-alt")
+    if dest.exists():
+        return []
+    spec.rename(dest)
+    return [str(dest)]
 
 
 def _patch_local_runtime(path: Path) -> None:
@@ -557,20 +572,48 @@ def _patch_desktop(path: Path) -> None:
         "Schnelle lokale Bearbeitung ist verfügbar; Mistral ist optional.",
         "Schnelle lokale Bearbeitung ist verfügbar; gründlich nur mit Foundry.",
     )
-    desk = _replace_all_if_present(
-        desk,
-        "        DesktopApp().run()\n"
-        "    except Exception as error:\n"
-        '        write_diagnostic_event("desktop_fatal", error)\n'
-        "        show_startup_error()\n"
-        "        return 1\n"
-        "    return 0",
-        '    print("Bitte Desktop Text verbessern oder '
-        "_Gemeinsam\\\\text_verbessern_foundry\\\\Starten.bat.\")\n"
-        '    print("Die alte Oberflaeche startet nicht. Nur Foundry, kein Mistral.")\n'
-        "    return 2",
-    )
+    desk = _replace_desktop_main(desk)
     path.write_text(desk, encoding="utf-8")
+
+
+DESKTOP_MAIN_HINT = (
+    '    print("Bitte Desktop Text verbessern oder '
+    "_Gemeinsam\\\\text_verbessern_foundry\\\\Starten.bat.\")\n"
+    '    print("Die alte Oberflaeche startet nicht. Nur Foundry, kein Mistral.")\n'
+    "    return 2"
+)
+
+DESKTOP_MAIN_OLD = (
+    "    try:\n"
+    "        DesktopApp().run()\n"
+    "    except Exception as error:\n"
+    '        write_diagnostic_event("desktop_fatal", error)\n'
+    "        show_startup_error()\n"
+    "        return 1\n"
+    "    return 0"
+)
+
+DESKTOP_MAIN_BROKEN = "    try:\n" + DESKTOP_MAIN_HINT
+
+
+def _replace_desktop_main(desk: str) -> str:
+    """Alte Oberfläche nicht starten – und kein hängendes try: hinterlassen."""
+    if DESKTOP_MAIN_OLD in desk:
+        return desk.replace(DESKTOP_MAIN_OLD, DESKTOP_MAIN_HINT, 1)
+    if DESKTOP_MAIN_BROKEN in desk:
+        return desk.replace(DESKTOP_MAIN_BROKEN, DESKTOP_MAIN_HINT, 1)
+    if "DesktopApp().run()" in desk:
+        return _replace_all_if_present(
+            desk,
+            "        DesktopApp().run()\n"
+            "    except Exception as error:\n"
+            '        write_diagnostic_event("desktop_fatal", error)\n'
+            "        show_startup_error()\n"
+            "        return 1\n"
+            "    return 0",
+            DESKTOP_MAIN_HINT,
+        )
+    return desk
 
 
 def _patch_streamlit(path: Path) -> None:
