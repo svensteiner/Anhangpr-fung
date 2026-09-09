@@ -254,7 +254,7 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     ps1 = (tool / "scripts" / "start_windows.ps1").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" in ps1
     assert "streamlit" not in ps1.lower()
-    assert "mistral" not in ps1.lower()
+    assert "mistral-rephraser wird nicht gestartet" in ps1.lower()
     assert "text_verbessern_foundry" in ps1.lower()
     assert "foundry-seite" in ps1.lower()
     ps1_bak = (tool / "scripts" / "start_windows.ps1.llp-alt").read_text(encoding="utf-8")
