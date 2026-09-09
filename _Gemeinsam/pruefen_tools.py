@@ -578,6 +578,27 @@ def desktop_self_test_live_text(text: str) -> bool:
     return "--self-test" in text and "report = run_self_test()" in text
 
 
+def desktop_pipeline_live_text(text: str) -> bool:
+    return "run_pipeline(source, options)" in text
+
+
+def desktop_pipeline_live(path: Path | None) -> bool:
+    if path is None or not path.is_file():
+        return False
+    return desktop_pipeline_live_text(
+        path.read_text(encoding="utf-8", errors="replace")
+    )
+
+
+def find_live_desktop_pipeline(roots: list[Path]) -> Path | None:
+    for root in roots:
+        for name in TOOL_NAMES["text"]:
+            desktop = root / name / "app" / "desktop.py"
+            if desktop_pipeline_live(desktop):
+                return desktop
+    return None
+
+
 LOCAL_FALLBACK_MARKERS = (
     "sichere lokale",
     "lokale textverbesserung",
@@ -690,6 +711,7 @@ def report(start: Path | None = None) -> dict[str, object]:
     desktop_window = find_live_desktop_window(roots)
     desktop_self_test = find_live_desktop_self_test(roots)
     desktop_fallback = find_live_desktop_fallback(roots)
+    desktop_pipeline = find_live_desktop_pipeline(roots)
     evaluation = find_text_evaluation(roots)
     spec = find_live_spec(roots)
     build = find_live_build_script(roots)
@@ -732,6 +754,7 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_desktop_window": desktop_window,
         "text_self_test": desktop_self_test,
         "text_local_fallback": desktop_fallback,
+        "text_desktop_pipeline": desktop_pipeline,
         "text_evaluation": evaluation,
         "text_evaluation_modus": evaluation_modus(evaluation),
         "text_spec": spec,
@@ -776,6 +799,8 @@ def format_report(data: dict[str, object]) -> str:
         + ("noch Regeln – Anwenden.bat" if data["text_self_test"] else "beiseite"),
         "  Regelfassung:    "
         + ("noch lokal – Anwenden.bat" if data["text_local_fallback"] else "beiseite"),
+        "  Desktop-Pipeline:"
+        + (" noch da – Anwenden.bat" if data["text_desktop_pipeline"] else " beiseite"),
         "  Bewertung:       " + str(data["text_evaluation_modus"]),
         "  Text-Pipeline:   " + str(data["text_pipeline_modus"]),
         "  Hybrid-Weg:      " + str(data["text_hybrid_modus"]),
@@ -866,6 +891,11 @@ def format_report(data: dict[str, object]) -> str:
             "  app/desktop.py verspricht noch eine lokale Fassung."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_desktop_pipeline"] is not None:
+        lines.append(
+            "  app/desktop.py ruft noch die alte Pipeline auf."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     if data["text_evaluation_modus"] in {"noch Bewertung", "nicht erkannt"}:
         lines.append(
             "  app/evaluation.py startet noch die lokale Pipeline."
@@ -944,6 +974,8 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
         reasons.append("Selbsttest")
     if desktop.is_file() and desktop_local_fallback_live(desktop):
         reasons.append("Regelfassung")
+    if desktop.is_file() and desktop_pipeline_live(desktop):
+        reasons.append("Desktop-Pipeline")
     evaluation = tool_root / "app" / "evaluation.py"
     if evaluation.is_file() and evaluation_modus(evaluation) != "abgeschaltet":
         reasons.append("Bewertung")
@@ -1050,6 +1082,7 @@ def text_has_leftovers(
         or data["text_desktop_window"] is not None
         or data["text_self_test"] is not None
         or data["text_local_fallback"] is not None
+        or data["text_desktop_pipeline"] is not None
         or data["text_evaluation_modus"] in {"noch Bewertung", "nicht erkannt"}
         or data["text_spec"] is not None
         or data["text_build"] is not None
@@ -1083,6 +1116,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     window_ok = data["text_desktop_window"] is None
     self_test_ok = data["text_self_test"] is None
     fallback_ok = data["text_local_fallback"] is None
+    desktop_pipeline_ok = data["text_desktop_pipeline"] is None
     evaluation_ok = data["text_evaluation_modus"] in {"abgeschaltet", "nicht gefunden"}
     pack_ok = data["text_spec"] is None and data["text_build"] is None and data["text_workflow"] is None
     return (
@@ -1110,6 +1144,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and window_ok
         and self_test_ok
         and fallback_ok
+        and desktop_pipeline_ok
         and evaluation_ok
         and pack_ok
     )

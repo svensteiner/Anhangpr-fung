@@ -21,6 +21,7 @@ from pruefen_tools import (
     BACKUP_NOTE_MARK,
     PARK_DIR_NAME,
     desktop_local_fallback_live_text,
+    desktop_pipeline_live_text,
     desktop_self_test_live_text,
     is_launchable_backup,
     leftovers_in_tool,
@@ -85,6 +86,7 @@ def apply_foundry(tool_root: Path) -> tuple[bool, str]:
             and "if foundry_ready():" in current
             and not desktop_self_test_live_text(current)
             and not desktop_local_fallback_live_text(current)
+            and not desktop_pipeline_live_text(current)
             and leftovers_in_tool(tool_root) == []
         )
     try:
@@ -916,6 +918,7 @@ def _patch_desktop(path: Path) -> None:
     desk = _replace_all_if_present(desk, DESKTOP_RUN_OLD, DESKTOP_RUN_STUB)
     desk = _disable_self_test(desk)
     desk = _neutralize_local_fallback_copy(desk)
+    desk = _disable_desktop_pipeline(desk)
     path.write_text(desk, encoding="utf-8")
 
 
@@ -964,6 +967,19 @@ def _replace_status_text(desk: str) -> str:
         if old in desk:
             return desk.replace(old, STATUS_TEXT_NEW, 1)
     raise ValueError("Erwartete Stelle fehlt: system_status_text")
+
+
+DESKTOP_PIPELINE_OLD = "            result = run_pipeline(source, options)\n"
+DESKTOP_PIPELINE_STUB = (
+    "            raise SystemExit(\n"
+    '                "Die alte Oberflaeche startet nicht. Nur Foundry, kein Mistral."\n'
+    "            )  # LLP-FOUNDRY-TOR\n"
+)
+
+
+def _disable_desktop_pipeline(desk: str) -> str:
+    """Kein run_pipeline mehr aus der alten Desktop-Oberfläche."""
+    return _replace_all_if_present(desk, DESKTOP_PIPELINE_OLD, DESKTOP_PIPELINE_STUB)
 
 
 def _disable_self_test(desk: str) -> str:

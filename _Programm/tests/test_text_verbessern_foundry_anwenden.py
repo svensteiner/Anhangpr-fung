@@ -121,6 +121,10 @@ class App:
         unused = model_request
         diagnostics = {"mistral_available": local_mistral_ready()}
 
+    def _worker(self, source, options):
+            result = run_pipeline(source, options)
+            unused = result
+
 
 def run_self_test() -> dict[str, object]:
     result = run_pipeline("Gruesse", TransformOptions(provider="rules", rewrite_strength="light"))
@@ -462,6 +466,7 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "lokale textverbesserung" not in desktop.lower()
     assert "schnelle lokale bearbeitung" not in desktop.lower()
     assert "der Text bleibt unverändert" in desktop
+    assert "run_pipeline(source, options)" not in desktop
 
     evaluation = (tool / "app" / "evaluation.py").read_text(encoding="utf-8")
     assert "Keine lokale Bewertung" in evaluation
@@ -697,6 +702,22 @@ def test_anwenden_stellt_bewertung_ab(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert "Bewertung" in module.leftovers_in_tool(tool)
+
+
+def test_anwenden_stellt_desktop_pipeline_ab(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    desktop = tool / "app" / "desktop.py"
+    assert "run_pipeline(source, options)" in desktop.read_text(encoding="utf-8")
+    assert "Desktop-Pipeline" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    text = desktop.read_text(encoding="utf-8")
+    assert "run_pipeline(source, options)" not in text
+    assert "Die alte Oberflaeche startet nicht" in text
+    text = text.replace(module.DESKTOP_PIPELINE_STUB, module.DESKTOP_PIPELINE_OLD, 1)
+    desktop.write_text(text, encoding="utf-8")
+    assert "Desktop-Pipeline" in module.leftovers_in_tool(tool)
 
 
 def test_anwenden_stellt_lokal_provider_ab(tmp_path: Path) -> None:
