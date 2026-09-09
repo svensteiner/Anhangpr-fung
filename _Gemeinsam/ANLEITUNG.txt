@@ -1,0 +1,48 @@
+============================================================
+  LLP AI TOOLS  (dieser Ordner liegt auf dem Server)
+============================================================
+
+Das Programm bleibt auf dem Server. Es wird NICHT
+auf den PC kopiert. Keine EXE auf den PC kopieren.
+
+EINMALIG
+--------
+  Im Anhangspruefer-Ordner:  Installieren.bat
+  Legt drei Desktop-Verknuepfungen an:
+    Anhangspruefer
+    LLP AI Tools
+    Text verbessern   (nur Foundry, nicht Mistral)
+
+TAEGLICH
+--------
+  1  Anhangspruefer
+     Desktop „Anhangspruefer“ oder Starten.bat
+     Der Browser oeffnet sich. Beenden: Knopf oben rechts.
+     Modus 3: GmbH/AG und klein/mittel/gross waehlen
+     und bestaetigen. Teil 1 zeigt, wie viele Fragen
+     gelten. Ohne Auswahl startet nichts. Kein stilles
+     „unbekannt“. Dann wird nur der Rest geprueft.
+
+  2  Text verbessern
+     Desktop „Text verbessern“ oder LLP AI Tools, Punkt 2
+     oder text_verbessern_foundry\Starten.bat
+     TEXT VERBESSERN.cmd im Tool-Ordner ist dasselbe
+     Foundry-Tor, nicht Mistral.
+
+  3  Pseudokrat
+     START.bat im Ordner Pseudokrat
+     Bleibt lokal, ohne Foundry.
+
+KI
+--
+  Nur Microsoft Foundry in llp_ai.
+  Dieselbe .env wie bisher, nicht neu anlegen.
+  Schluessel niemals ins Git.
+  Status ohne Schluessel:  Pruefen.bat  in diesem Ordner.
+
+  Foundry aus: Anhangspruefer Heuristik,
+  Text verbessern sagt klar Bescheid.
+  Kein stiller Wechsel auf Mistral oder Ollama.
+
+Mehr Details:  WERKZEUGE.txt  in diesem Ordner.
+============================================================

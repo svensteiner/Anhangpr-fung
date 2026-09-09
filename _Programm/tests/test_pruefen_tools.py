@@ -29,6 +29,7 @@ def test_report_findet_diesen_anhangspruefer() -> None:
     assert Path(data["anhang"]).name == "Starten.bat"
     text = module.format_report(data)
     assert "Anhangspruefer:  gefunden" in text
+    assert "ANLEITUNG.txt" in text
     assert "Schluessel" in text
     assert "FOUNDRY_API_KEY" not in text
     assert "sk-" not in text

@@ -21,6 +21,7 @@ SO STARTEN SIE:
   ALLE LLP-TOOLS (Anhangspruefer, Text verbessern, Pseudokrat):
     Doppelklick auf  Tools_starten.bat
     oder  _Gemeinsam\llp_start\Start.bat
+    Kurzanleitung auf dem Share:  _Gemeinsam\ANLEITUNG.txt
     Text verbessern: Desktop-Verknuepfung nach Installieren.bat
     (nur Foundry, nicht Mistral) oder
     _Gemeinsam\text_verbessern_foundry\Starten.bat

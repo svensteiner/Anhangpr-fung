@@ -1,6 +1,8 @@
 Gemeinsamer Start der LLP-Tools
 ===============================
 
+Zuerst die Kurzanleitung:  ..\ANLEITUNG.txt
+
 Doppelklick auf Start.bat in diesem Ordner
 oder auf Tools_starten.bat im Anhangspruefer-Ordner.
 

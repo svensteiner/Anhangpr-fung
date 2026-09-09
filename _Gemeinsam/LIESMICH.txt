@@ -1,6 +1,10 @@
 LLP – gemeinsamer Ordner
 ========================
 
+Fuer Kolleginnen und Kollegen zuerst:
+  ANLEITUNG.txt  in diesem Ordner
+  oder Pruefen.bat (Status ohne Schluessel)
+
 Dieser Ordner gehört auf den Server nach:
 
   K:\LLP Wirtschaftsprüfung\AI Tools\_Gemeinsam

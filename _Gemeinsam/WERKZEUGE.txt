@@ -1,6 +1,8 @@
 Welche LLP-Tools wie starten und welche KI nutzen
 =================================================
 
+Kurz fuer den Alltag: ANLEITUNG.txt in diesem Ordner.
+
 Regel: Braucht ein Tool ein Sprachmodell, geht der Aufruf
 NUR über llp_ai (Microsoft Foundry). Kein eigener OpenAI-
 oder Ollama-Zugang, kein stiller Wechsel.

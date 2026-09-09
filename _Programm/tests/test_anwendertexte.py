@@ -19,6 +19,7 @@ def test_anleitung_kein_exe_copy_und_modus3_pflicht():
     assert "unbekannt" in text
     assert "tools_starten.bat" in text
     assert "llp_start" in text
+    assert "_gemeinsam\\anleitung.txt" in text or "_gemeinsam/anleitung.txt" in text
 
 
 def test_installieren_kopiert_keine_exe():
@@ -62,6 +63,26 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "llp ai tools" in low
     assert "offen – angabe gefunden" in low or "offen - angabe gefunden" in low
     assert "nicht mistral" in low
+    assert "teil 1" in low
+    assert "text verbessern" in low
+    assert "anleitung.txt" in low
+    assert "foundry-tor" in low or "foundry tor" in low
+
+
+def test_share_anleitung_fuer_kollegen():
+    text = (ROOT / "_Gemeinsam" / "ANLEITUNG.txt").read_text(encoding="utf-8").lower()
+    assert "nicht" in text and "kopiert" in text
+    assert ".exe" not in text
+    assert "foundry" in text
+    assert "pseudokrat" in text and "ohne foundry" in text
+    assert "teil 1" in text
+    assert "unbekannt" in text
+    assert "pruefen.bat" in text
+    assert "tools_starten" in text or "llp ai tools" in text
+    assert "nicht mistral" in text
+    assert "healthz" not in text
+    lies = (ROOT / "_Gemeinsam" / "LIESMICH.txt").read_text(encoding="utf-8").lower()
+    assert "anleitung.txt" in lies
 
 
 def test_klienten_liesmich_ohne_healthz():

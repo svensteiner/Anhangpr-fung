@@ -120,6 +120,7 @@ def format_report(data: dict[str, object]) -> str:
             " Punkt 2 oeffnet dann die Foundry-Seite, nicht Mistral."
         )
     lines.append("  Keine Schluessel in dieser Anzeige.")
+    lines.append("  Anleitung: ANLEITUNG.txt in diesem Ordner.")
     return "\n".join(lines)
 
 
