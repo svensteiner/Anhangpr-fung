@@ -342,7 +342,9 @@ def _fake_rephraser(tmp_path: Path) -> Path:
     )
     (tool / "app" / "local_runtime.py").write_text(
         "def local_mistral_ready(timeout: float = 0.8) -> bool:\n"
-        "    return True  # http://127.0.0.1:11434\n\n"
+        "    return True  # http://127.0.0.1:11434\n"
+        "    raw = opener.open(base_url + '/api/tags')\n"
+        "    model = os.getenv('MISTRAL_MODEL', 'mistral')\n\n"
         "def preflight_local_mistral() -> bool:\n"
         "    return True\n",
         encoding="utf-8",
@@ -437,6 +439,8 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "kein Ollama" in runtime
     assert "11434" not in runtime
     assert "MISTRAL_BASE_URL" not in runtime
+    assert "/api/tags" not in runtime
+    assert "MISTRAL_MODEL" not in runtime
     assert runtime.count("return False") >= 2
     lines = [ln.strip() for ln in runtime.splitlines() if ln.strip()]
     ready_idx = lines.index("def local_mistral_ready(timeout: float = 0.8) -> bool:")
@@ -449,6 +453,7 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "Nur Foundry" in mistral
     assert "/api/generate" not in mistral
     assert "11434" not in mistral
+    assert "MISTRAL_MODEL" not in mistral
     lines = [ln.rstrip() for ln in mistral.splitlines()]
     init_idx = next(i for i, ln in enumerate(lines) if "def __init__" in ln)
     assert "raise RuntimeError" in lines[init_idx + 1]
@@ -724,6 +729,8 @@ def test_anwenden_entfernt_ollama_probe_url(tmp_path: Path) -> None:
     text = runtime.read_text(encoding="utf-8")
     assert "11434" not in text
     assert "MISTRAL_BASE_URL" not in text
+    assert "/api/tags" not in text
+    assert "MISTRAL_MODEL" not in text
     assert module.leftovers_in_tool(tool) == []
     runtime.write_text(
         text + "\nMISTRAL_BASE_URL = 'http://127.0.0.1:11434'\n",

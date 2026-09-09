@@ -143,7 +143,12 @@ def local_runtime_modus(path: Path | None) -> str:
     if path is None:
         return "nicht gefunden"
     text = path.read_text(encoding="utf-8", errors="replace")
-    if "11434" in text or "MISTRAL_BASE_URL" in text:
+    if (
+        "11434" in text
+        or "MISTRAL_BASE_URL" in text
+        or "/api/tags" in text
+        or "MISTRAL_MODEL" in text
+    ):
         return "noch Ollama"
     if "LLP-FOUNDRY-TOR" in text and "kein Ollama" in text:
         return "kein Ollama"
@@ -162,7 +167,7 @@ def mistral_provider_modus(path: Path | None) -> str:
     if path is None:
         return "nicht gefunden"
     text = path.read_text(encoding="utf-8", errors="replace")
-    if "/api/generate" in text or "11434" in text:
+    if "/api/generate" in text or "11434" in text or "MISTRAL_MODEL" in text:
         return "noch Ollama"
     if "LLP-FOUNDRY-TOR" in text and "LocalMistralProvider ist abgeschaltet" in text:
         return "abgeschaltet"
