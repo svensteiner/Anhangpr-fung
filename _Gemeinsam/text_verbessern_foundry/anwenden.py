@@ -673,16 +673,17 @@ def _disable_cloud_provider(path: Path) -> None:
 def _patch_mistral_provider(path: Path) -> None:
     """Direktaufruf darf Ollama nicht mehr erreichen."""
     text = path.read_text(encoding="utf-8")
-    if "LLP-FOUNDRY-TOR" in text and "LocalMistralProvider ist abgeschaltet" in text:
-        return
-    text = _replace_all_if_present(
-        text,
-        "    def __init__(self, base_url: str | None = None, model: str | None = None) -> None:\n",
-        "    def __init__(self, base_url: str | None = None, model: str | None = None) -> None:\n"
-        '        raise RuntimeError(\n'
-        '            "LocalMistralProvider ist abgeschaltet. Nur Foundry (llp_ai)."\n'
-        "        )  # LLP-FOUNDRY-TOR\n",
-    )
+    if "LLP-FOUNDRY-TOR" not in text or "LocalMistralProvider ist abgeschaltet" not in text:
+        text = _replace_all_if_present(
+            text,
+            "    def __init__(self, base_url: str | None = None, model: str | None = None) -> None:\n",
+            "    def __init__(self, base_url: str | None = None, model: str | None = None) -> None:\n"
+            '        raise RuntimeError(\n'
+            '            "LocalMistralProvider ist abgeschaltet. Nur Foundry (llp_ai)."\n'
+            "        )  # LLP-FOUNDRY-TOR\n",
+        )
+    if "/api/generate" in text:
+        text = text.replace("/api/generate", "/api/abgeschaltet")
     path.write_text(text, encoding="utf-8")
 
 

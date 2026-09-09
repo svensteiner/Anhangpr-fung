@@ -350,7 +350,11 @@ def _fake_rephraser(tmp_path: Path) -> Path:
     (tool / "app" / "providers" / "mistral_provider.py").write_text(
         "class LocalMistralProvider:\n"
         "    def __init__(self, base_url: str | None = None, model: str | None = None) -> None:\n"
-        "        self.base_url = 'http://127.0.0.1:11434'\n",
+        "        self.base_url = 'http://127.0.0.1:11434'\n"
+        "    def rewrite(self, text: str, constraints: SemanticConstraints, "
+        "options: TransformOptions) -> str:\n"
+        "        request = self.base_url + '/api/generate'\n"
+        "        return text\n",
         encoding="utf-8",
     )
     (tool / "app" / "providers" / "openai_provider.py").write_text(
@@ -441,6 +445,7 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "LLP-FOUNDRY-TOR" in mistral
     assert "LocalMistralProvider ist abgeschaltet" in mistral
     assert "Nur Foundry" in mistral
+    assert "/api/generate" not in mistral
     lines = [ln.rstrip() for ln in mistral.splitlines()]
     init_idx = next(i for i, ln in enumerate(lines) if "def __init__" in ln)
     assert "raise RuntimeError" in lines[init_idx + 1]
@@ -704,6 +709,28 @@ def test_anwenden_ohne_tool_gibt_hinweis(tmp_path: Path) -> None:
     leer = tmp_path / "_Gemeinsam" / "text_verbessern_foundry"
     leer.mkdir(parents=True)
     assert module.find_tool_root(leer) is None
+
+
+def test_anwenden_entfernt_ollama_generate(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    assert "/api/generate" in (tool / "app" / "providers" / "mistral_provider.py").read_text(
+        encoding="utf-8"
+    )
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    mistral = (tool / "app" / "providers" / "mistral_provider.py").read_text(encoding="utf-8")
+    assert "/api/generate" not in mistral
+    assert "/api/abgeschaltet" in mistral
+    assert module.leftovers_in_tool(tool) == []
+    path = tool / "app" / "providers" / "mistral_provider.py"
+    path.write_text(mistral.replace("/api/abgeschaltet", "/api/generate"), encoding="utf-8")
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    assert "/api/generate" not in path.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
 
 
 def test_anwenden_scheitert_wenn_mistral_export_bleibt(tmp_path: Path) -> None:
