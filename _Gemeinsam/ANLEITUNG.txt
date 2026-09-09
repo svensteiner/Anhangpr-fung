@@ -25,7 +25,8 @@ EINMALIG
   keine alte API, keine Mistral-Pipeline,
   kein Mistral-Export, keine EXE-Anleitung im Tool-Ordner,
   keine alte Offline-HTML, kein Offline-Editor-Skript,
-  keine startbare Sicherung, keine alte Kommandozeile.
+  keine startbare Sicherung, keine alte Kommandozeile,
+  keine startbare Desktop-Oberflaeche.
   Bleibt ein alter Weg, sagt Installieren das klar.
 
 TAEGLICH

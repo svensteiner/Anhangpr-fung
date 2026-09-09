@@ -122,6 +122,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "kein offline-editor-skript" in text
     assert "keine startbare sicherung" in text
     assert "keine alte kommandozeile" in text
+    assert "keine startbare desktop-oberflaeche" in text
     assert "vor teil 2" in text
     assert "bei jedem start" in text
     assert "bitte pruefen.bat" in text

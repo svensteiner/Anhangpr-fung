@@ -832,6 +832,7 @@ def _patch_desktop(path: Path) -> None:
         "Schnelle lokale Bearbeitung ist verfügbar; gründlich nur mit Foundry.",
     )
     desk = _replace_desktop_main(desk)
+    desk = _replace_all_if_present(desk, DESKTOP_RUN_OLD, DESKTOP_RUN_STUB)
     path.write_text(desk, encoding="utf-8")
 
 
@@ -840,6 +841,13 @@ DESKTOP_MAIN_HINT = (
     "_Gemeinsam\\\\text_verbessern_foundry\\\\Starten.bat.\")\n"
     '    print("Die alte Oberflaeche startet nicht. Nur Foundry, kein Mistral.")\n'
     "    return 2"
+)
+DESKTOP_RUN_OLD = "    def run(self) -> None:\n        self.root.mainloop()"
+DESKTOP_RUN_STUB = (
+    "    def run(self) -> None:\n"
+    "        raise SystemExit(\n"
+    '            "Die alte Oberflaeche startet nicht. Nur Foundry, kein Mistral."\n'
+    "        )  # LLP-FOUNDRY-TOR"
 )
 
 DESKTOP_MAIN_OLD = (

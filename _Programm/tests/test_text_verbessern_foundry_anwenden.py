@@ -130,6 +130,11 @@ def main(argv=None):
         show_startup_error()
         return 1
     return 0
+
+
+class DesktopApp:
+    def run(self) -> None:
+        self.root.mainloop()
 '''
 
 STREAMLIT_MAIN = '''import streamlit as st
@@ -387,6 +392,7 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "thorough_ready = foundry_ready()" in desktop
     assert "self.mistral_ready = foundry_ready()" in desktop
     assert "DesktopApp().run()" not in desktop
+    assert "self.root.mainloop()" not in desktop
     assert "alte Oberflaeche startet nicht" in desktop
     assert "Nur Foundry, kein Mistral" in desktop
     ast.parse(desktop)
@@ -468,7 +474,11 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     schnell = (tool / "SCHNELLSTART.md").read_text(encoding="utf-8")
     assert schnell == note
     assert "textverbessern.exe" not in schnell.lower()
-    schnell_bak = (tool / "SCHNELLSTART.md.llp-alt").read_text(encoding="utf-8")
+    schnell_note = (tool / "SCHNELLSTART.md.llp-alt").read_text(encoding="utf-8")
+    assert "Sicherung. Nicht starten" in schnell_note
+    schnell_bak = (
+        tool / "_llp_parked" / "SCHNELLSTART.md.llp-alt.txt"
+    ).read_text(encoding="utf-8")
     assert "Gründlich mit Mistral" in schnell_bak
     assert "LLP-FOUNDRY-TOR" not in schnell_bak
 
@@ -484,7 +494,9 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "kein Streamlit" in readme
     assert "TextVerbessern.exe" not in readme
     assert "streamlit run" not in readme.lower()
-    readme_bak = (tool / "README.md.llp-alt").read_text(encoding="utf-8")
+    readme_note = (tool / "README.md.llp-alt").read_text(encoding="utf-8")
+    assert "Sicherung. Nicht starten" in readme_note
+    readme_bak = (tool / "_llp_parked" / "README.md.llp-alt.txt").read_text(encoding="utf-8")
     assert "TextVerbessern.exe" in readme_bak
     assert "LLP-FOUNDRY-TOR" not in readme_bak
     html = (tool / "web" / "TextVerbessern-Browser.html").read_text(encoding="utf-8")
@@ -608,6 +620,27 @@ def test_anwenden_scheitert_wenn_mistral_export_bleibt(tmp_path: Path) -> None:
     assert "LocalMistralProvider" in msg or "exportiert" in msg
 
 
+def test_anwenden_stellt_desktop_run_ab(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    desktop = tool / "app" / "desktop.py"
+    assert "self.root.mainloop()" in desktop.read_text(encoding="utf-8")
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    text = desktop.read_text(encoding="utf-8")
+    assert "self.root.mainloop()" not in text
+    assert "Die alte Oberflaeche startet nicht" in text
+    text = text.replace(
+        "raise SystemExit(\n"
+        '            "Die alte Oberflaeche startet nicht. Nur Foundry, kein Mistral."\n'
+        "        )  # LLP-FOUNDRY-TOR",
+        "self.root.mainloop()",
+        1,
+    )
+    desktop.write_text(text, encoding="utf-8")
+    assert "Oberflaeche" in module.leftovers_in_tool(tool)
+
+
 def test_anwenden_legt_startbare_sicherung_still(tmp_path: Path) -> None:
     module = _load_anwenden()
     tool = _fake_rephraser(tmp_path)
@@ -686,6 +719,12 @@ def test_anwenden_stellt_liesmich_im_tool_um(tmp_path: Path) -> None:
     assert "LLP-FOUNDRY-TOR" in text
     assert "TextVerbessern.exe" not in text
     assert (tool / "LIESMICH.txt.llp-alt").is_file()
+    assert "Sicherung. Nicht starten" in (tool / "LIESMICH.txt.llp-alt").read_text(
+        encoding="utf-8"
+    )
+    assert "TextVerbessern.exe" in (
+        tool / "_llp_parked" / "LIESMICH.txt.llp-alt.txt"
+    ).read_text(encoding="utf-8")
     assert module.leftovers_in_tool(tool) == []
 
 

@@ -115,6 +115,7 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert "Alte API:" in blob
     assert "Alte CLI:" in blob
     assert "Sicherung:" in blob
+    assert "Desktop-Fenster:" in blob
     assert "Text-Pipeline:" in blob
     assert "Hybrid-Weg:" in blob
     assert "Paketdatei:" in blob
@@ -537,6 +538,36 @@ def test_report_foundry_aber_alte_cli_ist_nicht_ok(tmp_path: Path) -> None:
     assert module.text_foundry_ok(gemeinsam) is False
     assert module.text_has_leftovers(data) is True
     assert "CLI" in module.leftovers_in_tool(tools / "rephraser")
+
+
+def test_report_foundry_aber_alte_desktop_run_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    desktop = tools / "rephraser" / "app" / "desktop.py"
+    desktop.write_text(
+        desktop.read_text(encoding="utf-8")
+        + "\nclass DesktopApp:\n    def run(self) -> None:\n        self.root.mainloop()\n",
+        encoding="utf-8",
+    )
+    assert "Oberflaeche" in module.leftovers_in_tool(tools / "rephraser")
+    assert module.text_foundry_ok(gemeinsam) is False
+
+
+def test_report_foundry_aber_alte_anleitung_sicherung_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    alt = tools / "rephraser" / "README.md.llp-alt"
+    alt.write_text("Doppelklick auf TextVerbessern.exe. Gründlich mit Mistral.\n", encoding="utf-8")
+    data = module.report(gemeinsam)
+    assert data["text_launchable_backup"] is not None
+    assert module.text_has_leftovers(data) is True
+    assert "Sicherung-startbar" in module.leftovers_in_tool(tools / "rephraser")
 
 
 def test_report_foundry_aber_packaging_spec_ist_nicht_ok(tmp_path: Path) -> None:

@@ -321,12 +321,21 @@ LAUNCHABLE_BACKUP_NAMES = frozenset(
     {
         "streamlit_app.py.llp-alt",
         "main.py.llp-alt",
+        "desktop.py.llp-alt",
     }
+)
+DOC_BACKUP_MARKERS = (
+    "textverbessern.exe",
+    "gründlich mit mistral",
+    "mistral-bearbeitung",
+    "streamlit",
+    "ollama",
+    "editorial-transformer",
 )
 
 
 def is_launchable_backup(path: Path) -> bool:
-    """Geparkte HTML/PS1/CMD/JS dürfen nicht per Doppelklick starten."""
+    """Geparkte HTML/PS1/CMD/JS/Anleitungen dürfen nicht als alter Startweg liegen."""
     if not path.is_file():
         return False
     if PARK_DIR_NAME in path.parts:
@@ -334,11 +343,13 @@ def is_launchable_backup(path: Path) -> bool:
     name = path.name.lower()
     if not name.endswith(".llp-alt"):
         return False
-    matched = any(name.endswith(suffix) for suffix in LAUNCHABLE_BACKUP_SUFFIXES)
-    if not matched and path.name.lower() not in LAUNCHABLE_BACKUP_NAMES:
-        return False
     text = path.read_text(encoding="utf-8", errors="replace")
     if "LLP-FOUNDRY-TOR" in text and BACKUP_NOTE_MARK in text:
+        return False
+    matched = any(name.endswith(suffix) for suffix in LAUNCHABLE_BACKUP_SUFFIXES)
+    if not matched and name not in LAUNCHABLE_BACKUP_NAMES:
+        if name.endswith(".md.llp-alt") or name == "liesmich.txt.llp-alt":
+            return any(marker in text.lower() for marker in DOC_BACKUP_MARKERS)
         return False
     return True
 
@@ -492,6 +503,21 @@ def find_pseudokrat(roots: list[Path]) -> Path | None:
     return None
 
 
+def desktop_window_live(path: Path | None) -> bool:
+    if path is None or not path.is_file():
+        return False
+    return "self.root.mainloop()" in path.read_text(encoding="utf-8", errors="replace")
+
+
+def find_live_desktop_window(roots: list[Path]) -> Path | None:
+    for root in roots:
+        for name in TOOL_NAMES["text"]:
+            desktop = root / name / "app" / "desktop.py"
+            if desktop_window_live(desktop):
+                return desktop
+    return None
+
+
 def text_verbessern_modus(desktop: Path | None) -> str:
     if desktop is None:
         return "nicht gefunden"
@@ -537,6 +563,7 @@ def report(start: Path | None = None) -> dict[str, object]:
     web_html = find_live_web_html(roots)
     web_js = find_live_web_js(roots)
     launchable_backup = find_live_launchable_backup(roots)
+    desktop_window = find_live_desktop_window(roots)
     spec = find_live_spec(roots)
     build = find_live_build_script(roots)
     workflow = find_live_portable_workflow(roots)
@@ -573,6 +600,7 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_web_html": web_html,
         "text_web_js": web_js,
         "text_launchable_backup": launchable_backup,
+        "text_desktop_window": desktop_window,
         "text_spec": spec,
         "text_build": build,
         "text_workflow": workflow,
@@ -609,6 +637,8 @@ def format_report(data: dict[str, object]) -> str:
         "  Alte CLI:        " + str(data["text_cli_modus"]),
         "  Sicherung:       "
         + ("noch startbar – Anwenden.bat" if data["text_launchable_backup"] else "beiseite"),
+        "  Desktop-Fenster: "
+        + ("noch startbar – Anwenden.bat" if data["text_desktop_window"] else "beiseite"),
         "  Text-Pipeline:   " + str(data["text_pipeline_modus"]),
         "  Hybrid-Weg:      " + str(data["text_hybrid_modus"]),
         "  Paketdatei:      " + str(data["text_pyproject_modus"]),
@@ -681,6 +711,11 @@ def format_report(data: dict[str, object]) -> str:
             "  Eine Sicherung (.llp-alt) ist noch startbar."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_desktop_window"] is not None:
+        lines.append(
+            "  app/desktop.py oeffnet noch das alte Fenster."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     if data["text_pipeline_modus"] in {"noch Mistral", "nicht erkannt"}:
         lines.append(
             "  app/pipeline.py leitet noch auf Mistral."
@@ -735,7 +770,10 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
     """Restwege in einem konkreten rephraser-Ordner, unabhängig vom Ordnernamen."""
     reasons: list[str] = []
     desktop = tool_root / "app" / "desktop.py"
-    if desktop.is_file() and text_verbessern_modus(desktop) != "Foundry":
+    if desktop.is_file() and (
+        text_verbessern_modus(desktop) != "Foundry"
+        or "self.root.mainloop()" in desktop.read_text(encoding="utf-8", errors="replace")
+    ):
         reasons.append("Oberflaeche")
     pipeline = tool_root / "app" / "pipeline.py"
     if pipeline.is_file() and pipeline_modus(pipeline) != "Foundry":
@@ -829,6 +867,7 @@ def text_has_leftovers(
         or data["text_web_html"] is not None
         or data["text_web_js"] is not None
         or data["text_launchable_backup"] is not None
+        or data["text_desktop_window"] is not None
         or data["text_spec"] is not None
         or data["text_build"] is not None
         or data["text_workflow"] is not None
@@ -856,6 +895,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     web_ok = data["text_web_html"] is None
     web_js_ok = data["text_web_js"] is None
     backup_ok = data["text_launchable_backup"] is None
+    window_ok = data["text_desktop_window"] is None
     pack_ok = data["text_spec"] is None and data["text_build"] is None and data["text_workflow"] is None
     return (
         data["text_modus"] == "Foundry"
@@ -877,6 +917,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and web_ok
         and web_js_ok
         and backup_ok
+        and window_ok
         and pack_ok
     )
 
