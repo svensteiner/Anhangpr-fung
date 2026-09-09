@@ -438,6 +438,68 @@ def test_mode3_ui_uses_excel_labels_and_confirm():
     assert "localhost:5555" not in (root / "Starten.bat").read_text(encoding="utf-8")
 
 
+def test_ugb_web_e2e_docx_gmbh_klein(tmp_path):
+    """Kompletter Web-Weg: Word-Anhang, Profil, zweistufige Prüfung, kein unbekannt."""
+    import docx
+
+    root = Path(__file__).resolve().parents[2]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    import app as webapp
+
+    p = tmp_path / "anhang.docx"
+    doc = docx.Document()
+    doc.add_paragraph(
+        "Die Musterfirma Handels GmbH ist eine kleine Kapitalgesellschaft. "
+        "Die Vorräte werden zu Anschaffungskosten bewertet. "
+        "Die Vorratsbewertung erfolgt zu Anschaffungskosten."
+    )
+    doc.save(str(p))
+
+    client = webapp.app.test_client()
+    with p.open("rb") as fh:
+        profil = client.post(
+            "/ugb_profil",
+            data={"anhang": (fh, "anhang.docx")},
+            content_type="multipart/form-data",
+        )
+    assert profil.status_code == 200, profil.get_json()
+    vorschlag = profil.get_json()
+    assert vorschlag["rechtsform"] == "gmbh"
+    assert vorschlag["groessenklasse"] == "klein"
+    assert "unbekannt" not in (vorschlag.get("hinweis") or "").lower()
+
+    with p.open("rb") as fh:
+        review = client.post(
+            "/ugb_review",
+            data={
+                "anhang": (fh, "anhang.docx"),
+                "rechtsform": "gmbh",
+                "groessenklasse": "klein",
+            },
+            content_type="multipart/form-data",
+        )
+    assert review.status_code == 200, review.get_json()
+    body = review.get_json()
+    blob = str(body).lower()
+    assert "unbekannt" not in blob
+    assert "gmbh" in body["hinweis"].lower()
+    assert "klein" in body["hinweis"].lower()
+    assert body["zu_pruefen"] >= 1
+    assert any("standard-checkliste" in w.lower() for w in body.get("warnungen") or [])
+    out = root / "Ergebnisse" / body["filename"]
+    assert out.is_file()
+    wb_text = "\n".join(
+        str(c.value or "")
+        for sheet in openpyxl.load_workbook(out)
+        for row in sheet.iter_rows()
+        for c in row
+    )
+    assert "unbekannt" not in wb_text.lower()
+    assert "GmbH" in wb_text
+    out.unlink(missing_ok=True)
+
+
 def test_review_checklist_two_stage(tmp_path):
     import docx
     from anhangspruefer.compliance.ugb_pipeline import review_checklist
