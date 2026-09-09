@@ -46,18 +46,20 @@ try {
   if (!/foundry/i.test(body) || !/kein mistral/i.test(body)) {
     throw new Error("Seite nennt Foundry/Mistral nicht klar");
   }
-  await page.type("#quelle", "Bitte diesen Satz klarer machen.");
-  await page.click("#run");
   await page.waitForFunction(
-    () => document.getElementById("fehler").textContent.trim().length > 0,
+    () => document.getElementById("run").disabled && document.getElementById("fehler").textContent.trim().length > 0,
     {timeout: 10000},
   );
   const err = await page.$eval("#fehler", (el) => el.textContent);
+  const disabled = await page.$eval("#run", (el) => el.disabled);
+  if (!disabled) {
+    throw new Error("Knopf war bei ausgeschaltetem Foundry aktiv");
+  }
   if (!/foundry/i.test(err)) {
-    throw new Error(`Fehler ohne Foundry: ${err}`);
+    throw new Error(`Hinweis ohne Foundry: ${err}`);
   }
   if (!/mistral|ollama/i.test(err)) {
-    throw new Error(`Fehler verschweigt den nicht-Wechsel: ${err}`);
+    throw new Error(`Hinweis verschweigt den nicht-Wechsel: ${err}`);
   }
   await page.click("#quit");
   await page.waitForFunction(

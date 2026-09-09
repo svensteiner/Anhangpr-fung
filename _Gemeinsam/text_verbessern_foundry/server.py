@@ -49,21 +49,32 @@ PAGE = """<!DOCTYPE html>
   <p class="hint">Nur Microsoft Foundry (llp_ai). Kein Mistral, kein Ollama.</p>
   <label for="quelle">Ausgangstext</label>
   <textarea id="quelle" maxlength="20000" placeholder="Text hier einfügen…"></textarea>
-  <button id="run" type="button">Gründlich mit Foundry</button>
+  <button id="run" type="button" disabled>Gründlich mit Foundry</button>
   <p class="err" id="fehler"></p>
   <label for="ergebnis">Ergebnis</label>
   <textarea id="ergebnis" readonly></textarea>
   <script>
+    const ausHinweis = 'Foundry ist aus. Es gibt keinen Wechsel auf Mistral oder Ollama. Bitte die IT rufen oder _Gemeinsam\\\\Pruefen.bat.';
+    let foundryBereit = false;
     fetch('/status').then(r => r.json()).then(d => {
       document.getElementById('status').textContent = d.kurz || 'KI: aus';
+      foundryBereit = !!d.bereit;
+      document.getElementById('run').disabled = !foundryBereit;
+      if (!foundryBereit) document.getElementById('fehler').textContent = ausHinweis;
     }).catch(() => {
       document.getElementById('status').textContent = 'KI: Status nicht lesbar';
+      document.getElementById('run').disabled = true;
+      document.getElementById('fehler').textContent = ausHinweis;
     });
     document.getElementById('quit').onclick = async () => {
       try { await fetch('/beenden', {method: 'POST'}); } catch (e) {}
       document.body.innerHTML = '<p>Text verbessern ist beendet. Dieses Fenster können Sie schließen.</p>';
     };
     document.getElementById('run').onclick = async () => {
+      if (!foundryBereit) {
+        document.getElementById('fehler').textContent = ausHinweis;
+        return;
+      }
       const text = document.getElementById('quelle').value;
       const btn = document.getElementById('run');
       const err = document.getElementById('fehler');
@@ -84,7 +95,7 @@ PAGE = """<!DOCTYPE html>
       } catch (e) {
         err.textContent = 'Die Anfrage ist fehlgeschlagen. Bitte erneut versuchen.';
       } finally {
-        btn.disabled = false;
+        btn.disabled = !foundryBereit;
       }
     };
   </script>

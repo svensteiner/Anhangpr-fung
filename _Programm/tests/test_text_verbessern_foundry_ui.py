@@ -75,6 +75,8 @@ def test_seite_nennt_nur_foundry() -> None:
     assert "FOUNDRY_API_KEY" not in html
     assert "Beenden" in html
     assert "/beenden" in html
+    assert "foundryBereit" in html
+    assert "run').disabled" in html or 'run").disabled' in html
 
 
 def test_umschreiben_ohne_foundry_ohne_stillen_wechsel(monkeypatch: pytest.MonkeyPatch) -> None:
