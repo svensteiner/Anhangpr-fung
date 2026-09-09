@@ -229,6 +229,15 @@ def test_describe_status_names_missing_parts(monkeypatch):
     assert "https://" not in json.dumps(status)
 
 
+def test_modus3_ui_zeigt_foundry_hinweis_vor_start():
+    html = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert "st.hinweis" in html
+    assert "Pruefen.bat" in html
+    assert "Status nicht lesbar" in html
+    assert "}).catch(() => {});" not in html
+    assert "ug-ki-hint" in html
+
+
 def test_healthz_foundry_status_has_no_secrets():
     root = Path(__file__).resolve().parents[2]
     if str(root) not in sys.path:

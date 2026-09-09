@@ -54,6 +54,17 @@ try {
   const cards = await page.$$(".mode-card");
   await cards[2].click();
   await page.waitForSelector("#mode-ugb:not(.hidden)", {timeout: 5000});
+  await page.waitForFunction(
+    () => {
+      const text = document.getElementById("ug-ki-hint")?.textContent || "";
+      return text && !/wird geprüft/.test(text);
+    },
+    {timeout: 10000},
+  );
+  const kiHint = await page.$eval("#ug-ki-hint", (el) => el.textContent);
+  if (!/Heuristik|Foundry|Pruefen\.bat|llp_ai/i.test(kiHint)) {
+    throw new Error(`KI-Hinweis vor Teil 2 zu kurz: ${kiHint}`);
+  }
   const startDisabled = await page.$eval("#ug-btn", (el) => el.disabled);
   if (!startDisabled) {
     throw new Error("Start war ohne Datei und Häkchen aktiv");

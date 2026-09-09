@@ -1141,13 +1141,21 @@ async function quitApp() {
   loadStatus().then(checkFolderFiles);
   fetch('/healthz').then(r => r.json()).then(d => {
     const st = d.foundry || {};
-    const txt = d.foundry_bereit
-      ? (st.kurz || 'KI: bereit')
-      : (st.kurz || 'KI: aus – Heuristik');
+    const kurz = st.kurz || (d.foundry_bereit ? 'KI: bereit' : 'KI: aus – Heuristik');
     const badge = document.getElementById('ki-badge');
     const hint = document.getElementById('ug-ki-hint');
-    if (badge) badge.textContent = txt;
-    if (hint) hint.textContent = txt;
+    if (badge) badge.textContent = kurz;
+    if (hint) {
+      if (d.foundry_bereit) {
+        hint.textContent = kurz;
+        hint.classList.remove('result-warn');
+      } else {
+        const teile = [kurz, st.hinweis, 'Status ohne Schlüssel: _Gemeinsam\\\\Pruefen.bat']
+          .filter(Boolean);
+        hint.textContent = teile.join(' · ');
+        hint.classList.add('result-warn');
+      }
+    }
     const pp = document.getElementById('ug-pp-warn');
     if (pp) {
       if (d.pruefprogramm_gefunden) {
@@ -1169,7 +1177,16 @@ async function quitApp() {
         plug.textContent = 'Ein Mandantenprofil konnte nicht geladen werden. Dieser Lauf nutzt das Standardprofil: ' + fehler.join(' · ');
       }
     }
-  }).catch(() => {});
+  }).catch(() => {
+    const fallback = 'KI: Status nicht lesbar. Bitte Seite neu laden oder _Gemeinsam\\\\Pruefen.bat.';
+    const badge = document.getElementById('ki-badge');
+    const hint = document.getElementById('ug-ki-hint');
+    if (badge) badge.textContent = fallback;
+    if (hint) {
+      hint.textContent = fallback;
+      hint.classList.add('result-warn');
+    }
+  });
 })();
 </script>
 </body>
