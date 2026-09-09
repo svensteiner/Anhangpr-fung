@@ -117,6 +117,7 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert "Sicherung:" in blob
     assert "Desktop-Fenster:" in blob
     assert "Selbsttest:" in blob
+    assert "Bewertung:" in blob
     assert "Text-Pipeline:" in blob
     assert "Hybrid-Weg:" in blob
     assert "Paketdatei:" in blob
@@ -539,6 +540,28 @@ def test_report_foundry_aber_alte_cli_ist_nicht_ok(tmp_path: Path) -> None:
     assert module.text_foundry_ok(gemeinsam) is False
     assert module.text_has_leftovers(data) is True
     assert "CLI" in module.leftovers_in_tool(tools / "rephraser")
+
+
+def test_report_foundry_aber_bewertung_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    evaluation = tools / "rephraser" / "app" / "evaluation.py"
+    evaluation.write_text(
+        "from app.pipeline import run_pipeline\n"
+        "def evaluate_case(case):\n"
+        "    return run_pipeline(case.input)\n",
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_evaluation_modus"] == "noch Bewertung"
+    blob = module.format_report(data)
+    assert "evaluation.py" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Bewertung" in module.leftovers_in_tool(tools / "rephraser")
 
 
 def test_report_foundry_aber_desktop_selbsttest_ist_nicht_ok(tmp_path: Path) -> None:

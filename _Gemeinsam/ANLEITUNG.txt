@@ -26,7 +26,8 @@ EINMALIG
   kein Mistral-Export, keine EXE-Anleitung im Tool-Ordner,
   keine alte Offline-HTML, kein Offline-Editor-Skript,
   keine startbare Sicherung, keine alte Kommandozeile,
-  keine startbare Desktop-Oberflaeche.
+  keine startbare Desktop-Oberflaeche, keinen Desktop-Selbsttest,
+  keine lokale Bewertung.
   Bleibt ein alter Weg, sagt Installieren das klar.
 
 TAEGLICH

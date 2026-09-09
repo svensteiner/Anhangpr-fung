@@ -228,6 +228,16 @@ def _fake_rephraser(tmp_path: Path) -> Path:
     (tool / "app" / "ui").mkdir(parents=True)
     (tool / "app" / "pipeline.py").write_text(PIPELINE_MAIN, encoding="utf-8")
     (tool / "app" / "desktop.py").write_text(DESKTOP_MAIN, encoding="utf-8")
+    (tool / "app" / "evaluation.py").write_text(
+        "from app.pipeline import run_pipeline\n"
+        "def evaluate_case(case):\n"
+        "    return run_pipeline(case.input, TransformOptions(provider=case.provider))\n"
+        "def main() -> int:\n"
+        "    return 0\n"
+        'if __name__ == "__main__":\n'
+        "    raise SystemExit(main())\n",
+        encoding="utf-8",
+    )
     (tool / "app" / "ui" / "streamlit_app.py").write_text(STREAMLIT_MAIN, encoding="utf-8")
     (tool / "TEXT VERBESSERN.cmd").write_text(
         "@echo off\r\nstart TextVerbessern.exe\r\n",
@@ -421,6 +431,11 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "report = run_self_test()" not in desktop
     assert "Kein Selbsttest mit Regeln oder Modellwahl" in desktop
     assert "LLP-FOUNDRY-TOR: kein Selbsttest" in desktop
+
+    evaluation = (tool / "app" / "evaluation.py").read_text(encoding="utf-8")
+    assert "Keine lokale Bewertung" in evaluation
+    assert "run_pipeline(" not in evaluation
+    assert "LLP-FOUNDRY-TOR" in evaluation
 
     streamlit = (tool / "app" / "ui" / "streamlit_app.py").read_text(encoding="utf-8")
     ast.parse(streamlit)
@@ -631,6 +646,26 @@ def test_anwenden_scheitert_wenn_mistral_export_bleibt(tmp_path: Path) -> None:
     ok, msg = module.apply_foundry(tool)
     assert ok is False
     assert "LocalMistralProvider" in msg or "exportiert" in msg
+
+
+def test_anwenden_stellt_bewertung_ab(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    evaluation = tool / "app" / "evaluation.py"
+    assert "run_pipeline(" in evaluation.read_text(encoding="utf-8")
+    assert "Bewertung" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    text = evaluation.read_text(encoding="utf-8")
+    assert "run_pipeline(" not in text
+    assert "Keine lokale Bewertung" in text
+    evaluation.write_text(
+        "from app.pipeline import run_pipeline\n"
+        "def evaluate_case(case):\n"
+        "    return run_pipeline(case.input)\n",
+        encoding="utf-8",
+    )
+    assert "Bewertung" in module.leftovers_in_tool(tool)
 
 
 def test_anwenden_stellt_desktop_selbsttest_ab(tmp_path: Path) -> None:

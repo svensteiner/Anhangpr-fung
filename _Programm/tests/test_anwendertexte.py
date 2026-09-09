@@ -28,6 +28,8 @@ def test_anleitung_kein_exe_copy_und_modus3_pflicht():
     assert "teil 2 rest" in text
     assert "42 von 180 fragen geprueft" not in text
     assert "aendert" in text and "den text nicht" in text
+    assert "desktop-selbsttest" in text
+    assert "lokale bewertung" in text
 
 
 def test_installieren_kopiert_keine_exe():
@@ -91,6 +93,8 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "kein offline-editor-skript" in low
     assert "keine startbare sicherung" in low
     assert "keine alte kommandozeile" in low
+    assert "keinen desktop-selbsttest" in low
+    assert "keine lokale bewertung" in low
     assert "bei jedem start" in low
     assert "bitte pruefen.bat" in low
     assert "vor teil 2" in low
@@ -127,6 +131,8 @@ def test_share_anleitung_fuer_kollegen():
     assert "keine startbare sicherung" in text
     assert "keine alte kommandozeile" in text
     assert "keine startbare desktop-oberflaeche" in text
+    assert "keinen desktop-selbsttest" in text
+    assert "keine lokale bewertung" in text
     assert "vor teil 2" in text
     assert "wie viele fragen vom rest" in text
     assert "bei jedem start" in text
@@ -230,6 +236,8 @@ def test_werkzeuge_pseudokrat_ohne_foundry():
     assert "offline-editor" in text
     assert "startbare" in text
     assert "kommandozeile" in text
+    assert "selbsttest" in text
+    assert "bewertung" in text
     assert "sonst die sichere lokale" not in text
     assert "keine lokale regelfassung" in text
     assert "unveraendert" in text or "unverändert" in text

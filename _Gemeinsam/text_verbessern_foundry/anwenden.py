@@ -120,6 +120,10 @@ def apply(tool_root: Path) -> list[str]:
     if streamlit.is_file():
         _disable_streamlit(streamlit)
         done.append(str(streamlit))
+    evaluation = tool_root / EVALUATION_REL
+    if evaluation.is_file():
+        _disable_evaluation(evaluation)
+        done.append(str(evaluation))
     pyproject = tool_root / PYPROJECT_REL
     if pyproject.is_file():
         _patch_pyproject(pyproject)
@@ -218,6 +222,14 @@ EXE_REL_DIRS = (
     Path("release"),
 )
 STREAMLIT_REL = Path("app") / "ui" / "streamlit_app.py"
+EVALUATION_REL = Path("app") / "evaluation.py"
+EVALUATION_STUB = (
+    "raise SystemExit(\n"
+    '    "Bitte Desktop Text verbessern oder '
+    '_Gemeinsam\\\\text_verbessern_foundry\\\\Starten.bat. "\n'
+    '    "Keine lokale Bewertung mit Regeln. Nur Foundry, kein Mistral."\n'
+    ")  # LLP-FOUNDRY-TOR\n"
+)
 STREAMLIT_STUB = (
     "raise SystemExit(\n"
     '    "Bitte Desktop Text verbessern oder '
@@ -909,6 +921,21 @@ def _replace_desktop_main(desk: str) -> str:
             DESKTOP_MAIN_HINT,
         )
     return desk
+
+
+def _disable_evaluation(path: Path) -> None:
+    """python -m app.evaluation darf die lokale Pipeline nicht mehr starten."""
+    text = path.read_text(encoding="utf-8")
+    if (
+        "LLP-FOUNDRY-TOR" in text
+        and "Keine lokale Bewertung" in text
+        and "run_pipeline(" not in text
+    ):
+        return
+    bak = path.with_name(path.name + ".llp-alt")
+    if not bak.is_file():
+        bak.write_text(text, encoding="utf-8")
+    path.write_text(EVALUATION_STUB, encoding="utf-8")
 
 
 def _disable_streamlit(path: Path) -> None:

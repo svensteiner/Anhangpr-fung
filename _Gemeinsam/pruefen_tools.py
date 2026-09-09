@@ -322,6 +322,7 @@ LAUNCHABLE_BACKUP_NAMES = frozenset(
         "streamlit_app.py.llp-alt",
         "main.py.llp-alt",
         "desktop.py.llp-alt",
+        "evaluation.py.llp-alt",
     }
 )
 DOC_BACKUP_MARKERS = (
@@ -495,6 +496,25 @@ def text_cli_modus(path: Path | None) -> str:
     return "nicht erkannt"
 
 
+def find_text_evaluation(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "app/evaluation.py")
+        if found is not None:
+            return found
+    return None
+
+
+def evaluation_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "LLP-FOUNDRY-TOR" in text and "Keine lokale Bewertung" in text:
+        return "abgeschaltet"
+    if "run_pipeline(" in text:
+        return "noch Bewertung"
+    return "nicht erkannt"
+
+
 def find_pseudokrat(roots: list[Path]) -> Path | None:
     for root in roots:
         found = _first_existing(root, TOOL_NAMES["pseudo"], "START.bat")
@@ -586,6 +606,7 @@ def report(start: Path | None = None) -> dict[str, object]:
     launchable_backup = find_live_launchable_backup(roots)
     desktop_window = find_live_desktop_window(roots)
     desktop_self_test = find_live_desktop_self_test(roots)
+    evaluation = find_text_evaluation(roots)
     spec = find_live_spec(roots)
     build = find_live_build_script(roots)
     workflow = find_live_portable_workflow(roots)
@@ -624,6 +645,8 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_launchable_backup": launchable_backup,
         "text_desktop_window": desktop_window,
         "text_self_test": desktop_self_test,
+        "text_evaluation": evaluation,
+        "text_evaluation_modus": evaluation_modus(evaluation),
         "text_spec": spec,
         "text_build": build,
         "text_workflow": workflow,
@@ -664,6 +687,7 @@ def format_report(data: dict[str, object]) -> str:
         + ("noch startbar – Anwenden.bat" if data["text_desktop_window"] else "beiseite"),
         "  Selbsttest:      "
         + ("noch Regeln – Anwenden.bat" if data["text_self_test"] else "beiseite"),
+        "  Bewertung:       " + str(data["text_evaluation_modus"]),
         "  Text-Pipeline:   " + str(data["text_pipeline_modus"]),
         "  Hybrid-Weg:      " + str(data["text_hybrid_modus"]),
         "  Paketdatei:      " + str(data["text_pyproject_modus"]),
@@ -746,6 +770,11 @@ def format_report(data: dict[str, object]) -> str:
             "  app/desktop.py hat noch den Selbsttest mit Regeln."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_evaluation_modus"] in {"noch Bewertung", "nicht erkannt"}:
+        lines.append(
+            "  app/evaluation.py startet noch die lokale Pipeline."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     if data["text_pipeline_modus"] in {"noch Mistral", "nicht erkannt"}:
         lines.append(
             "  app/pipeline.py leitet noch auf Mistral."
@@ -807,6 +836,9 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
         reasons.append("Oberflaeche")
     if desktop.is_file() and desktop_self_test_live(desktop):
         reasons.append("Selbsttest")
+    evaluation = tool_root / "app" / "evaluation.py"
+    if evaluation.is_file() and evaluation_modus(evaluation) != "abgeschaltet":
+        reasons.append("Bewertung")
     pipeline = tool_root / "app" / "pipeline.py"
     if pipeline.is_file() and pipeline_modus(pipeline) != "Foundry":
         reasons.append("Pipeline")
@@ -901,6 +933,7 @@ def text_has_leftovers(
         or data["text_launchable_backup"] is not None
         or data["text_desktop_window"] is not None
         or data["text_self_test"] is not None
+        or data["text_evaluation_modus"] in {"noch Bewertung", "nicht erkannt"}
         or data["text_spec"] is not None
         or data["text_build"] is not None
         or data["text_workflow"] is not None
@@ -930,6 +963,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     backup_ok = data["text_launchable_backup"] is None
     window_ok = data["text_desktop_window"] is None
     self_test_ok = data["text_self_test"] is None
+    evaluation_ok = data["text_evaluation_modus"] in {"abgeschaltet", "nicht gefunden"}
     pack_ok = data["text_spec"] is None and data["text_build"] is None and data["text_workflow"] is None
     return (
         data["text_modus"] == "Foundry"
@@ -953,6 +987,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and backup_ok
         and window_ok
         and self_test_ok
+        and evaluation_ok
         and pack_ok
     )
 

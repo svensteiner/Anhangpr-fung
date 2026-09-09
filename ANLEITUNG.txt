@@ -109,7 +109,8 @@ KI (MICROSOFT FOUNDRY):
 
   Status ohne Schluessel: _Gemeinsam\Pruefen.bat
   (zeigt Foundry und Restwege: Mistral, Streamlit,
-   Offline-Editor, Sicherung, alte Kommandozeile)
+   Offline-Editor, Sicherung, alte Kommandozeile,
+   Desktop-Selbsttest, lokale Bewertung)
   Starten.bat zeigt eine Zeile, wenn Anwenden nicht klappt
   oder ein alter Weg bleibt („Bitte Pruefen.bat“).
   In der Oberflaeche unten kurz "KI: bereit" oder "KI: aus".
