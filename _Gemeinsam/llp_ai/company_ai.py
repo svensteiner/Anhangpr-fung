@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+_DATE_API_VERSION = re.compile(r"^\d{4}-\d{2}-\d{2}")
 
 _ALLOWED_PROVIDER = "foundry"
 _OFFICE_SHARED = Path(r"K:\LLP Wirtschaftsprüfung\AI Tools\_Gemeinsam")
@@ -222,12 +225,22 @@ def active_provider() -> ProviderInfo:
     return ProviderInfo("", "")
 
 
+def _legacy_azure_chat_url(cfg: Config) -> bool:
+    """Klassische Azure-OpenAI-URL, wie sie beim Anhangsprüfer schon ging."""
+    return bool(_DATE_API_VERSION.match(cfg.api_version or ""))
+
+
 def _chat_url(cfg: Config) -> str:
-    base = cfg.endpoint
+    base = cfg.endpoint.rstrip("/")
     if base.endswith("/chat/completions"):
         return base
+    if _legacy_azure_chat_url(cfg):
+        return (
+            f"{base}/openai/deployments/{cfg.deployment}/chat/completions"
+            f"?api-version={cfg.api_version}"
+        )
     if "/openai/" in base:
-        return base.rstrip("/") + "/chat/completions"
+        return base + "/chat/completions"
     return f"{base}/openai/{cfg.api_version}/chat/completions"
 
 
@@ -248,6 +261,7 @@ def _post_chat(prompt: str, *, json_mode: bool) -> str:
         headers={
             "Content-Type": "application/json",
             "api-key": cfg.api_key,
+            "Authorization": f"Bearer {cfg.api_key}",
         },
         method="POST",
     )

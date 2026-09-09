@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -140,7 +141,68 @@ def test_chat_sends_store_false_and_no_other_provider(monkeypatch):
     assert captured["body"]["store"] is False
     assert captured["body"]["model"] == "llp-gpt"
     assert captured["headers"]["api-key"] == "secret-key"
+    assert captured["headers"]["authorization"] == "Bearer secret-key"
     assert captured["url"].endswith("/openai/v1/chat/completions")
+
+
+def test_existing_azure_date_version_uses_classic_deployments_url(monkeypatch):
+    """Der bisherige Azure-Zugang nutzt oft api-version=2024-… statt Foundry v1."""
+    _reset(
+        monkeypatch,
+        AZURE_OPENAI_ENDPOINT="https://llp.openai.azure.com",
+        AZURE_OPENAI_DEPLOYMENT="llp-model",
+        AZURE_OPENAI_API_KEY="existing-key",
+        AZURE_OPENAI_API_VERSION="2024-08-01-preview",
+    )
+    captured: dict = {}
+
+    class _Resp:
+        def read(self):
+            return json.dumps({
+                "choices": [{"message": {"content": '{"ok": true}'}}],
+            }).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def fake_urlopen(request, timeout=90):
+        captured["url"] = request.full_url
+        captured["body"] = json.loads(request.data.decode())
+        return _Resp()
+
+    monkeypatch.setattr(layer.urllib.request, "urlopen", fake_urlopen)
+    assert layer.ask_json("Prüfe den Anhang.") == {"ok": True}
+    assert "/openai/deployments/llp-model/chat/completions" in captured["url"]
+    assert "api-version=2024-08-01-preview" in captured["url"]
+    assert captured["body"]["store"] is False
+    assert captured["body"]["model"] == "llp-model"
+
+
+def test_loads_office_env_with_azure_names(monkeypatch, tmp_path):
+    env = tmp_path / ".env"
+    env.write_text(
+        "AZURE_OPENAI_ENDPOINT=https://llp.openai.azure.com\n"
+        "AZURE_OPENAI_DEPLOYMENT=llp-model\n"
+        "AZURE_OPENAI_API_KEY=from-office-file\n",
+        encoding="utf-8",
+    )
+    _reset(monkeypatch)
+    monkeypatch.setattr(layer, "_ENV_LOADED", False)
+    monkeypatch.setattr(layer, "_env_files", lambda: [env])
+    try:
+        assert layer.is_ai_ready() is True
+        assert layer.describe_status()["bereit"] is True
+    finally:
+        for key in (
+            "AZURE_OPENAI_ENDPOINT",
+            "AZURE_OPENAI_DEPLOYMENT",
+            "AZURE_OPENAI_API_KEY",
+        ):
+            os.environ.pop(key, None)
+        layer._ENV_LOADED = True
 
 
 def test_describe_status_has_no_secrets_when_off(monkeypatch):

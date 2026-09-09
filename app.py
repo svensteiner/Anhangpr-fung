@@ -529,14 +529,14 @@ HTML = r"""<!DOCTYPE html>
       <div class="step"        id="bg-step3"><div class="step-num">3</div><div class="step-label">Ergebnis laden</div></div>
     </div>
     <div class="card" id="bg-upload">
-      <h2><span class="num">1</span>Anhang auswählen (PDF)</h2>
+      <h2><span class="num">1</span>Anhang auswählen (PDF oder Word)</h2>
       <div class="upload-area" id="bg-area-anhang"
            ondragover="dragOn(event,'bg-area-anhang')" ondragleave="dragOff('bg-area-anhang')"
            ondrop="dropPdf(event,'bg-area-anhang','bg-file-anhang','bgAnhang','bg-name-anhang')">
-        <input type="file" id="bg-file-anhang" accept=".pdf" onchange="bgAnhangSelect()">
+        <input type="file" id="bg-file-anhang" accept=".pdf,.docx" onchange="bgAnhangSelect()">
         <div class="upload-icon">📄</div>
         <div class="upload-label">Anhang zum Jahresabschluss</div>
-        <div class="upload-hint">z.B. Anhang 2025</div>
+        <div class="upload-hint">PDF oder Word, z.B. Anhang 2025</div>
         <div class="upload-filename" id="bg-name-anhang"></div>
       </div>
 
@@ -1343,7 +1343,10 @@ def pruefen_route():
     anhang_file = request.files.get("anhang")
     beleg_files = request.files.getlist("belege")
     if not anhang_file:
-        return jsonify({"error": "Anhang-PDF fehlt."}), 400
+        return jsonify({"error": "Bitte den Anhang hochladen (PDF oder Word)."}), 400
+    suffix = Path(anhang_file.filename or "anhang.pdf").suffix.lower()
+    if suffix not in (".pdf", ".docx"):
+        return jsonify({"error": "Bitte eine PDF- oder Word-Datei wählen."}), 400
     # Detailunterlagen sind OPTIONAL: ohne sie wird der interne Abgleich
     # gefahren (Detailzahlen im vorderen Teil ↔ Angaben im Anhang).
 

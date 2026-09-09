@@ -8,7 +8,7 @@ Unterstützte Belegtypen (automatische Erkennung):
   - Rückstellungsspiegel            (PDF)
   - Verbindlichkeitenspiegel        (PDF)
 
-Aus dem Anhang werden extrahiert:
+Aus dem Anhang (PDF oder Word) werden extrahiert:
   - Haftungsverhältnisse  (Gesamtbetrag)
   - Arbeitnehmer          (durchschnittlich, Gesamt)
   - Summe Forderungen     (Gesamtbetrag)
@@ -25,6 +25,8 @@ from typing import Optional
 
 import pdfplumber
 import openpyxl
+
+from anhangspruefer.parsers.document_text import load_page_texts
 
 
 # ---------------------------------------------------------------------------
@@ -199,20 +201,17 @@ def _detect_excel_type(path: Path) -> str:
 # ---------------------------------------------------------------------------
 def extract_from_anhang(pdf_path: Path) -> list[AnhangPosition]:
     """
-    Extrahiert prüfbare Positionen aus dem Anhang:
+    Extrahiert prüfbare Positionen aus dem Anhang (PDF oder Word):
       - Haftungsverhältnisse (Gesamtbetrag)
       - Arbeitnehmer (Gesamt, durchschnittlich)
     """
     positions: list[AnhangPosition] = []
     pdf_path = Path(pdf_path)
 
-    with pdfplumber.open(str(pdf_path)) as pdf:
-        for page_num, page in enumerate(pdf.pages, 1):
-            text = page.extract_text() or ""
-            lines = text.split("\n")
-
-            _extract_haftungen(lines, page_num, positions)
-            _extract_arbeitnehmer(lines, page_num, positions)
+    for page_num, text in enumerate(load_page_texts(pdf_path), 1):
+        lines = (text or "").split("\n")
+        _extract_haftungen(lines, page_num, positions)
+        _extract_arbeitnehmer(lines, page_num, positions)
 
     # Duplikate eliminieren (gleiche section + label, ersten Treffer behalten)
     seen: set[tuple[str, str]] = set()

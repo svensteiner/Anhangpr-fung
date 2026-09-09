@@ -45,7 +45,7 @@ MODUS 1 - VORJAHRESVERGLEICH
 
 MODUS 2 - DETAILZAHLENVERGLEICH
 --------------------------------
-  1. Anhang (PDF) hochladen
+  1. Anhang hochladen (PDF oder Word)
   2. Detailunterlagen hinzufuegen (Bank, Personal, ...)
   3. "Pruefung starten"
 
@@ -73,12 +73,9 @@ KI (MICROSOFT FOUNDRY):
 -----------------------
   Alle LLP-Tools mit Modell nutzen denselben Zugang:
     AI Tools\_Gemeinsam\llp_ai
-  (liegt auch im Programmordner unter _Gemeinsam, falls
-   der Server-Ordner noch nicht eingerichtet ist.)
-
-  Der Zugang ist derselbe wie bisher: Datei llp_ai\.env
-  auf dem Server (nicht neu anlegen, wenn sie schon da ist).
-  Auch AZURE_OPENAI_ENDPOINT / _DEPLOYMENT / _API_KEY gelten.
+  Derselbe Zugang wie bisher beim Anhangsprüfer:
+  Datei llp_ai\.env auf dem Server, nicht neu anlegen.
+  Auch AZURE_OPENAI_* und die klassische Azure-URL (api-version=2024-…) gelten.
   Schluessel niemals ins Git.
 
   Ist der Zugang nicht erreichbar: Heuristik, kein stiller Wechsel.
