@@ -95,6 +95,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "nicht mistral" in text
     assert "anwenden.bat" in text
     assert "daneben" in text
+    assert "kein ollama-rest" in text
     assert "healthz" not in text
     lies = (ROOT / "_Gemeinsam" / "LIESMICH.txt").read_text(encoding="utf-8").lower()
     assert "anleitung.txt" in lies

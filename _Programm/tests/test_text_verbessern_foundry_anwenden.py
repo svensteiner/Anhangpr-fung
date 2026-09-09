@@ -251,6 +251,13 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         'parser.add_argument("--provider", choices=["fast-editor", "rules", "mistral-local"])\n',
         encoding="utf-8",
     )
+    (tool / "app" / "local_runtime.py").write_text(
+        "def local_mistral_ready(timeout: float = 0.8) -> bool:\n"
+        "    return True  # http://127.0.0.1:11434\n\n"
+        "def preflight_local_mistral() -> bool:\n"
+        "    return True\n",
+        encoding="utf-8",
+    )
     (tool / "app" / "providers" / "hybrid.py").write_text(
         "from app.providers.mistral_provider import LocalMistralProvider\n\n"
         "class HybridLocalProvider:\n"
@@ -288,6 +295,15 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "or mistral-local." not in pipeline
     assert 'if "mistral" not in active_provider.name:' not in pipeline
     assert "except ProviderError as error:\n        raise\n" in pipeline
+
+    runtime = (tool / "app" / "local_runtime.py").read_text(encoding="utf-8")
+    assert "LLP-FOUNDRY-TOR" in runtime
+    assert "kein Ollama" in runtime
+    assert runtime.count("return False") >= 2
+    lines = [ln.strip() for ln in runtime.splitlines() if ln.strip()]
+    ready_idx = lines.index("def local_mistral_ready(timeout: float = 0.8) -> bool:")
+    assert lines[ready_idx + 1] == "return False  # LLP-FOUNDRY-TOR: kein Ollama"
+    assert runtime.count("return False  # LLP-FOUNDRY-TOR: kein Ollama") == 2
 
     hybrid = (tool / "app" / "providers" / "hybrid.py").read_text(encoding="utf-8")
     assert "FoundryEditorialProvider" in hybrid
@@ -405,6 +421,8 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     ps1_again = (tool / "scripts" / "start_windows.ps1").read_text(encoding="utf-8")
     assert ps1_again == ps1
     assert (tool / "scripts" / "start_windows.ps1.llp-alt").read_text(encoding="utf-8") == ps1_bak
+    runtime2 = (tool / "app" / "local_runtime.py").read_text(encoding="utf-8")
+    assert runtime2.count("return False  # LLP-FOUNDRY-TOR: kein Ollama") == 2
 
 
 def test_anwenden_ohne_windows_startskript_bleibt_ok(tmp_path: Path) -> None:

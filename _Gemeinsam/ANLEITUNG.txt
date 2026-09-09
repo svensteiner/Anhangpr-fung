@@ -16,7 +16,7 @@ EINMALIG
     Text verbessern   (nur Foundry, nicht Mistral)
   Installieren.bat stellt Text verbessern auf Foundry
   um (Anwenden.bat). Danach Pruefen.bat: kein Streamlit,
-  keine alte EXE.
+  keine alte EXE, kein Ollama-Rest.
 
 TAEGLICH
 --------

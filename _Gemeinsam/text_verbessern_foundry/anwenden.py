@@ -116,6 +116,10 @@ def apply(tool_root: Path) -> list[str]:
     if hybrid.is_file():
         _patch_hybrid(hybrid)
         done.append(str(hybrid))
+    runtime = tool_root / "app" / "local_runtime.py"
+    if runtime.is_file():
+        _patch_local_runtime(runtime)
+        done.append(str(runtime))
 
     return done
 
@@ -334,6 +338,26 @@ def _park_exe(tool_root: Path) -> list[str]:
         exe.rename(dest)
         parked.append(str(dest))
     return parked
+
+
+def _patch_local_runtime(path: Path) -> None:
+    """Übrige Aufrufe dürfen Ollama nicht mehr anpingen."""
+    text = path.read_text(encoding="utf-8")
+    if "LLP-FOUNDRY-TOR" in text and "return False" in text:
+        return
+    text = _replace_all_if_present(
+        text,
+        "def local_mistral_ready(timeout: float = 0.8) -> bool:\n",
+        "def local_mistral_ready(timeout: float = 0.8) -> bool:\n"
+        "    return False  # LLP-FOUNDRY-TOR: kein Ollama\n",
+    )
+    text = _replace_all_if_present(
+        text,
+        "def preflight_local_mistral() -> bool:\n",
+        "def preflight_local_mistral() -> bool:\n"
+        "    return False  # LLP-FOUNDRY-TOR: kein Ollama\n",
+    )
+    path.write_text(text, encoding="utf-8")
 
 
 def _patch_hybrid(path: Path) -> None:

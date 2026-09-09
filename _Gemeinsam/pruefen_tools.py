@@ -81,6 +81,25 @@ def find_live_text_exe(roots: list[Path]) -> Path | None:
     return None
 
 
+def find_local_runtime(roots: list[Path]) -> Path | None:
+    for root in roots:
+        found = _first_existing(root, TOOL_NAMES["text"], "app/local_runtime.py")
+        if found is not None:
+            return found
+    return None
+
+
+def local_runtime_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "LLP-FOUNDRY-TOR" in text and "kein Ollama" in text:
+        return "kein Ollama"
+    if "11434" in text or "MISTRAL_BASE_URL" in text:
+        return "noch Ollama"
+    return "nicht erkannt"
+
+
 def find_foundry_provider(roots: list[Path]) -> Path | None:
     for root in roots:
         found = _first_existing(root, TOOL_NAMES["text"], "app/providers/foundry_provider.py")
@@ -136,9 +155,11 @@ def report(start: Path | None = None) -> dict[str, object]:
     cmd = find_text_cmd(roots)
     exe = find_live_text_exe(roots)
     provider = find_foundry_provider(roots)
+    runtime = find_local_runtime(roots)
     modus = text_verbessern_modus(desktop)
     start_modus = text_startskript_modus(startskript)
     cmd_modus = text_cmd_modus(cmd)
+    runtime_modus = local_runtime_modus(runtime)
     return {
         "foundry": describe_status(),
         "anhang": find_anhang(roots),
@@ -150,6 +171,8 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_cmd_modus": cmd_modus,
         "text_exe": exe,
         "text_provider": provider,
+        "text_runtime": runtime,
+        "text_runtime_modus": runtime_modus,
         "pseudokrat": find_pseudokrat(roots),
     }
 
@@ -176,6 +199,7 @@ def format_report(data: dict[str, object]) -> str:
         "  Startbefehl:     " + str(data["text_cmd_modus"]),
         "  Foundry-Datei:   "
         + ("vorhanden" if data["text_provider"] else "fehlt"),
+        "  Ollama-Rest:     " + str(data["text_runtime_modus"]),
         "  Alte EXE:        "
         + ("noch da – Anwenden.bat" if data["text_exe"] else "beiseite"),
         "  Pseudokrat:      "
@@ -205,6 +229,11 @@ def format_report(data: dict[str, object]) -> str:
         lines.append("  Eine alte TextVerbessern.exe liegt noch im Tool-Ordner.")
     if data["text_desktop"] is not None and data["text_provider"] is None:
         lines.append("  foundry_provider.py fehlt im Tool-Ordner.")
+    if data["text_runtime_modus"] == "noch Ollama":
+        lines.append(
+            "  app/local_runtime.py prueft noch Ollama."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     lines.append("  Keine Schluessel in dieser Anzeige.")
     lines.append("  Anleitung: ANLEITUNG.txt in diesem Ordner.")
     return "\n".join(lines)
@@ -216,12 +245,14 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     cmd_ok = data["text_cmd_modus"] in {"Foundry-Tor", "nicht gefunden"}
     exe_ok = data["text_exe"] is None
     provider_ok = data["text_provider"] is not None or data["text_desktop"] is None
+    runtime_ok = data["text_runtime_modus"] in {"kein Ollama", "nicht gefunden"}
     return (
         data["text_modus"] == "Foundry"
         and start_ok
         and cmd_ok
         and exe_ok
         and provider_ok
+        and runtime_ok
     )
 
 
@@ -236,11 +267,12 @@ def main(argv: list[str] | None = None) -> int:
     print(format_report(data))
     foundry = data["foundry"]
     assert isinstance(foundry, dict)
-    leftover = (
+        leftover = (
         data["text_modus"] == "noch Mistral"
         or data["text_start"] == "noch Streamlit"
         or data["text_cmd_modus"] == "noch alt"
         or data["text_exe"] is not None
+        or data["text_runtime_modus"] == "noch Ollama"
         or (data["text_desktop"] is not None and data["text_provider"] is None)
     )
     if leftover:

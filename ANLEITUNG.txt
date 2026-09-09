@@ -103,7 +103,7 @@ KI (MICROSOFT FOUNDRY):
   Pseudokrat bleibt lokal und nutzt Foundry nicht.
 
   Status ohne Schluessel: _Gemeinsam\Pruefen.bat
-  (zeigt Foundry und ob Text verbessern noch Mistral nutzt)
+  (zeigt Foundry und ob Text verbessern noch Mistral oder Ollama nutzt)
   In der Oberflaeche unten kurz "KI: bereit" oder "KI: aus".
 
 
