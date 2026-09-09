@@ -137,11 +137,6 @@ if defined LLP_SHARED_AI_ROOT if exist "%LLP_SHARED_AI_ROOT%\text_verbessern_fou
     %PY% "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\anwenden.py"
 )
 
-if defined LLP_SHARED_AI_ROOT if exist "%LLP_SHARED_AI_ROOT%\pruefen_tools.py" (
-    %PY% "%LLP_SHARED_AI_ROOT%\pruefen_tools.py" --text-foundry
-    if not errorlevel 1 goto FOUNDRY_DESKTOP
-)
-
 echo  Oeffne Foundry-Seite. Ein Mistral-rephraser wird nicht gestartet.
 if defined LLP_SHARED_AI_ROOT if exist "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\Starten.bat" (
     start "" "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\Starten.bat"
@@ -149,20 +144,6 @@ if defined LLP_SHARED_AI_ROOT if exist "%LLP_SHARED_AI_ROOT%\text_verbessern_fou
 )
 echo  Text verbessern (Foundry) nicht gefunden.
 echo  Bitte _Gemeinsam\text_verbessern_foundry\Starten.bat doppelklicken.
-pause
-exit /b 1
-
-:FOUNDRY_DESKTOP
-rem Nur die gepatchte Python-Oberflaeche, nie die alte Desktop-EXE.
-if exist "%~dp0app\desktop.py" (
-    %PY% -c "from app.desktop import main; main()"
-    exit /b %ERRORLEVEL%
-)
-if defined LLP_SHARED_AI_ROOT if exist "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\Starten.bat" (
-    start "" "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\Starten.bat"
-    exit /b 0
-)
-echo  Text verbessern nicht gefunden.
 pause
 exit /b 1
 """

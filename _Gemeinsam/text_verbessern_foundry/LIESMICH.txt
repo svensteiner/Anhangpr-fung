@@ -19,9 +19,9 @@ Wenn daneben noch der Ordner rephraser liegt und
 4. Danach Text verbessern wie gewohnt starten
    (Tools_starten.bat Punkt 2 oder Desktop
    "Text verbessern"). TEXT VERBESSERN.cmd im
-   Tool-Ordner wird zum Foundry-Tor: Mistral
-   startet nicht mehr. Eine alte Desktop-EXE
-   wird zur Seite gelegt (.llp-alt).
+   Tool-Ordner oeffnet nur die Foundry-Seite,
+   nicht die Rephraser-Oberflaeche. Eine alte
+   Desktop-EXE wird zur Seite gelegt (.llp-alt).
 
 Nicht nötig, wenn das Tool bereits „Gründlich mit Foundry“
 zeigt. Ein zweiter Lauf ändert nichts.

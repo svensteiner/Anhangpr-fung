@@ -234,11 +234,12 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
 
     launcher = (tool / "TEXT VERBESSERN.cmd").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" in launcher
-    assert "--text-foundry" in launcher
     assert "mistral-rephraser wird nicht gestartet" in launcher.lower()
     assert "TEXT VERBESSERN.original.cmd" not in launcher
     assert "TextVerbessern.exe" not in launcher
-    assert "from app.desktop import main" in launcher
+    assert "from app.desktop import main" not in launcher
+    assert "app\\desktop.py" not in launcher
+    assert "text_verbessern_foundry" in launcher.lower()
     backup = (tool / "TEXT VERBESSERN.original.cmd").read_text(encoding="utf-8")
     assert "TextVerbessern.exe" in backup
     assert "LLP-FOUNDRY-TOR" not in backup
