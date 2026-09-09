@@ -8,6 +8,8 @@ auf den PC kopiert. Keine EXE auf den PC kopieren.
 EINMALIG
 --------
   Im Anhangspruefer-Ordner:  Installieren.bat
+  Findet _Gemeinsam daneben (Kanzlei-Share) oder
+  die Kopie im Tool-Ordner.
   Legt drei Desktop-Verknuepfungen an:
     Anhangspruefer
     LLP AI Tools

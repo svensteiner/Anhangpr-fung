@@ -93,6 +93,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "tools_starten" in text or "llp ai tools" in text
     assert "nicht mistral" in text
     assert "anwenden.bat" in text
+    assert "daneben" in text
     assert "healthz" not in text
     lies = (ROOT / "_Gemeinsam" / "LIESMICH.txt").read_text(encoding="utf-8").lower()
     assert "anleitung.txt" in lies

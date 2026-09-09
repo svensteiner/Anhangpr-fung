@@ -508,6 +508,19 @@ def _patch_desktop(path: Path) -> None:
         "Schnelle lokale Bearbeitung ist verfügbar; Mistral ist optional.",
         "Schnelle lokale Bearbeitung ist verfügbar; gründlich nur mit Foundry.",
     )
+    desk = _replace_all_if_present(
+        desk,
+        "        DesktopApp().run()\n"
+        "    except Exception as error:\n"
+        '        write_diagnostic_event("desktop_fatal", error)\n'
+        "        show_startup_error()\n"
+        "        return 1\n"
+        "    return 0",
+        '    print("Bitte Desktop Text verbessern oder '
+        "_Gemeinsam\\\\text_verbessern_foundry\\\\Starten.bat.\")\n"
+        '    print("Die alte Oberflaeche startet nicht. Nur Foundry, kein Mistral.")\n'
+        "    return 2",
+    )
     path.write_text(desk, encoding="utf-8")
 
 

@@ -310,6 +310,15 @@ def test_paragraphs_from_pages_keeps_page_and_splits():
     assert any("Haftungsverhältnisse" in t for t, _p in paras)
 
 
+def test_refine_lehnt_localllm_ab():
+    cl, res, paras = _setup()
+    local = LocalLLM(base_url="http://127.0.0.1:11434")
+    with pytest.raises(RuntimeError, match="LocalLLM ist abgeschaltet"):
+        refine_binaer(res, cl, paras, llm=local)
+    with pytest.raises(RuntimeError, match="LocalLLM ist abgeschaltet"):
+        refine_findings(res, cl, paras, llm=local)
+
+
 def test_foundry_llm_unavailable_without_layer():
     llm = FoundryLLM()
     assert llm.is_available() is False

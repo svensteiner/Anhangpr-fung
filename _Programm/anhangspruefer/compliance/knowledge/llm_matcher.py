@@ -301,6 +301,16 @@ class LLMClient(Protocol):
     def generate_json(self, prompt: str, num_predict: int = 120) -> Optional[dict]: ...
 
 
+def _production_llm(llm: Optional[LLMClient]) -> LLMClient:
+    """Default und Produktion: Foundry. Ein übergebenes LocalLLM wird abgelehnt."""
+    chosen = llm or FoundryLLM()
+    if isinstance(chosen, LocalLLM):
+        raise RuntimeError(
+            "LocalLLM ist abgeschaltet. Modus 3 nutzt nur Foundry (llp_ai)."
+        )
+    return chosen
+
+
 # ---------------------------------------------------------------------------
 # Prompt + Bewertung
 # ---------------------------------------------------------------------------
@@ -503,7 +513,7 @@ def refine_binaer(
       * und der Beleg muss einen spezifischen Fachbegriff der Prüffrage enthalten.
     Andernfalls bleibt der Punkt "Offen".
     """
-    llm = llm or FoundryLLM()
+    llm = _production_llm(llm)
     if not llm.is_available():
         logger.info("Foundry nicht verfügbar – Heuristik-Ergebnis bleibt.")
         return {"ja": 0, "fehlt": 0, "offen": 0, "ki": None, "verbleibend": 0}
@@ -587,7 +597,7 @@ def refine_findings(
     bisheriges (Stichwort-)Ergebnis — die Prüfung kippt nie.
     Standard ist FoundryLLM. Kein stiller Fallback auf Ollama.
     """
-    llm = llm or FoundryLLM()
+    llm = _production_llm(llm)
     if not llm.is_available():
         logger.info("Foundry nicht verfügbar – Stichwort-Ergebnis bleibt bestehen.")
         return {"verfeinert": 0, "uebersprungen": len(result.findings), "ki": None}

@@ -119,6 +119,16 @@ class App:
             )
         unused = model_request
         diagnostics = {"mistral_available": local_mistral_ready()}
+
+
+def main(argv=None):
+    try:
+        DesktopApp().run()
+    except Exception as error:
+        write_diagnostic_event("desktop_fatal", error)
+        show_startup_error()
+        return 1
+    return 0
 '''
 
 STREAMLIT_MAIN = '''from app.local_runtime import (
@@ -281,6 +291,9 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "if not mistral_ready:" not in desktop
     assert "thorough_ready = foundry_ready()" in desktop
     assert "self.mistral_ready = foundry_ready()" in desktop
+    assert "DesktopApp().run()" not in desktop
+    assert "alte Oberflaeche startet nicht" in desktop
+    assert "Nur Foundry, kein Mistral" in desktop
     assert "self.mistral_ready = local_mistral_ready()" not in desktop
     assert '"mistral_available": foundry_ready()' in desktop
     assert "local_mistral_ready()" not in desktop
