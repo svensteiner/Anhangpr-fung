@@ -42,8 +42,11 @@ if exist "%~1\%~2" (
 exit /b 1
 
 :ANHANG
+if exist "%ROOT%\app.py" call :TRY "%ROOT%" "Starten.bat" && exit /b 0
 call :TRY "%ROOT%\Anhangspruefung" "Starten.bat" && exit /b 0
 call :TRY "%ROOT%\Anhangpr-fung" "Starten.bat" && exit /b 0
+call :TRY "%ROOT%\..\Anhangspruefung" "Starten.bat" && exit /b 0
+call :TRY "%ROOT%\..\Anhangpr-fung" "Starten.bat" && exit /b 0
 echo  Anhangspruefer nicht gefunden. Bitte Starten.bat
 echo  im Ordner des Anhangspruefers doppelklicken.
 pause
@@ -57,6 +60,8 @@ call :TEXT_IST_FOUNDRY
 if not errorlevel 1 (
     call :TRY "%ROOT%\rephraser" "TEXT VERBESSERN.cmd" && exit /b 0
     call :TRY "%ROOT%\paraphraser" "TEXT VERBESSERN.cmd" && exit /b 0
+    call :TRY "%ROOT%\..\rephraser" "TEXT VERBESSERN.cmd" && exit /b 0
+    call :TRY "%ROOT%\..\paraphraser" "TEXT VERBESSERN.cmd" && exit /b 0
 )
 echo  Oeffne Foundry-Seite. Ein Mistral-rephraser wird nicht gestartet.
 if defined LLP_SHARED_AI_ROOT call :TRY "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry" "Starten.bat" && exit /b 0
@@ -93,6 +98,7 @@ goto :eof
 
 :PSEUDO
 call :TRY "%ROOT%\Pseudokrat" "START.bat" && exit /b 0
+call :TRY "%ROOT%\..\Pseudokrat" "START.bat" && exit /b 0
 echo  Pseudokrat nicht gefunden. Bitte START.bat
 echo  im Pseudokrat-Ordner doppelklicken.
 pause

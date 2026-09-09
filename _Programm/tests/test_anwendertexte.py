@@ -97,6 +97,18 @@ def test_tools_starten_ruft_llp_start_auf():
     assert "LLP_SHARED_AI_ROOT" in text
     assert "llp_start\\Start.bat" in text
     assert ".exe" not in text.lower()
+    share = text.lower().find("..\\_gemeinsam\\llp_start")
+    lokal = text.lower().find("%~dp0_gemeinsam\\llp_start")
+    assert share != -1 and lokal != -1
+    assert share < lokal
+
+
+def test_llp_start_findet_tools_im_eigenen_und_nachbarordner():
+    text = (ROOT / "_Gemeinsam" / "llp_start" / "Start.bat").read_text(encoding="utf-8")
+    assert '%ROOT%\\app.py' in text or "%ROOT%\\app.py" in text
+    assert '%ROOT%\\..\\rephraser' in text or "%ROOT%\\..\\rephraser" in text
+    assert '%ROOT%\\..\\Pseudokrat' in text or "%ROOT%\\..\\Pseudokrat" in text
+    assert 'call :TRY "%ROOT%" "Starten.bat"' in text
 
 
 def test_text_verbessern_foundry_kit_liegt_bereit():
