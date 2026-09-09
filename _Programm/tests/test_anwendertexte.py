@@ -60,6 +60,7 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "tools_starten.bat" in low
     assert "llp ai tools" in low
     assert "offen – angabe gefunden" in low or "offen - angabe gefunden" in low
+    assert "nicht mistral" in low
 
 
 def test_klienten_liesmich_ohne_healthz():

@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -142,3 +145,40 @@ def test_beenden_haelt_den_server_an() -> None:
     if not stopped:
         server.shutdown()
     assert stopped
+
+
+@pytest.mark.skipif(
+    not shutil.which("google-chrome") and not shutil.which("google-chrome-stable"),
+    reason="Chrome nicht vorhanden",
+)
+@pytest.mark.skipif(not shutil.which("node"), reason="Node nicht vorhanden")
+def test_foundry_seite_im_browser_ohne_stillen_wechsel() -> None:
+    tests_dir = Path(__file__).resolve().parent
+    if str(tests_dir) not in sys.path:
+        sys.path.insert(0, str(tests_dir))
+    from test_ugb_browser import _ensure_puppeteer
+
+    if not _ensure_puppeteer():
+        pytest.skip("puppeteer-core konnte nicht eingerichtet werden")
+    module = _load()
+    server, base = _serve(module)
+    env = os.environ.copy()
+    env["CHROME_PATH"] = shutil.which("google-chrome-stable") or shutil.which("google-chrome") or ""
+    script = Path(__file__).resolve().parent / "text_foundry_browser.mjs"
+    try:
+        proc = subprocess.run(
+            ["node", str(script), base + "/"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=env,
+        )
+    finally:
+        try:
+            server.shutdown()
+        except Exception:
+            pass
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "BROWSER_OK" in proc.stdout
+    assert "foundry" in proc.stdout.lower()
+    assert "mistral" in proc.stdout.lower() or "ollama" in proc.stdout.lower()
