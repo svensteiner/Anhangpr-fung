@@ -327,6 +327,7 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     ok, msg = module.apply_foundry(tool)
     assert ok, msg
     assert "Foundry-Anbindung" in msg
+    assert module.leftovers_in_tool(tool) == []
     assert (tool / "app" / "providers" / "foundry_provider.py").is_file()
     provider = (tool / "app" / "providers" / "foundry_provider.py").read_text(encoding="utf-8")
     assert "ask_ai" in provider
@@ -549,6 +550,34 @@ def test_anwenden_ohne_tool_gibt_hinweis(tmp_path: Path) -> None:
     leer = tmp_path / "_Gemeinsam" / "text_verbessern_foundry"
     leer.mkdir(parents=True)
     assert module.find_tool_root(leer) is None
+
+
+def test_anwenden_ersetzt_einzelnen_mistral_return(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    pipe = tool / "app" / "pipeline.py"
+    text = pipe.read_text(encoding="utf-8")
+    pipe.write_text(
+        text.replace("return FoundryEditorialProvider()", "return LocalMistralProvider()", 1),
+        encoding="utf-8",
+    )
+    assert "Pipeline" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    assert "return LocalMistralProvider()" not in pipe.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_meldet_rest_wenn_patch_ausfaellt(tmp_path: Path, monkeypatch) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    monkeypatch.setattr(module, "apply", lambda root: [])
+    ok, msg = module.apply_foundry(tool)
+    assert ok is False
+    assert "nicht alles umgestellt" in msg
+    assert "Pipeline" in msg
 
 
 def test_main_leise_ohne_tool_bleibt_still(monkeypatch, capsys) -> None:

@@ -441,6 +441,54 @@ def format_report(data: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def leftovers_in_tool(tool_root: Path) -> list[str]:
+    """Restwege in einem konkreten rephraser-Ordner, unabhängig vom Ordnernamen."""
+    reasons: list[str] = []
+    desktop = tool_root / "app" / "desktop.py"
+    if desktop.is_file() and text_verbessern_modus(desktop) != "Foundry":
+        reasons.append("Oberflaeche")
+    pipeline = tool_root / "app" / "pipeline.py"
+    if pipeline.is_file() and pipeline_modus(pipeline) != "Foundry":
+        reasons.append("Pipeline")
+    hybrid = tool_root / "app" / "providers" / "hybrid.py"
+    if hybrid.is_file() and hybrid_modus(hybrid) != "Foundry":
+        reasons.append("Hybrid")
+    cmd = tool_root / "TEXT VERBESSERN.cmd"
+    if cmd.is_file() and text_cmd_modus(cmd) != "Foundry-Tor":
+        reasons.append("Startbefehl")
+    ps1 = tool_root / "scripts" / "start_windows.ps1"
+    if ps1.is_file() and text_startskript_modus(ps1) != "Foundry-Tor":
+        reasons.append("Startskript")
+    streamlit = tool_root / "app" / "ui" / "streamlit_app.py"
+    if streamlit.is_file() and streamlit_app_modus(streamlit) != "abgeschaltet":
+        reasons.append("Streamlit")
+    api = tool_root / "app" / "main.py"
+    if api.is_file() and text_api_modus(api) != "abgeschaltet":
+        reasons.append("API")
+    runtime = tool_root / "app" / "local_runtime.py"
+    if runtime.is_file() and local_runtime_modus(runtime) != "kein Ollama":
+        reasons.append("Ollama")
+    mistral = tool_root / "app" / "providers" / "mistral_provider.py"
+    if mistral.is_file() and mistral_provider_modus(mistral) != "abgeschaltet":
+        reasons.append("Mistral-Client")
+    pyproject = tool_root / "pyproject.toml"
+    if pyproject.is_file() and pyproject_modus(pyproject) != "abgeschaltet":
+        reasons.append("Paketdatei")
+    provider = tool_root / "app" / "providers" / "foundry_provider.py"
+    if desktop.is_file() and not provider.is_file():
+        reasons.append("Foundry-Datei")
+    for rel in EXE_REL_DIRS:
+        folder = tool_root / rel
+        for exe_name in ("TextVerbessern.exe", "TEXT VERBESSERN.exe", "rephraser.exe"):
+            if (folder / exe_name).is_file():
+                reasons.append("EXE")
+                break
+        else:
+            continue
+        break
+    return reasons
+
+
 def text_has_leftovers(
     data: dict[str, object] | None = None, start: Path | None = None
 ) -> bool:

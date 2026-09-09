@@ -451,6 +451,26 @@ def test_report_foundry_desktop_aber_pyproject_ist_nicht_ok(tmp_path: Path) -> N
     assert module.text_has_leftovers(data) is True
 
 
+def test_leftovers_in_tool_unabhaengig_vom_ordnernamen(tmp_path: Path) -> None:
+    module = _load()
+    tool = tmp_path / "rephraser-kopie"
+    desktop = tool / "app" / "desktop.py"
+    desktop.parent.mkdir(parents=True)
+    desktop.write_text(
+        'MODE_STRONG = "Gründlich mit Mistral (bis 45 s)"\n'
+        'return "rules+mistral-local", "substantial"\n',
+        encoding="utf-8",
+    )
+    (tool / "app" / "pipeline.py").write_text(
+        "        return LocalMistralProvider()\n",
+        encoding="utf-8",
+    )
+    reasons = module.leftovers_in_tool(tool)
+    assert "Oberflaeche" in reasons
+    assert "Pipeline" in reasons
+    assert module.leftovers_in_tool(tmp_path / "leer") == []
+
+
 def test_rest_ohne_nachbar_ist_ok(tmp_path: Path) -> None:
     module = _load()
     gemeinsam = tmp_path / "_Gemeinsam"

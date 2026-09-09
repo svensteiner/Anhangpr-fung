@@ -13,6 +13,11 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SOURCE = HERE / "foundry_provider.py"
+SHARED = HERE.parent
+if str(SHARED) not in sys.path:
+    sys.path.insert(0, str(SHARED))
+
+from pruefen_tools import leftovers_in_tool
 
 MODE_STRONG_OLD = 'MODE_STRONG = "Gründlich mit Mistral (bis 45 s)"'
 MODE_STRONG_NEW = 'MODE_STRONG = "Gründlich mit Foundry (Büro-KI)"'
@@ -76,6 +81,13 @@ def apply_foundry(tool_root: Path) -> tuple[bool, str]:
         apply(tool_root)
     except (FileNotFoundError, ValueError, OSError) as exc:
         return False, str(exc)
+    leftover = leftovers_in_tool(tool_root)
+    if leftover:
+        return False, (
+            "Anwenden hat nicht alles umgestellt: "
+            + ", ".join(leftover)
+            + ". Bitte Pruefen.bat."
+        )
     if already:
         return True, "Text verbessern ist bereits auf Foundry umgestellt."
     return True, "Foundry-Anbindung für Text verbessern ist eingerichtet."
@@ -544,15 +556,14 @@ def _patch_pipeline(path: Path) -> None:
         "    if normalized in {\"rules+foundry\"}:\n"
         "        return HybridFoundryProvider()",
     )
-    pipe = _replace_once(
+    pipe = _replace_all_if_present(
         pipe,
-        '    if normalized in {"mistral", "mistral-local", "ollama"}:\n'
-        "        return LocalMistralProvider()\n"
-        '    if normalized in {"auto", "hybrid", "rules+mistral-local"}:\n'
+        "        return LocalMistralProvider()",
+        "        return FoundryEditorialProvider()",
+    )
+    pipe = _replace_all_if_present(
+        pipe,
         "        return HybridLocalProvider()",
-        '    if normalized in {"mistral", "mistral-local", "ollama"}:\n'
-        "        return FoundryEditorialProvider()\n"
-        '    if normalized in {"auto", "hybrid", "rules+mistral-local"}:\n'
         "        return HybridFoundryProvider()",
     )
     pipe = _replace_all_if_present(
