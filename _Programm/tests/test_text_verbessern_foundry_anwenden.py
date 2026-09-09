@@ -1202,6 +1202,32 @@ def test_anwenden_stellt_pipeline_regel_fallback_ab(tmp_path: Path) -> None:
     assert "Pipeline" in module.leftovers_in_tool(tool)
 
 
+def test_anwenden_entfernt_pipeline_regeln_name(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    pipe = tool / "app" / "pipeline.py"
+    text = pipe.read_text(encoding="utf-8")
+    assert "LocalRuleProvider.name" not in text
+    assert "FastEditorialProvider.name" not in text
+    assert "from .providers.local import LocalRuleProvider" not in text
+    assert "from .providers.fast_editor import FastEditorialProvider" not in text
+    pipe.write_text(
+        text
+        + "\n        applied_provider = LocalRuleProvider.name\n"
+        + "        applied_provider = FastEditorialProvider.name\n",
+        encoding="utf-8",
+    )
+    assert "Pipeline" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    leftover = pipe.read_text(encoding="utf-8")
+    assert "LocalRuleProvider.name" not in leftover
+    assert "FastEditorialProvider.name" not in leftover
+    assert module.leftovers_in_tool(tool) == []
+
+
 def test_anwenden_ersetzt_einzelnen_mistral_return(tmp_path: Path) -> None:
     module = _load_anwenden()
     tool = _fake_rephraser(tmp_path)

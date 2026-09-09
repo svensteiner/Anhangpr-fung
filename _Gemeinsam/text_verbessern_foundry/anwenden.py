@@ -843,7 +843,33 @@ def _patch_pipeline(path: Path) -> None:
         "rewritten = LocalRuleProvider().rewrite(text, semantics, selected)",
         'raise RuntimeError("Lokale Regeln sind abgeschaltet. Nur Foundry.")  # LLP-FOUNDRY-TOR',
     )
+    pipe = _replace_all_if_present(
+        pipe,
+        "from .providers.fast_editor import FastEditorialProvider\n",
+        "",
+    )
+    pipe = _replace_all_if_present(
+        pipe,
+        "from .providers.local import LocalRuleProvider\n",
+        "",
+    )
+    pipe = _strip_provider_name_assignments(pipe)
     path.write_text(pipe, encoding="utf-8")
+
+
+def _strip_provider_name_assignments(text: str) -> str:
+    """Tote LocalRuleProvider.name-Zuweisungen nach dem Foundry-Tor zählen weiter."""
+    lines: list[str] = []
+    for line in text.splitlines(keepends=True):
+        if "LocalRuleProvider.name" not in line and "FastEditorialProvider.name" not in line:
+            lines.append(line)
+            continue
+        indent = line[: len(line) - len(line.lstrip(" \t"))]
+        ending = "\n" if line.endswith("\n") else ""
+        lines.append(
+            f'{indent}raise RuntimeError("Lokale Regeln sind abgeschaltet. Nur Foundry.")  # LLP-FOUNDRY-TOR{ending}'
+        )
+    return "".join(lines)
 
 
 def _patch_providers_init(path: Path) -> None:
