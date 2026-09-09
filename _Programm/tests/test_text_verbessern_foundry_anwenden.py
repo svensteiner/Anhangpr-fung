@@ -132,7 +132,8 @@ def main(argv=None):
     return 0
 '''
 
-STREAMLIT_MAIN = '''from app.local_runtime import (
+STREAMLIT_MAIN = '''import streamlit as st
+from app.local_runtime import (
     LOCAL_MODEL_MAX_CHARACTERS,
     local_mistral_ready,
     local_model_eligible,
