@@ -793,6 +793,16 @@ def _patch_pipeline(path: Path) -> None:
         "from .providers.hybrid import HybridLocalProvider\n",
         "",
     )
+    pipe = _replace_all_if_present(
+        pipe,
+        "rewritten = FastEditorialProvider().rewrite(text, semantics, selected)",
+        'raise RuntimeError("Schnell-Editor ist abgeschaltet. Nur Foundry.")  # LLP-FOUNDRY-TOR',
+    )
+    pipe = _replace_all_if_present(
+        pipe,
+        "rewritten = LocalRuleProvider().rewrite(text, semantics, selected)",
+        'raise RuntimeError("Lokale Regeln sind abgeschaltet. Nur Foundry.")  # LLP-FOUNDRY-TOR',
+    )
     path.write_text(pipe, encoding="utf-8")
 
 

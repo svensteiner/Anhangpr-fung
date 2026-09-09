@@ -290,7 +290,10 @@ def pipeline_modus(path: Path | None) -> str:
     still_mistral = "return LocalMistralProvider()" in text
     still_hybrid = "return HybridLocalProvider()" in text
     still_rules = (
-        "return LocalRuleProvider()" in text or "return FastEditorialProvider()" in text
+        "return LocalRuleProvider()" in text
+        or "return FastEditorialProvider()" in text
+        or "LocalRuleProvider().rewrite" in text
+        or "FastEditorialProvider().rewrite" in text
     )
     foundry = "FoundryEditorialProvider" in text and "HybridFoundryProvider" in text
     if still_mistral or still_hybrid:

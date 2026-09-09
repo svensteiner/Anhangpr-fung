@@ -41,7 +41,9 @@ def run_pipeline(text, options=None, provider=None):
         if "mistral" not in active_provider.name:
             raise
         provider_failure = error
-        rewritten = text
+        rewritten = LocalRuleProvider().rewrite(text, semantics, selected)
+    elif ("mistral" in active_provider.name or active_provider.name == "fast-editor") and warnings:
+        rewritten = LocalRuleProvider().rewrite(text, semantics, selected)
     return rewritten
 '''
 
@@ -417,6 +419,8 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "return HybridLocalProvider()" not in pipeline
     assert "return LocalRuleProvider()" not in pipeline
     assert "return FastEditorialProvider()" not in pipeline
+    assert "LocalRuleProvider().rewrite" not in pipeline
+    assert "FastEditorialProvider().rewrite" not in pipeline
     assert "LocalRuleProvider" not in provider
     assert "Der Text bleibt unverändert" in provider
     assert "or foundry." in pipeline
@@ -990,6 +994,27 @@ def test_anwenden_ersetzt_einzelnen_regel_return(tmp_path: Path) -> None:
     assert ok2, msg2
     assert "return LocalRuleProvider()" not in pipe.read_text(encoding="utf-8")
     assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_stellt_pipeline_regel_fallback_ab(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    assert "LocalRuleProvider().rewrite" in (tool / "app" / "pipeline.py").read_text(
+        encoding="utf-8"
+    )
+    assert "Pipeline" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    text = (tool / "app" / "pipeline.py").read_text(encoding="utf-8")
+    assert "LocalRuleProvider().rewrite" not in text
+    assert "Lokale Regeln sind abgeschaltet" in text
+    assert module.leftovers_in_tool(tool) == []
+    pipe = tool / "app" / "pipeline.py"
+    pipe.write_text(
+        text + "\nrewritten = LocalRuleProvider().rewrite(text, semantics, selected)\n",
+        encoding="utf-8",
+    )
+    assert "Pipeline" in module.leftovers_in_tool(tool)
 
 
 def test_anwenden_ersetzt_einzelnen_mistral_return(tmp_path: Path) -> None:
