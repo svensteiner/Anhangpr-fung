@@ -259,7 +259,8 @@ def _fake_rephraser(tmp_path: Path) -> Path:
     )
     (tool / "pyproject.toml").write_text(
         "dependencies = [\"fastapi>=0.115\", \"pydantic>=2.8\", \"uvicorn>=0.30\"]\n"
-        "[project.optional-dependencies]\nui = [\"streamlit>=1.37\"]\n",
+        "[project.optional-dependencies]\nui = [\"streamlit>=1.37\"]\n"
+        "[project.scripts]\neditorial-transformer = \"app.main:cli\"\n",
         encoding="utf-8",
     )
     wf = tool / ".github" / "workflows"
@@ -281,7 +282,10 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         "    except ProviderError as error:\n"
         "        raise HTTPException(status_code=503, detail=str(error)) from error\n"
         "def transform_text(request: TransformRequest) -> str:\n"
-        "    return transform(request).rewritten_text\n",
+        "    return transform(request).rewritten_text\n"
+        "def cli(argv=None):\n"
+        "    result = run_pipeline(text, options)\n"
+        "    return 0\n",
         encoding="utf-8",
     )
     (tool / "app" / "providers" / "__init__.py").write_text(
@@ -405,7 +409,11 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "Streamlit-Oberflaeche startet nicht" in streamlit
     assert "import streamlit" not in streamlit
     assert "Gründlich mit Mistral" not in streamlit
-    stub_bak = (tool / "app" / "ui" / "streamlit_app.py.llp-alt").read_text(encoding="utf-8")
+    stub_note = (tool / "app" / "ui" / "streamlit_app.py.llp-alt").read_text(encoding="utf-8")
+    assert "Sicherung. Nicht starten" in stub_note
+    stub_bak = (
+        tool / "_llp_parked" / "app" / "ui" / "streamlit_app.py.llp-alt.txt"
+    ).read_text(encoding="utf-8")
     assert "import streamlit" in stub_bak
     pyproject = (tool / "pyproject.toml").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" in pyproject
@@ -414,6 +422,9 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "streamlit>=" not in pyproject
     assert "uvicorn>=" not in pyproject
     assert "fastapi>=" not in pyproject
+    assert "keine alte CLI" in pyproject
+    assert "editorial-transformer" not in pyproject or "entfernt" in pyproject
+    assert 'editorial-transformer = "app.main:cli"' not in pyproject
     assert not (tool / "dist" / "TextVerbessern" / "TextVerbessern.exe").is_file()
     assert (tool / "dist" / "TextVerbessern" / "TextVerbessern.exe.llp-alt").is_file()
     assert not (tool / ".github" / "workflows" / "windows-portable.yml").is_file()
@@ -429,8 +440,12 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "text_verbessern_foundry" in launcher.lower()
     assert not (tool / "TEXT VERBESSERN.original.cmd").is_file()
     backup = (tool / "TEXT VERBESSERN.cmd.llp-alt").read_text(encoding="utf-8")
-    assert "TextVerbessern.exe" in backup
-    assert "LLP-FOUNDRY-TOR" not in backup
+    assert "Sicherung. Nicht starten" in backup
+    cmd_parked = (tool / "_llp_parked" / "TEXT VERBESSERN.cmd.llp-alt.txt").read_text(
+        encoding="utf-8"
+    )
+    assert "TextVerbessern.exe" in cmd_parked
+    assert "LLP-FOUNDRY-TOR" not in cmd_parked
 
     ps1 = (tool / "scripts" / "start_windows.ps1").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" in ps1
@@ -438,7 +453,11 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "mistral-rephraser wird nicht gestartet" in ps1.lower()
     assert "text_verbessern_foundry" in ps1.lower()
     assert "foundry-seite" in ps1.lower()
-    ps1_bak = (tool / "scripts" / "start_windows.ps1.llp-alt").read_text(encoding="utf-8")
+    ps1_note = (tool / "scripts" / "start_windows.ps1.llp-alt").read_text(encoding="utf-8")
+    assert "Sicherung. Nicht starten" in ps1_note
+    ps1_bak = (tool / "_llp_parked" / "scripts" / "start_windows.ps1.llp-alt.txt").read_text(
+        encoding="utf-8"
+    )
     assert "streamlit" in ps1_bak.lower()
     assert "LLP-FOUNDRY-TOR" not in ps1_bak
 
@@ -473,7 +492,12 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "Offline-Datei startet nicht" in html
     assert "<script" not in html.lower()
     assert "text_verbessern_foundry" in html
-    html_bak = (tool / "web" / "TextVerbessern-Browser.html.llp-alt").read_text(encoding="utf-8")
+    html_note = (tool / "web" / "TextVerbessern-Browser.html.llp-alt").read_text(encoding="utf-8")
+    assert "Sicherung. Nicht starten" in html_note
+    assert "<script" not in html_note.lower()
+    html_bak = (
+        tool / "_llp_parked" / "web" / "TextVerbessern-Browser.html.llp-alt.txt"
+    ).read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" not in html_bak
     index = (tool / "web" / "index.html").read_text(encoding="utf-8")
     assert "Offline-Datei startet nicht" in index
@@ -482,7 +506,12 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert not (tool / "web" / "editor.js").is_file()
     assert (tool / "web" / "app.js.llp-alt").is_file()
     assert (tool / "web" / "editor.js.llp-alt").is_file()
-    assert "startEditor" in (tool / "web" / "app.js.llp-alt").read_text(encoding="utf-8")
+    assert "Sicherung. Nicht starten" in (tool / "web" / "app.js.llp-alt").read_text(
+        encoding="utf-8"
+    )
+    assert "startEditor" in (
+        tool / "_llp_parked" / "web" / "app.js.llp-alt.txt"
+    ).read_text(encoding="utf-8")
     cli = (tool / "app" / "main.py").read_text(encoding="utf-8")
     assert 'choices=["fast-editor", "rules", "foundry"]' in cli
     assert "mistral-local" not in cli
@@ -491,6 +520,8 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "return run_pipeline(request.text, request.options)" not in cli
     assert 'return {"status": "ok", "default_provider": "fast-editor"}' not in cli
     assert "return transform(request).rewritten_text" not in cli
+    assert "Die alte CLI startet nicht" in cli
+    assert "result = run_pipeline" not in cli
     providers_init = (tool / "app" / "providers" / "__init__.py").read_text(encoding="utf-8")
     assert "FoundryEditorialProvider" in providers_init
     assert "LocalMistralProvider" not in providers_init
@@ -506,7 +537,7 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert backup2 == backup
     ps1_again = (tool / "scripts" / "start_windows.ps1").read_text(encoding="utf-8")
     assert ps1_again == ps1
-    assert (tool / "scripts" / "start_windows.ps1.llp-alt").read_text(encoding="utf-8") == ps1_bak
+    assert (tool / "scripts" / "start_windows.ps1.llp-alt").read_text(encoding="utf-8") == ps1_note
     runtime2 = (tool / "app" / "local_runtime.py").read_text(encoding="utf-8")
     assert runtime2.count("return False  # LLP-FOUNDRY-TOR: kein Ollama") == 2
 
@@ -577,6 +608,39 @@ def test_anwenden_scheitert_wenn_mistral_export_bleibt(tmp_path: Path) -> None:
     assert "LocalMistralProvider" in msg or "exportiert" in msg
 
 
+def test_anwenden_legt_startbare_sicherung_still(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    html_alt = tool / "web" / "TextVerbessern-Browser.html.llp-alt"
+    html_alt.write_text(
+        "<html><body><script>startEditor()</script></body></html>\n",
+        encoding="utf-8",
+    )
+    assert "Sicherung-startbar" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    assert "Sicherung. Nicht starten" in html_alt.read_text(encoding="utf-8")
+    assert "<script" not in html_alt.read_text(encoding="utf-8").lower()
+    parked = tool / "_llp_parked" / "web" / "TextVerbessern-Browser.html.llp-alt.txt"
+    assert parked.is_file()
+    assert "startEditor" in parked.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_stellt_alte_cli_ab(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    main = tool / "app" / "main.py"
+    assert "result = run_pipeline" in main.read_text(encoding="utf-8")
+    assert "CLI" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    text = main.read_text(encoding="utf-8")
+    assert "Die alte CLI startet nicht" in text
+    assert "result = run_pipeline" not in text
+    assert module.leftovers_in_tool(tool) == []
+
+
 def test_anwenden_parkt_offline_js(tmp_path: Path) -> None:
     module = _load_anwenden()
     tool = _fake_rephraser(tmp_path)
@@ -587,6 +651,9 @@ def test_anwenden_parkt_offline_js(tmp_path: Path) -> None:
     assert not (tool / "web" / "editor.js").is_file()
     assert (tool / "web" / "app.js.llp-alt").is_file()
     assert (tool / "web" / "editor.js.llp-alt").is_file()
+    assert "Sicherung. Nicht starten" in (tool / "web" / "app.js.llp-alt").read_text(
+        encoding="utf-8"
+    )
     assert module.leftovers_in_tool(tool) == []
 
 
@@ -632,7 +699,11 @@ def test_anwenden_legt_original_cmd_beiseite(tmp_path: Path) -> None:
     assert not live.is_file()
     parked = tool / "TEXT VERBESSERN.original.cmd.llp-alt"
     assert parked.is_file()
-    assert "TextVerbessern.exe" in parked.read_text(encoding="utf-8")
+    assert "Sicherung. Nicht starten" in parked.read_text(encoding="utf-8")
+    original = (
+        tool / "_llp_parked" / "TEXT VERBESSERN.original.cmd.llp-alt.txt"
+    ).read_text(encoding="utf-8")
+    assert "TextVerbessern.exe" in original
     assert module.leftovers_in_tool(tool) == []
 
 

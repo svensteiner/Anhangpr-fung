@@ -86,6 +86,8 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "keine streamlit-datei" in low
     assert "keine alte offline-html" in low
     assert "kein offline-editor-skript" in low
+    assert "keine startbare sicherung" in low
+    assert "keine alte kommandozeile" in low
     assert "bei jedem start" in low
     assert "bitte pruefen.bat" in low
     assert "vor teil 2" in low
@@ -118,6 +120,8 @@ def test_share_anleitung_fuer_kollegen():
     assert "keine exe-anleitung" in text
     assert "keine alte offline-html" in text
     assert "kein offline-editor-skript" in text
+    assert "keine startbare sicherung" in text
+    assert "keine alte kommandozeile" in text
     assert "vor teil 2" in text
     assert "bei jedem start" in text
     assert "bitte pruefen.bat" in text
@@ -215,6 +219,8 @@ def test_werkzeuge_pseudokrat_ohne_foundry():
     assert "foundry-tor" in text
     assert "nicht mistral" in text
     assert "offline-editor" in text
+    assert "startbare" in text
+    assert "kommandozeile" in text
 
 
 def test_tools_starten_ruft_llp_start_auf():

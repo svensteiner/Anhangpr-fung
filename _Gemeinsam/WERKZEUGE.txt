@@ -55,6 +55,7 @@ kopiert sie nicht.
 Status ohne Schluessel
 ----------------------
 Pruefen.bat in diesem Ordner. Zeigt Foundry und ob
-Text verbessern noch Mistral, Streamlit, Ollama
-oder den Offline-Editor (HTML/JS) nutzt.
+Text verbessern noch Mistral, Streamlit, Ollama,
+den Offline-Editor (HTML/JS), eine startbare
+Sicherung oder die alte Kommandozeile nutzt.
 Keine Schluessel.

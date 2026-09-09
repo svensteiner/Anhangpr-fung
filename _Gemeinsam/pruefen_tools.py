@@ -309,6 +309,58 @@ def find_live_web_js(roots: list[Path]) -> Path | None:
     return None
 
 
+PARK_DIR_NAME = "_llp_parked"
+BACKUP_NOTE_MARK = "Sicherung. Nicht starten"
+LAUNCHABLE_BACKUP_SUFFIXES = (
+    ".html.llp-alt",
+    ".js.llp-alt",
+    ".ps1.llp-alt",
+    ".cmd.llp-alt",
+)
+LAUNCHABLE_BACKUP_NAMES = frozenset(
+    {
+        "streamlit_app.py.llp-alt",
+        "main.py.llp-alt",
+    }
+)
+
+
+def is_launchable_backup(path: Path) -> bool:
+    """Geparkte HTML/PS1/CMD/JS dürfen nicht per Doppelklick starten."""
+    if not path.is_file():
+        return False
+    if PARK_DIR_NAME in path.parts:
+        return False
+    name = path.name.lower()
+    if not name.endswith(".llp-alt"):
+        return False
+    matched = any(name.endswith(suffix) for suffix in LAUNCHABLE_BACKUP_SUFFIXES)
+    if not matched and path.name.lower() not in LAUNCHABLE_BACKUP_NAMES:
+        return False
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "LLP-FOUNDRY-TOR" in text and BACKUP_NOTE_MARK in text:
+        return False
+    return True
+
+
+def find_launchable_backup(tool_root: Path) -> Path | None:
+    if not tool_root.is_dir():
+        return None
+    for path in sorted(tool_root.rglob("*.llp-alt")):
+        if is_launchable_backup(path):
+            return path
+    return None
+
+
+def find_live_launchable_backup(roots: list[Path]) -> Path | None:
+    for root in roots:
+        for name in TOOL_NAMES["text"]:
+            found = find_launchable_backup(root / name)
+            if found is not None:
+                return found
+    return None
+
+
 def find_live_spec(roots: list[Path]) -> Path | None:
     for root in roots:
         found = _first_existing(root, TOOL_NAMES["text"], str(SPEC_REL))
@@ -397,6 +449,8 @@ def pyproject_modus(path: Path | None) -> str:
         return "noch API"
     if raw_streamlit:
         return "noch Streamlit"
+    if 'editorial-transformer = "app.main:cli"' in text:
+        return "noch CLI"
     if marked:
         return "abgeschaltet"
     return "nicht erkannt"
@@ -414,6 +468,19 @@ def text_api_modus(path: Path | None) -> str:
         return "abgeschaltet"
     if "FastAPI" in text or "uvicorn" in text or "default_provider" in text:
         return "noch API"
+    return "nicht erkannt"
+
+
+def text_cli_modus(path: Path | None) -> str:
+    if path is None:
+        return "nicht gefunden"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "Die alte CLI startet nicht" in text:
+        return "abgeschaltet"
+    if "def cli(" in text and "run_pipeline" in text:
+        return "noch CLI"
+    if "def cli(" not in text:
+        return "nicht gefunden"
     return "nicht erkannt"
 
 
@@ -461,6 +528,7 @@ def report(start: Path | None = None) -> dict[str, object]:
     mistral_modus = mistral_provider_modus(mistral_provider)
     streamlit_modus = streamlit_app_modus(streamlit_app)
     api_modus = text_api_modus(api)
+    cli_modus = text_cli_modus(api)
     pipeline_mode = pipeline_modus(pipeline)
     hybrid_mode = hybrid_modus(hybrid)
     pyproject_mode = pyproject_modus(pyproject)
@@ -468,6 +536,7 @@ def report(start: Path | None = None) -> dict[str, object]:
     docs_mode = start_docs_modus(roots=roots)
     web_html = find_live_web_html(roots)
     web_js = find_live_web_js(roots)
+    launchable_backup = find_live_launchable_backup(roots)
     spec = find_live_spec(roots)
     build = find_live_build_script(roots)
     workflow = find_live_portable_workflow(roots)
@@ -491,6 +560,7 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_streamlit_modus": streamlit_modus,
         "text_api": api,
         "text_api_modus": api_modus,
+        "text_cli_modus": cli_modus,
         "text_pipeline": pipeline,
         "text_pipeline_modus": pipeline_mode,
         "text_hybrid": hybrid,
@@ -502,6 +572,7 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_docs_modus": docs_mode,
         "text_web_html": web_html,
         "text_web_js": web_js,
+        "text_launchable_backup": launchable_backup,
         "text_spec": spec,
         "text_build": build,
         "text_workflow": workflow,
@@ -535,6 +606,9 @@ def format_report(data: dict[str, object]) -> str:
         "  Mistral-Client:  " + str(data["text_mistral_modus"]),
         "  Streamlit-Datei: " + str(data["text_streamlit_modus"]),
         "  Alte API:        " + str(data["text_api_modus"]),
+        "  Alte CLI:        " + str(data["text_cli_modus"]),
+        "  Sicherung:       "
+        + ("noch startbar – Anwenden.bat" if data["text_launchable_backup"] else "beiseite"),
         "  Text-Pipeline:   " + str(data["text_pipeline_modus"]),
         "  Hybrid-Weg:      " + str(data["text_hybrid_modus"]),
         "  Paketdatei:      " + str(data["text_pyproject_modus"]),
@@ -597,6 +671,16 @@ def format_report(data: dict[str, object]) -> str:
             "  app/main.py bietet noch eine FastAPI/uvicorn-Route."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_cli_modus"] == "noch CLI":
+        lines.append(
+            "  app/main.py hat noch die alte Kommandozeile."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
+    if data["text_launchable_backup"] is not None:
+        lines.append(
+            "  Eine Sicherung (.llp-alt) ist noch startbar."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     if data["text_pipeline_modus"] in {"noch Mistral", "nicht erkannt"}:
         lines.append(
             "  app/pipeline.py leitet noch auf Mistral."
@@ -607,7 +691,7 @@ def format_report(data: dict[str, object]) -> str:
             "  hybrid.py ruft noch Mistral auf."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
-    if data["text_pyproject_modus"] in {"noch API", "noch Streamlit", "nicht erkannt"}:
+    if data["text_pyproject_modus"] in {"noch API", "noch Streamlit", "noch CLI", "nicht erkannt"}:
         lines.append(
             "  pyproject.toml zieht noch Streamlit oder uvicorn nach."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
@@ -674,6 +758,10 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
     api = tool_root / "app" / "main.py"
     if api.is_file() and text_api_modus(api) != "abgeschaltet":
         reasons.append("API")
+    if api.is_file() and text_cli_modus(api) == "noch CLI":
+        reasons.append("CLI")
+    if find_launchable_backup(tool_root) is not None:
+        reasons.append("Sicherung-startbar")
     runtime = tool_root / "app" / "local_runtime.py"
     if runtime.is_file() and local_runtime_modus(runtime) != "kein Ollama":
         reasons.append("Ollama")
@@ -732,13 +820,15 @@ def text_has_leftovers(
         or data["text_mistral_modus"] == "noch Ollama"
         or data["text_streamlit_modus"] == "noch Streamlit"
         or data["text_api_modus"] == "noch API"
+        or data["text_cli_modus"] == "noch CLI"
         or data["text_pipeline_modus"] in {"noch Mistral", "nicht erkannt"}
         or data["text_hybrid_modus"] in {"noch Mistral", "nicht erkannt"}
-        or data["text_pyproject_modus"] in {"noch API", "noch Streamlit", "nicht erkannt"}
+        or data["text_pyproject_modus"] in {"noch API", "noch Streamlit", "noch CLI", "nicht erkannt"}
         or data["text_providers_init_modus"] in {"noch Mistral", "nicht erkannt"}
         or data["text_docs_modus"] in {"noch alt", "nicht erkannt"}
         or data["text_web_html"] is not None
         or data["text_web_js"] is not None
+        or data["text_launchable_backup"] is not None
         or data["text_spec"] is not None
         or data["text_build"] is not None
         or data["text_workflow"] is not None
@@ -757,6 +847,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     mistral_ok = data["text_mistral_modus"] in {"abgeschaltet", "nicht gefunden"}
     streamlit_ok = data["text_streamlit_modus"] in {"abgeschaltet", "nicht gefunden"}
     api_ok = data["text_api_modus"] in {"abgeschaltet", "nicht gefunden"}
+    cli_ok = data["text_cli_modus"] in {"abgeschaltet", "nicht gefunden"}
     pipeline_ok = data["text_pipeline_modus"] in {"Foundry", "nicht gefunden"}
     hybrid_ok = data["text_hybrid_modus"] in {"Foundry", "nicht gefunden"}
     pyproject_ok = data["text_pyproject_modus"] in {"abgeschaltet", "nicht gefunden"}
@@ -764,6 +855,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     docs_ok = data["text_docs_modus"] in {"Foundry", "nicht gefunden"}
     web_ok = data["text_web_html"] is None
     web_js_ok = data["text_web_js"] is None
+    backup_ok = data["text_launchable_backup"] is None
     pack_ok = data["text_spec"] is None and data["text_build"] is None and data["text_workflow"] is None
     return (
         data["text_modus"] == "Foundry"
@@ -776,6 +868,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and mistral_ok
         and streamlit_ok
         and api_ok
+        and cli_ok
         and pipeline_ok
         and hybrid_ok
         and pyproject_ok
@@ -783,6 +876,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and docs_ok
         and web_ok
         and web_js_ok
+        and backup_ok
         and pack_ok
     )
 

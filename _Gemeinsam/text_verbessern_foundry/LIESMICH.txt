@@ -29,7 +29,9 @@ Wenn daneben noch der Ordner rephraser liegt und
    README.md und LIESMICH-FOUNDRY.txt zeigen
    denselben Weg. Die Offline-HTML im Ordner web
    startet nicht; app.js und editor.js werden
-   zur Seite gelegt. Nur der Foundry-Hinweis bleibt.
+   zur Seite gelegt. Startbare Sicherungen (.llp-alt)
+   sind nur noch ein Hinweis. Die alte CLI startet nicht.
+   Nur der Foundry-Hinweis bleibt.
 
 Nicht nötig, wenn das Tool bereits „Gründlich mit Foundry“
 zeigt. Ein zweiter Lauf ändert nichts.

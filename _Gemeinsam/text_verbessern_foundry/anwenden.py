@@ -17,7 +17,12 @@ SHARED = HERE.parent
 if str(SHARED) not in sys.path:
     sys.path.insert(0, str(SHARED))
 
-from pruefen_tools import leftovers_in_tool
+from pruefen_tools import (
+    BACKUP_NOTE_MARK,
+    PARK_DIR_NAME,
+    is_launchable_backup,
+    leftovers_in_tool,
+)
 
 MODE_STRONG_OLD = 'MODE_STRONG = "Gründlich mit Mistral (bis 45 s)"'
 MODE_STRONG_NEW = 'MODE_STRONG = "Gründlich mit Foundry (Büro-KI)"'
@@ -133,6 +138,7 @@ def apply(tool_root: Path) -> list[str]:
     extra = _patch_leftover_docs(tool_root)
     done.extend(extra)
     done.extend(_park_web_scripts(tool_root))
+    done.extend(_neutralize_launchable_backups(tool_root))
     hybrid = tool_root / "app" / "providers" / "hybrid.py"
     if hybrid.is_file():
         _patch_hybrid(hybrid)
@@ -347,6 +353,7 @@ def _patch_leftover_docs(tool_root: Path) -> list[str]:
             'choices=["fast-editor", "rules", "foundry"]',
         )
         updated = _disable_fastapi(updated)
+        updated = _disable_cli(updated)
         if updated != text:
             bak = cli.with_name(cli.name + ".llp-alt")
             if not bak.is_file():
@@ -395,6 +402,55 @@ def _disable_fastapi(text: str) -> str:
         + FOUNDRY_UVICORN_HINT,
     )
     return text
+
+
+CLI_STUB = (
+    "def cli(argv: list[str] | None = None) -> int:\n"
+    "    raise SystemExit(\n"
+    '        "Bitte Desktop Text verbessern oder "\n'
+    '        "_Gemeinsam\\\\text_verbessern_foundry\\\\Starten.bat. "\n'
+    '        "Die alte CLI startet nicht. Nur Foundry, kein Mistral."\n'
+    "    )  # LLP-FOUNDRY-TOR\n"
+)
+
+
+def _disable_cli(text: str) -> str:
+    """python -m app.main und editorial-transformer dürfen nicht mehr umschreiben."""
+    if "Die alte CLI startet nicht" in text:
+        return text
+    start = text.find("def cli(")
+    if start == -1:
+        return text
+    end = text.find('if __name__ == "__main__":', start)
+    if end == -1:
+        return text[:start] + CLI_STUB
+    return text[:start] + CLI_STUB + "\n\n" + text[end:]
+
+
+BACKUP_NOTE = (
+    "LLP-FOUNDRY-TOR\n"
+    f"{BACKUP_NOTE_MARK}.\n"
+    "Bitte Desktop Text verbessern oder "
+    "_Gemeinsam\\text_verbessern_foundry\\Starten.bat.\n"
+    "Nur Foundry, kein Mistral.\n"
+)
+
+
+def _neutralize_launchable_backups(tool_root: Path) -> list[str]:
+    """HTML/PS1/CMD/JS-.llp-alt nebenan nicht per Doppelklick startbar lassen."""
+    written: list[str] = []
+    park_root = tool_root / PARK_DIR_NAME
+    for path in sorted(tool_root.rglob("*.llp-alt")):
+        if not is_launchable_backup(path):
+            continue
+        rel = path.relative_to(tool_root)
+        dest = park_root / f"{rel.as_posix()}.txt"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if not dest.is_file():
+            dest.write_bytes(path.read_bytes())
+        path.write_text(BACKUP_NOTE, encoding="utf-8")
+        written.append(str(path))
+    return written
 
 
 WEB_HTML_NAMES = (
@@ -846,6 +902,11 @@ def _patch_pyproject(path: Path) -> None:
         text,
         'dependencies = ["fastapi>=0.115", "pydantic>=2.8", "uvicorn>=0.30"]',
         'dependencies = ["pydantic>=2.8"]  # LLP-FOUNDRY-TOR: kein uvicorn',
+    )
+    text = _replace_all_if_present(
+        text,
+        'editorial-transformer = "app.main:cli"',
+        "# editorial-transformer entfernt  # LLP-FOUNDRY-TOR: keine alte CLI",
     )
     path.write_text(text, encoding="utf-8")
 

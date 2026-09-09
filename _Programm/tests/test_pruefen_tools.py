@@ -113,6 +113,8 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert "Mistral-Client:" in blob
     assert "Streamlit-Datei:" in blob
     assert "Alte API:" in blob
+    assert "Alte CLI:" in blob
+    assert "Sicherung:" in blob
     assert "Text-Pipeline:" in blob
     assert "Hybrid-Weg:" in blob
     assert "Paketdatei:" in blob
@@ -495,6 +497,46 @@ def test_report_foundry_aber_offline_js_ist_nicht_ok(tmp_path: Path) -> None:
     assert module.text_foundry_ok(gemeinsam) is False
     assert module.text_has_leftovers(data) is True
     assert "Offline-JS" in module.leftovers_in_tool(tools / "rephraser")
+
+
+def test_report_foundry_aber_startbare_sicherung_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    alt = tools / "rephraser" / "web" / "TextVerbessern-Browser.html.llp-alt"
+    alt.parent.mkdir(parents=True)
+    alt.write_text("<html><body><script>startEditor()</script></body></html>\n", encoding="utf-8")
+    data = module.report(gemeinsam)
+    assert data["text_launchable_backup"] is not None
+    blob = module.format_report(data)
+    assert "Sicherung" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Sicherung-startbar" in module.leftovers_in_tool(tools / "rephraser")
+
+
+def test_report_foundry_aber_alte_cli_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    main = tools / "rephraser" / "app" / "main.py"
+    main.write_text(
+        "def cli(argv=None):\n"
+        "    result = run_pipeline(text, options)\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_cli_modus"] == "noch CLI"
+    blob = module.format_report(data)
+    assert "Kommandozeile" in blob or "CLI" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "CLI" in module.leftovers_in_tool(tools / "rephraser")
 
 
 def test_report_foundry_aber_packaging_spec_ist_nicht_ok(tmp_path: Path) -> None:
