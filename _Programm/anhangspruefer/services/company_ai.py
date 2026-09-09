@@ -1,8 +1,12 @@
 """Kompatibilitätsimport zum zentralen LLP-Foundry-Layer.
 
-Der Zugang liegt in ``K:\\LLP Wirtschaftsprüfung\\AI Tools\\_Gemeinsam\\llp_ai``.
-Dieses Modul enthält weder Schlüssel noch eigene Netzlogik. Ist der Layer
-nicht erreichbar, bleibt die Prüfung bei der Heuristik.
+Suche (in dieser Reihenfolge):
+  1. Umgebung ``LLP_SHARED_AI_ROOT`` (wenn gesetzt: nur dieser Ordner)
+  2. ``K:\\LLP Wirtschaftsprüfung\\AI Tools\\_Gemeinsam``
+  3. ``_Gemeinsam`` neben dem Tool und eine Ebene darüber
+
+Dieses Modul enthält keine Schlüssel. Ist der Layer nicht erreichbar,
+bleibt die Prüfung bei der Heuristik.
 """
 
 from __future__ import annotations
@@ -12,9 +16,24 @@ import sys
 from pathlib import Path
 
 DEFAULT_SHARED_ROOT = Path(r"K:\LLP Wirtschaftsprüfung\AI Tools\_Gemeinsam")
-_shared = Path(os.environ.get("LLP_SHARED_AI_ROOT", DEFAULT_SHARED_ROOT))
-if _shared.is_dir() and str(_shared) not in sys.path:
-    sys.path.insert(0, str(_shared))
+_TOOL_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _candidate_roots() -> list[Path]:
+    env = os.environ.get("LLP_SHARED_AI_ROOT")
+    if env:
+        return [Path(env)]
+    return [
+        DEFAULT_SHARED_ROOT,
+        _TOOL_ROOT / "_Gemeinsam",
+        _TOOL_ROOT.parent / "_Gemeinsam",
+    ]
+
+
+def _prepare_path() -> None:
+    for root in _candidate_roots():
+        if root.is_dir() and str(root) not in sys.path:
+            sys.path.insert(0, str(root))
 
 
 class CompanyAIError(Exception):
@@ -22,6 +41,7 @@ class CompanyAIError(Exception):
 
 
 def _load():
+    _prepare_path()
     try:
         from llp_ai.company_ai import (  # type: ignore
             active_provider,
@@ -44,6 +64,11 @@ def _load():
 
 
 _LAYER = _load()
+
+
+def _reload() -> None:
+    global _LAYER
+    _LAYER = _load()
 
 
 def is_ai_ready() -> bool:

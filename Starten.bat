@@ -1,11 +1,12 @@
 @echo off
 chcp 65001 >nul
 title LLP - Anhangspruefer
+setlocal EnableExtensions
 
 echo.
 echo  ===============================================
 echo   LLP Wirtschaftspruefung und Steuerberatung
-echo   Anhangspruefer (3 Modi)
+echo   Anhangspruefer
 echo  ===============================================
 echo    1) Vorjahresvergleich
 echo    2) Detailpruefung
@@ -13,38 +14,54 @@ echo    3) UGB Inhaltspruefung
 echo  ===============================================
 echo.
 
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo  FEHLER: Python wurde nicht gefunden!
-    echo  Bitte Python 3.11+ installieren: https://www.python.org/downloads/
-    echo  Beim Setup: Haekchen bei "Add Python to PATH" setzen!
+cd /d "%~dp0"
+
+if exist "%~dp0_Gemeinsam" set "LLP_SHARED_AI_ROOT=%~dp0_Gemeinsam"
+if exist "%~dp0..\_Gemeinsam" set "LLP_SHARED_AI_ROOT=%~dp0..\_Gemeinsam"
+
+set "PY="
+py -3 -c "import sys" >nul 2>&1 && set "PY=py -3"
+if not defined PY python -c "import sys" >nul 2>&1 && set "PY=python"
+if not defined PY python3 -c "import sys" >nul 2>&1 && set "PY=python3"
+
+if not defined PY (
+    echo  Das Programm konnte Python nicht finden.
+    echo.
+    echo  Bitte Python 3.11 oder neuer installieren:
+    echo  https://www.python.org/downloads/
+    echo  Beim Setup das Haekchen "Add Python to PATH" setzen.
+    echo.
+    echo  Danach Starten.bat erneut doppelklicken.
+    echo.
     pause
     exit /b 1
 )
 
-echo  Pruefe Bibliotheken...
-pip install flask pdfplumber openpyxl pypdf --quiet --disable-pip-version-check
+%PY% -c "import flask, pdfplumber, openpyxl, pypdf, docx" >nul 2>&1
 if errorlevel 1 (
-    echo  WARNUNG: Bibliotheken konnten nicht aktualisiert werden.
-    echo  Versuche trotzdem zu starten...
+    echo  Richte benoetigte Bibliotheken ein (einmalig, einen Moment)...
+    %PY% -m pip install flask pdfplumber openpyxl pypdf python-docx --quiet --disable-pip-version-check
+    if errorlevel 1 (
+        echo  Die Bibliotheken konnten nicht eingerichtet werden.
+        echo  Bitte die IT um Hilfe bitten oder mit Internet erneut starten.
+        pause
+        exit /b 1
+    )
 )
-echo  OK.
-echo.
-echo  Starte Oberflaeche unter http://localhost:5555
-echo  Browser oeffnet sich automatisch...
-echo.
-echo  ZUM BEENDEN: Dieses Fenster schliessen.
+
+echo  Starte die Oberflaeche. Der Browser oeffnet sich.
+echo  Zum Beenden: Knopf "Beenden" oben rechts.
 echo.
 
 set PYTHONIOENCODING=utf-8
 set PYTHONUTF8=1
-cd /d "%~dp0"
 
 start "" "http://localhost:5555"
-python app.py
+%PY% app.py
 
 if errorlevel 1 (
     echo.
-    echo  FEHLER beim Starten der App. Details siehe oben.
+    echo  Das Programm konnte nicht starten.
+    echo  Bitte die Meldung oben lesen oder die IT rufen.
     pause
 )

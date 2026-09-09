@@ -575,25 +575,21 @@ def refine_findings(
     result: ReviewResult,
     checklist: Checklist,
     paragraphs: list[tuple[str, int]],
-    llm: Optional[LocalLLM] = None,
+    llm: Optional[LLMClient] = None,
     max_seconds: Optional[float] = None,
     progress: Optional[Callable[[int, int], None]] = None,
     answer_cache: Optional[dict] = None,
 ) -> dict:
-    """Verfeinert alle ANWENDBAREN Findings mit dem lokalen Modell.
+    """Verfeinert alle ANWENDBAREN Findings mit Foundry.
 
     NICHT ANWENDBAR bleibt unberührt (Relevanz-Filter hat Vorrang). Bei
     Zeitüberschreitung/Fehlern behalten die restlichen Findings ihr
     bisheriges (Stichwort-)Ergebnis — die Prüfung kippt nie.
-
-    answer_cache (optional): dict item_id -> Roh-Antwort (JSON-dict) des
-    Modells. Bereits beantwortete Punkte werden nicht erneut angefragt; neue
-    Antworten werden eingetragen. Damit ist ein langer Lauf in Etappen
-    wiederaufnehmbar.
+    Standard ist FoundryLLM. Kein stiller Fallback auf Ollama.
     """
-    llm = llm or LocalLLM()
+    llm = llm or FoundryLLM()
     if not llm.is_available():
-        logger.info("Lokale KI nicht verfügbar – Stichwort-Ergebnis bleibt bestehen.")
+        logger.info("Foundry nicht verfügbar – Stichwort-Ergebnis bleibt bestehen.")
         return {"verfeinert": 0, "uebersprungen": len(result.findings), "ki": None}
 
     by_id = {it.item_id: it for it in checklist.items}

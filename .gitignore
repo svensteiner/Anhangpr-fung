@@ -65,6 +65,7 @@ _apply_batch*.py
 # Schlüssel und lokale Umgebung — niemals einchecken
 .env
 .env.local
+_Gemeinsam/llp_ai/.env
 
 # OS / Editor
 Thumbs.db

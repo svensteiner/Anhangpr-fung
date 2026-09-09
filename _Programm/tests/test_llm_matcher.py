@@ -316,6 +316,23 @@ def test_foundry_llm_unavailable_without_layer():
     assert llm.generate_json("egal") is None
 
 
+def test_refine_findings_defaults_to_foundry_not_ollama(monkeypatch):
+    from anhangspruefer.compliance.knowledge import llm_matcher as m
+
+    created: list[str] = []
+
+    class Boom(m.LocalLLM):
+        def __init__(self, *a, **k):
+            created.append("local")
+            raise AssertionError("LocalLLM darf nicht still als Fallback dienen")
+
+    monkeypatch.setattr(m, "LocalLLM", Boom)
+    cl, res, paras = _setup()
+    out = m.refine_findings(res, cl, paras)
+    assert created == []
+    assert out["ki"] is None
+
+
 def test_refine_binaer_defaults_to_foundry_not_ollama(monkeypatch):
     from anhangspruefer.compliance.knowledge import llm_matcher as m
 

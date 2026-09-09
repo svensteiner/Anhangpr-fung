@@ -1,0 +1,24 @@
+LLP – gemeinsamer Ordner
+========================
+
+Dieser Ordner gehört auf den Server nach:
+
+  K:\LLP Wirtschaftsprüfung\AI Tools\_Gemeinsam
+
+Nicht ins Git: .env (Schlüssel). Nur .env.example.
+
+llp_ai
+------
+Einziger KI-Zugang für alle LLP-Tools, die ein Modell brauchen.
+Anbieter ist fest Microsoft Foundry. Kein stiller Wechsel
+auf Ollama, OpenAI oder Anthropic.
+
+1. Datei llp_ai\.env aus llp_ai\.env.example anlegen.
+2. COMPANY_AI_ENABLED=true setzen.
+3. Endpoint, Deployment und Schlüssel eintragen.
+4. Tools starten wie gewohnt (Starten.bat).
+
+Ist Foundry aus oder nicht erreichbar, arbeiten die Tools
+ohne Modell weiter (Heuristik / Regeln).
+
+Pseudokrat bleibt lokal und nutzt diesen Ordner nicht.

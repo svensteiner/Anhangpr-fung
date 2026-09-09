@@ -9,16 +9,15 @@
 
 ---
 
-## Schnellstart für Anfänger (EXE-Version)
+## Schnellstart
 
-**Keine Installation erforderlich!**
+Das Programm bleibt auf dem Server. Keine EXE kopieren.
 
-1. Doppelklicken Sie auf `dist\Anhangspruefer.exe`
-2. Klicken Sie auf "Durchsuchen..." und wählen Sie Ihre Anhang-PDF
-3. Klicken Sie auf "▶ Prüfung starten"
-4. Das Prüfungsprotokoll wird automatisch erstellt
+1. Einmalig: `Installieren.bat` (legt eine Desktop-Verknüpfung an)
+2. Immer: Desktop-Verknüpfung oder `Starten.bat`
+3. Browser öffnet sich. Mandant eintragen, Modus wählen.
 
-Die EXE-Datei befindet sich im Ordner `dist\`.
+KI nur über `_Gemeinsam/llp_ai` (Microsoft Foundry). Ohne Foundry: Heuristik.
 
 ---
 
@@ -39,14 +38,11 @@ Unternehmensgesetzbuch (UGB), insbesondere §§ 236-243.
 
 ## Installation
 
-### Option 1: EXE-Datei (empfohlen für Anfänger)
+### Start für Anwender
 
-Keine Installation erforderlich. Starten Sie einfach:
-```
-dist\Anhangspruefer.exe
-```
+`Starten.bat` im Programmordner (oder die Desktop-Verknüpfung).
 
-### Option 2: Python-Installation
+### Python-Installation (Entwicklung)
 
 Voraussetzungen:
 - Python 3.11 oder höher
@@ -67,19 +63,15 @@ python run_gui.py
 ```
 
 **Pflicht-Abhängigkeiten** (siehe `pyproject.toml`):
-`pypdf`, `pdfplumber`, `openpyxl`, `flask`
+`pypdf`, `pdfplumber`, `openpyxl`, `flask`, `python-docx`
 
 ## Verwendung
 
 ### GUI-Version (empfohlen)
 
-Starten Sie die grafische Oberfläche:
+Starten Sie die Oberfläche mit `Starten.bat` oder:
 ```bash
-# EXE-Version
-dist\Anhangspruefer.exe
-
-# Oder Python-Version
-python run_gui.py
+python app.py
 ```
 
 ### Kommandozeile

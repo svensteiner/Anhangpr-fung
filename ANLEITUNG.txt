@@ -71,12 +71,16 @@ MODUS 3 - UGB-INHALTSPRUEFUNG (zwei Schritte)
 
 KI (MICROSOFT FOUNDRY):
 -----------------------
-  Alle LLP-Tools nutzen denselben zentralen KI-Layer.
-  Liegt unter: AI Tools\_Gemeinsam\llp_ai
-  Schluessel niemals ins Programm oder ins Git legen.
+  Alle LLP-Tools mit Modell nutzen denselben Zugang:
+    AI Tools\_Gemeinsam\llp_ai
+  (liegt auch im Programmordner unter _Gemeinsam, falls
+   der Server-Ordner noch nicht eingerichtet ist.)
+
+  Schluessel nur in llp_ai\.env, niemals ins Git.
+  Anbieter ist fest Foundry. Kein stiller Wechsel.
 
   Ist Foundry aus: das Tool arbeitet mit der Heuristik.
-  Es wechselt nicht still auf ein anderes Modell.
+  Pseudokrat bleibt lokal und nutzt Foundry nicht.
 
 
 ERGEBNISSE:
