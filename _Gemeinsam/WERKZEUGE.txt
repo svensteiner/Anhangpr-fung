@@ -21,6 +21,7 @@ Modus 3: zuerst GmbH/AG und klein/mittel/gross, dann Rest.
 Text verbessern (rephraser / paraphraser)
 -----------------------------------------
 Start:  Tools_starten.bat, Punkt 2
+        (immer die Foundry-Seite, nicht rephraser)
         oder Desktop "Text verbessern"
         oder text_verbessern_foundry\Starten.bat
         TEXT VERBESSERN.cmd im Tool-Ordner oeffnet

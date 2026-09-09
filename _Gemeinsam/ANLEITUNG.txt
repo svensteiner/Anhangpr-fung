@@ -25,6 +25,7 @@ TAEGLICH
 
   2  Text verbessern
      Desktop „Text verbessern“ oder LLP AI Tools, Punkt 2
+     (Foundry-Seite, nicht das alte rephraser)
      oder text_verbessern_foundry\Starten.bat
      TEXT VERBESSERN.cmd im Tool-Ordner ist dasselbe
      Foundry-Tor, nicht Mistral. Eine alte EXE wird

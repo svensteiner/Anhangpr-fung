@@ -142,9 +142,10 @@ def test_tools_starten_ruft_llp_start_auf():
 def test_llp_start_findet_tools_im_eigenen_und_nachbarordner():
     text = (ROOT / "_Gemeinsam" / "llp_start" / "Start.bat").read_text(encoding="utf-8")
     assert '%ROOT%\\app.py' in text or "%ROOT%\\app.py" in text
-    assert '%ROOT%\\..\\rephraser' in text or "%ROOT%\\..\\rephraser" in text
     assert '%ROOT%\\..\\Pseudokrat' in text or "%ROOT%\\..\\Pseudokrat" in text
     assert 'call :TRY "%ROOT%" "Starten.bat"' in text
+    assert "TEXT VERBESSERN.cmd" not in text
+    assert "text_verbessern_foundry" in text.lower()
 
 
 def test_text_verbessern_foundry_kit_liegt_bereit():
@@ -165,5 +166,5 @@ def test_text_verbessern_foundry_kit_liegt_bereit():
     assert "llp_shared_ai_root" in low
     assert "text_verbessern_foundry" in low
     assert "text_verbessern_foundry\" \"starten.bat" in low or "text_verbessern_foundry\\starten.bat" in low
-    assert "--text-foundry" in low
+    assert "text verbessern.cmd" not in low
     assert "mistral-rephraser wird nicht gestartet" in low
