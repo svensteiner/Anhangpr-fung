@@ -88,5 +88,9 @@ def test_text_verbessern_foundry_kit_liegt_bereit():
     assert "foundry" in lies
     assert "mistral" in lies
     assert "ollama" in lies
-    start = (ROOT / "_Gemeinsam" / "llp_start" / "Start.bat").read_text(encoding="utf-8").lower()
-    assert "anwenden.bat" in start
+    start = (ROOT / "_Gemeinsam" / "llp_start" / "Start.bat").read_text(encoding="utf-8")
+    low = start.lower()
+    assert "anwenden.py" in low
+    assert "foundry_text" in low
+    assert "llp_shared_ai_root" in low
+    assert "text_verbessern_foundry" in low

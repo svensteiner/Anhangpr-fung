@@ -51,15 +51,26 @@ exit /b 1
 
 :TEXT
 echo  Text verbessern: gruendlich nur Foundry (llp_ai).
-echo  Zeigt das Tool noch Mistral, einmal
-echo  text_verbessern_foundry\Anwenden.bat doppelklicken.
-echo  Es gibt keinen stillen Wechsel auf Ollama.
+echo  Nicht Mistral/Ollama, kein stiller Wechsel.
+call :FOUNDRY_TEXT
 call :TRY "%ROOT%\rephraser" "TEXT VERBESSERN.cmd" && exit /b 0
 call :TRY "%ROOT%\paraphraser" "TEXT VERBESSERN.cmd" && exit /b 0
 echo  Text verbessern nicht gefunden. Bitte die
 echo  Startdatei im Tool-Ordner doppelklicken.
 pause
 exit /b 1
+
+:FOUNDRY_TEXT
+if not defined LLP_SHARED_AI_ROOT goto :eof
+if not exist "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\anwenden.py" goto :eof
+set "PY="
+py -3 -c "import sys" >nul 2>&1 && set "PY=py -3"
+if not defined PY python -c "import sys" >nul 2>&1 && set "PY=python"
+if not defined PY python3 -c "import sys" >nul 2>&1 && set "PY=python3"
+if not defined PY goto :eof
+echo  Foundry-Anbindung pruefen ...
+%PY% "%LLP_SHARED_AI_ROOT%\text_verbessern_foundry\anwenden.py"
+goto :eof
 
 :PSEUDO
 call :TRY "%ROOT%\Pseudokrat" "START.bat" && exit /b 0
