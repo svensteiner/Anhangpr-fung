@@ -140,7 +140,7 @@ def apply(tool_root: Path) -> list[str]:
 
     done.extend(_park_exe(tool_root))
     done.extend(_park_packaging(tool_root))
-    done.extend(_park_portable_workflow(tool_root))
+    done.extend(_park_leftover_workflows(tool_root))
     done.extend(_park_build_scripts(tool_root))
     ps1 = _patch_windows_start(tool_root)
     if ps1 is not None:
@@ -224,6 +224,11 @@ EXE_NAMES = (
 
 SPEC_REL = Path("packaging") / "TextVerbessern.spec"
 WORKFLOW_REL = Path(".github") / "workflows" / "windows-portable.yml"
+WORKFLOW_RELS = (
+    WORKFLOW_REL,
+    Path(".github") / "workflows" / "tests.yml",
+    Path(".github") / "workflows" / "pages.yml",
+)
 BUILD_RELS = (
     Path("scripts") / "build_browser_standalone.py",
 )
@@ -580,16 +585,19 @@ def _park_packaging(tool_root: Path) -> list[str]:
     return [str(dest)]
 
 
-def _park_portable_workflow(tool_root: Path) -> list[str]:
-    """CI-Rezept darf keine neue Mistral-EXE bauen."""
-    workflow = tool_root / WORKFLOW_REL
-    if not workflow.is_file():
-        return []
-    dest = workflow.with_name(workflow.name + ".llp-alt")
-    if dest.exists():
-        return []
-    workflow.rename(dest)
-    return [str(dest)]
+def _park_leftover_workflows(tool_root: Path) -> list[str]:
+    """CI darf keine EXE, Bewertung oder Offline-Editor mehr starten."""
+    parked: list[str] = []
+    for rel in WORKFLOW_RELS:
+        workflow = tool_root / rel
+        if not workflow.is_file():
+            continue
+        dest = workflow.with_name(workflow.name + ".llp-alt")
+        if dest.exists():
+            continue
+        workflow.rename(dest)
+        parked.append(str(dest))
+    return parked
 
 
 def _park_build_scripts(tool_root: Path) -> list[str]:

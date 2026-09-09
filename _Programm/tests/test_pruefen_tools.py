@@ -720,6 +720,24 @@ def test_report_foundry_aber_alte_anleitung_sicherung_ist_nicht_ok(tmp_path: Pat
     assert "Sicherung-startbar" in module.leftovers_in_tool(tools / "rephraser")
 
 
+def test_report_foundry_aber_tests_ci_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    workflow = tools / "rephraser" / ".github" / "workflows" / "tests.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("run: python -m app.evaluation\n", encoding="utf-8")
+    data = module.report(gemeinsam)
+    assert data["text_workflow"] is not None
+    blob = module.format_report(data)
+    assert "CI-Rezept" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "CI-Rezept" in module.leftovers_in_tool(tools / "rephraser")
+
+
 def test_report_foundry_aber_packaging_spec_ist_nicht_ok(tmp_path: Path) -> None:
     module = _load()
     tools = tmp_path / "AI Tools"

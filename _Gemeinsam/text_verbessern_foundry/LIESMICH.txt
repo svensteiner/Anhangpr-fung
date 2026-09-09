@@ -33,7 +33,8 @@ Wenn daneben noch der Ordner rephraser liegt und
    startet nicht; app.js und editor.js werden
    zur Seite gelegt. Startbare Sicherungen (.llp-alt)
    sind nur noch ein Hinweis. Die alte CLI, der
-   Desktop-Selbsttest und die lokale Bewertung
+   Desktop-Selbsttest, die lokale Bewertung und
+   CI-Rezepte (Bewertung oder Offline-Editor)
    starten nicht. Nur der Foundry-Hinweis bleibt.
 
 Nicht nötig, wenn das Tool bereits „Gründlich mit Foundry“

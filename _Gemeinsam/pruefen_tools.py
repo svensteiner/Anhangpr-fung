@@ -310,6 +310,11 @@ WEB_HTML_RELS = (
 SPEC_REL = Path("packaging") / "TextVerbessern.spec"
 BUILD_REL = Path("scripts") / "build_browser_standalone.py"
 WORKFLOW_REL = Path(".github") / "workflows" / "windows-portable.yml"
+WORKFLOW_RELS = (
+    WORKFLOW_REL,
+    Path(".github") / "workflows" / "tests.yml",
+    Path(".github") / "workflows" / "pages.yml",
+)
 
 
 def web_html_modus(path: Path | None) -> str:
@@ -436,9 +441,10 @@ def find_live_build_script(roots: list[Path]) -> Path | None:
 
 def find_live_portable_workflow(roots: list[Path]) -> Path | None:
     for root in roots:
-        found = _first_existing(root, TOOL_NAMES["text"], str(WORKFLOW_REL))
-        if found is not None:
-            return found
+        for rel in WORKFLOW_RELS:
+            found = _first_existing(root, TOOL_NAMES["text"], str(rel))
+            if found is not None:
+                return found
     return None
 
 
@@ -951,7 +957,12 @@ def format_report(data: dict[str, object]) -> str:
             "  web/app.js oder web/editor.js liegt noch im Tool-Ordner."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
-    if data["text_spec"] is not None or data["text_build"] is not None or data["text_workflow"] is not None:
+    if data["text_workflow"] is not None:
+        lines.append(
+            "  Ein CI-Rezept (Bewertung oder Offline-Editor) liegt noch im Tool-Ordner."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
+    if data["text_spec"] is not None or data["text_build"] is not None:
         lines.append(
             "  Ein Packaging- oder Build-Rezept liegt noch im Tool-Ordner."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
@@ -1035,8 +1046,8 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
         reasons.append("Packaging-Spec")
     if (tool_root / BUILD_REL).is_file():
         reasons.append("Build-Skript")
-    if (tool_root / WORKFLOW_REL).is_file():
-        reasons.append("Portable-CI")
+    if any((tool_root / rel).is_file() for rel in WORKFLOW_RELS):
+        reasons.append("CI-Rezept")
     provider = tool_root / "app" / "providers" / "foundry_provider.py"
     if desktop.is_file() and not provider.is_file():
         reasons.append("Foundry-Datei")

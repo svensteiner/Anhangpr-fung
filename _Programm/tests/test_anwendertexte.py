@@ -31,6 +31,7 @@ def test_anleitung_kein_exe_copy_und_modus3_pflicht():
     assert "desktop-selbsttest" in text
     assert "lokale bewertung" in text
     assert "lokale regelfassung" in text
+    assert "ci-rezepte" in text
 
 
 def test_installieren_kopiert_keine_exe():
@@ -97,6 +98,7 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "keinen desktop-selbsttest" in low
     assert "keine lokale bewertung" in low
     assert "keine lokale regelfassung" in low
+    assert "keine ci-rezepte" in low
     assert "bei jedem start" in low
     assert "bitte pruefen.bat" in low
     assert "vor teil 2" in low
@@ -136,6 +138,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "keinen desktop-selbsttest" in text
     assert "keine lokale bewertung" in text
     assert "keine lokale regelfassung" in text
+    assert "keine ci-rezepte" in text
     assert "vor teil 2" in text
     assert "wie viele fragen vom rest" in text
     assert "bei jedem start" in text
@@ -242,6 +245,7 @@ def test_werkzeuge_pseudokrat_ohne_foundry():
     assert "selbsttest" in text
     assert "bewertung" in text
     assert "regelfassung" in text
+    assert "ci-rezepte" in text or "bewertung/offline-editor" in text
     assert "sonst die sichere lokale" not in text
     assert "keine lokale regelfassung" in text
     assert "unveraendert" in text or "unverändert" in text
@@ -292,6 +296,7 @@ def test_text_verbessern_foundry_kit_liegt_bereit():
     assert "unveraendert" in lies or "unverändert" in lies
     assert "selbsttest" in lies
     assert "bewertung" in lies
+    assert "ci-rezepte" in lies
     kit_start = (kit / "Starten.bat").read_text(encoding="utf-8").lower()
     assert "anwenden.py" in kit_start
     assert "--leise" in kit_start

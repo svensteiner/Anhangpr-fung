@@ -298,6 +298,14 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         "name: portable\n  TextVerbessern.exe\n",
         encoding="utf-8",
     )
+    (wf / "tests.yml").write_text(
+        "name: Tests\n        run: python -m app.evaluation\n",
+        encoding="utf-8",
+    )
+    (wf / "pages.yml").write_text(
+        "name: Browser edition\n        run: node --test tests/web_editor.test.mjs\n",
+        encoding="utf-8",
+    )
     dist = tool / "dist" / "TextVerbessern"
     dist.mkdir(parents=True, exist_ok=True)
     (dist / "TextVerbessern.exe").write_bytes(b"mz-dist")
@@ -499,6 +507,10 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert (tool / "dist" / "TextVerbessern" / "TextVerbessern.exe.llp-alt").is_file()
     assert not (tool / ".github" / "workflows" / "windows-portable.yml").is_file()
     assert (tool / ".github" / "workflows" / "windows-portable.yml.llp-alt").is_file()
+    assert not (tool / ".github" / "workflows" / "tests.yml").is_file()
+    assert (tool / ".github" / "workflows" / "tests.yml.llp-alt").is_file()
+    assert not (tool / ".github" / "workflows" / "pages.yml").is_file()
+    assert (tool / ".github" / "workflows" / "pages.yml.llp-alt").is_file()
 
     launcher = (tool / "TEXT VERBESSERN.cmd").read_text(encoding="utf-8")
     assert "LLP-FOUNDRY-TOR" in launcher
@@ -702,6 +714,19 @@ def test_anwenden_stellt_bewertung_ab(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert "Bewertung" in module.leftovers_in_tool(tool)
+
+
+def test_anwenden_parkt_ci_rezepte(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    assert "CI-Rezept" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    assert module.leftovers_in_tool(tool) == []
+    (tool / ".github" / "workflows" / "tests.yml").write_text(
+        "run: python -m app.evaluation\n", encoding="utf-8"
+    )
+    assert "CI-Rezept" in module.leftovers_in_tool(tool)
 
 
 def test_anwenden_stellt_desktop_pipeline_ab(tmp_path: Path) -> None:
