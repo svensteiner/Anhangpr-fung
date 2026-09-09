@@ -344,7 +344,8 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         "def local_mistral_ready(timeout: float = 0.8) -> bool:\n"
         "    return True  # http://127.0.0.1:11434\n"
         "    raw = opener.open(base_url + '/api/tags')\n"
-        "    model = os.getenv('MISTRAL_MODEL', 'mistral')\n\n"
+        "    model = os.getenv('MISTRAL_MODEL', 'mistral')\n"
+        "MISTRAL_PREFLIGHT_TIMEOUT_SECONDS = 0.5\n\n"
         "def preflight_local_mistral() -> bool:\n"
         "    return True\n",
         encoding="utf-8",
@@ -354,6 +355,7 @@ def _fake_rephraser(tmp_path: Path) -> Path:
         "    def __init__(self, base_url: str | None = None, model: str | None = None) -> None:\n"
         "        self.base_url = os.getenv('MISTRAL_BASE_URL', 'http://127.0.0.1:11434')\n"
         "        self.model = os.getenv('MISTRAL_MODEL', 'mistral')\n"
+        "        self.timeout = float(os.getenv('MISTRAL_TIMEOUT_SECONDS', '42'))\n"
         "    def rewrite(self, text: str, constraints: SemanticConstraints, "
         "options: TransformOptions) -> str:\n"
         "        request = self.base_url + '/api/generate'\n"
@@ -443,6 +445,8 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "MISTRAL_BASE_URL" not in runtime
     assert "/api/tags" not in runtime
     assert "MISTRAL_MODEL" not in runtime
+    assert "MISTRAL_PREFLIGHT_TIMEOUT_SECONDS" not in runtime
+    assert "MISTRAL_TIMEOUT_SECONDS" not in runtime
     assert runtime.count("return False") >= 2
     lines = [ln.strip() for ln in runtime.splitlines() if ln.strip()]
     ready_idx = lines.index("def local_mistral_ready(timeout: float = 0.8) -> bool:")
@@ -457,6 +461,7 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "11434" not in mistral
     assert "MISTRAL_BASE_URL" not in mistral
     assert "MISTRAL_MODEL" not in mistral
+    assert "MISTRAL_TIMEOUT_SECONDS" not in mistral
     lines = [ln.rstrip() for ln in mistral.splitlines()]
     init_idx = next(i for i, ln in enumerate(lines) if "def __init__" in ln)
     assert "raise RuntimeError" in lines[init_idx + 1]
@@ -793,6 +798,41 @@ def test_anwenden_entfernt_mistral_base_url(tmp_path: Path) -> None:
     ok2, msg2 = module.apply_foundry(tool)
     assert ok2, msg2
     assert "MISTRAL_BASE_URL" not in path.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_entfernt_mistral_timeout(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    assert "MISTRAL_TIMEOUT_SECONDS" in (
+        tool / "app" / "providers" / "mistral_provider.py"
+    ).read_text(encoding="utf-8")
+    assert "MISTRAL_PREFLIGHT_TIMEOUT_SECONDS" in (
+        tool / "app" / "local_runtime.py"
+    ).read_text(encoding="utf-8")
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    mistral = tool / "app" / "providers" / "mistral_provider.py"
+    runtime = tool / "app" / "local_runtime.py"
+    assert "MISTRAL_TIMEOUT_SECONDS" not in mistral.read_text(encoding="utf-8")
+    assert "MISTRAL_PREFLIGHT_TIMEOUT_SECONDS" not in runtime.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
+    mistral.write_text(
+        mistral.read_text(encoding="utf-8")
+        + "\n        configured_timeout = float(os.getenv('MISTRAL_TIMEOUT_SECONDS', '42'))\n",
+        encoding="utf-8",
+    )
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    runtime.write_text(
+        runtime.read_text(encoding="utf-8") + "\nMISTRAL_PREFLIGHT_TIMEOUT_SECONDS = 0.5\n",
+        encoding="utf-8",
+    )
+    assert "Ollama" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    assert "MISTRAL_TIMEOUT_SECONDS" not in mistral.read_text(encoding="utf-8")
+    assert "MISTRAL_PREFLIGHT_TIMEOUT_SECONDS" not in runtime.read_text(encoding="utf-8")
     assert module.leftovers_in_tool(tool) == []
 
 

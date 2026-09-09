@@ -360,6 +360,35 @@ def test_report_foundry_aber_mistral_base_url_ist_nicht_ok(tmp_path: Path) -> No
     assert "Mistral-Client" in module.leftovers_in_tool(tools / "rephraser")
 
 
+def test_report_foundry_aber_mistral_timeout_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    (tools / "rephraser" / "app" / "providers" / "mistral_provider.py").write_text(
+        "class LocalMistralProvider:\n"
+        "    def __init__(self, base_url: str | None = None, model: str | None = None) -> None:\n"
+        '        raise RuntimeError("LocalMistralProvider ist abgeschaltet. Nur Foundry (llp_ai).")  # LLP-FOUNDRY-TOR\n'
+        "        configured_timeout = float(os.getenv('MISTRAL_TIMEOUT_SECONDS', '42'))\n",
+        encoding="utf-8",
+    )
+    (tools / "rephraser" / "app" / "local_runtime.py").write_text(
+        "def local_mistral_ready(timeout: float = 0.8) -> bool:\n"
+        "    return False  # LLP-FOUNDRY-TOR: kein Ollama\n"
+        "MISTRAL_PREFLIGHT_TIMEOUT_SECONDS = 0.5\n",
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_mistral_modus"] == "noch Ollama"
+    assert data["text_runtime_modus"] == "noch Ollama"
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    leftovers = module.leftovers_in_tool(tools / "rephraser")
+    assert "Mistral-Client" in leftovers
+    assert "Ollama" in leftovers
+
+
 def test_report_foundry_aber_ollama_probe_ist_nicht_ok(tmp_path: Path) -> None:
     module = _load()
     tools = tmp_path / "AI Tools"

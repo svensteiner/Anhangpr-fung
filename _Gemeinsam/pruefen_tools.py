@@ -148,6 +148,8 @@ def local_runtime_modus(path: Path | None) -> str:
         or "MISTRAL_BASE_URL" in text
         or "/api/tags" in text
         or "MISTRAL_MODEL" in text
+        or "MISTRAL_PREFLIGHT_TIMEOUT_SECONDS" in text
+        or "MISTRAL_TIMEOUT_SECONDS" in text
     ):
         return "noch Ollama"
     if "LLP-FOUNDRY-TOR" in text and "kein Ollama" in text:
@@ -172,6 +174,7 @@ def mistral_provider_modus(path: Path | None) -> str:
         or "11434" in text
         or "MISTRAL_MODEL" in text
         or "MISTRAL_BASE_URL" in text
+        or "MISTRAL_TIMEOUT_SECONDS" in text
     ):
         return "noch Ollama"
     if "LLP-FOUNDRY-TOR" in text and "LocalMistralProvider ist abgeschaltet" in text:
