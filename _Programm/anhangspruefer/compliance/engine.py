@@ -70,89 +70,12 @@ class ReviewEngine:
         ugb_source_path: Optional[str | Path] = None,
         checklist=None,
     ) -> ReviewResult:
-        """
-        Perform a review of the notes document.
-
-        Args:
-            notes_path: Path to the notes document (PDF/DOCX)
-            checklist_path: Optional path to checklist JSON file
-            ugb_source_path: Optional path to UGB source file
-
-        Returns:
-            ReviewResult containing all findings
-
-        Raises:
-            FileNotFoundError: If input files not found
-            ParseError: If document parsing fails
-        """
-        print(DISCLAIMER)
-
-        notes_path = Path(notes_path)
-        logger.info(f"Starting review of: {notes_path.name}")
-
-        # Step 1: Parse the notes document
-        logger.info("Parsing notes document...")
-        notes_document = self._parse_document(notes_path)
-
-        # Step 2: Detect sections
-        logger.info("Detecting document sections...")
-        notes_document.sections = self.section_detector.detect_sections(
-            notes_document
+        """Alte Keyword-Prüfung – absichtlich tot. Nur noch review_checklist."""
+        raise RuntimeError(
+            "Die alte Keyword-Prüfung ist abgeschaltet. "
+            "Bitte Starten.bat verwenden. Modus 3 braucht GmbH/AG und "
+            "klein/mittel/groß – sonst startet nichts, kein stilles unbekannt."
         )
-        logger.info(f"Detected {len(notes_document.sections)} sections")
-
-        # Step 3: Load checklist
-        logger.info("Loading checklist...")
-        if checklist is None:
-            if checklist_path:
-                checklist = self.checklist_loader.load_from_json(Path(checklist_path))
-            else:
-                checklist = self.checklist_loader.load_default_checklist()
-        logger.info(f"Checklist loaded: {len(checklist.items)} items")
-
-        # Step 4: Load UGB source if provided
-        if ugb_source_path:
-            logger.info("Loading UGB source...")
-            ugb_doc = self._parse_document(Path(ugb_source_path))
-            # Could enhance matching with actual UGB text here
-
-        # Step 5: Match requirements
-        logger.info("Matching requirements to document content...")
-        match_results = self.requirement_matcher.match_all(
-            checklist, notes_document
-        )
-
-        # Step 6: Evaluate each checklist item
-        logger.info("Evaluating compliance...")
-        result = ReviewResult(
-            document_name=notes_path.name,
-            checklist_name=checklist.name,
-            review_timestamp=datetime.now(),
-            tool_version=__version__,
-        )
-
-        for item in checklist.items:
-            match_result = match_results.get(item.item_id)
-            if not match_result:
-                continue
-
-            # Extract evidence
-            evidence = self.evidence_extractor.extract_evidence(
-                match_result, notes_document, item
-            )
-
-            # Evaluate
-            finding = self.evaluator.evaluate(item, match_result, evidence)
-            result.add_finding(finding)
-
-        logger.info(
-            f"Review complete: {len(result.findings)} items evaluated"
-        )
-        logger.info(
-            f"Summary: {result.summary_statistics}"
-        )
-
-        return result
 
     def _parse_document(self, file_path: Path) -> Document:
         """Parse a document based on its file type."""

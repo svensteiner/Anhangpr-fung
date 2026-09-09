@@ -13,6 +13,13 @@ ROOT = Path(__file__).resolve().parents[2]
 PROG = ROOT / "_Programm"
 
 
+def test_old_review_engine_cannot_run():
+    from anhangspruefer.compliance.engine import ReviewEngine
+
+    with pytest.raises(RuntimeError, match="abgeschaltet"):
+        ReviewEngine().review("anhang.pdf")
+
+
 def test_run_review_is_disabled():
     text = (PROG / "run_review.py").read_text(encoding="utf-8")
     assert "ReviewEngine" not in text
