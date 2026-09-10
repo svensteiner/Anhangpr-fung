@@ -470,6 +470,8 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "MISTRAL_BASE_URL" not in mistral
     assert "MISTRAL_MODEL" not in mistral
     assert "MISTRAL_TIMEOUT_SECONDS" not in mistral
+    assert "Local Mistral" not in mistral
+    assert "Local Mistral" not in runtime
     lines = [ln.rstrip() for ln in mistral.splitlines()]
     init_idx = next(i for i, ln in enumerate(lines) if "def __init__" in ln)
     assert "raise RuntimeError" in lines[init_idx + 1]
@@ -1335,6 +1337,41 @@ def test_anwenden_entfernt_pipeline_fast_editor_alias(tmp_path: Path) -> None:
     assert ok2, msg2
     leftover = pipe.read_text(encoding="utf-8")
     assert '"fast-editor"' not in leftover
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_entfernt_local_mistral_text(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    path = tool / "app" / "providers" / "mistral_provider.py"
+    path.write_text(
+        path.read_text(encoding="utf-8")
+        + '\n        raise ProviderError("Local Mistral returned no text.")\n',
+        encoding="utf-8",
+    )
+    runtime = tool / "app" / "local_runtime.py"
+    runtime.write_text(
+        runtime.read_text(encoding="utf-8")
+        + '\n        raise InvalidLocalRuntimeUrl("Local Mistral URL has an invalid port.")\n',
+        encoding="utf-8",
+    )
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    leftover = path.read_text(encoding="utf-8")
+    leftover_runtime = runtime.read_text(encoding="utf-8")
+    assert "Local Mistral" not in leftover
+    assert "Local Mistral" not in leftover_runtime
+    assert "Foundry-off" in leftover
+    assert module.leftovers_in_tool(tool) == []
+    path.write_text(
+        leftover + '\n        raise ProviderError("Local Mistral returned no text.")\n',
+        encoding="utf-8",
+    )
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    assert "Local Mistral" not in path.read_text(encoding="utf-8")
     assert module.leftovers_in_tool(tool) == []
 
 
