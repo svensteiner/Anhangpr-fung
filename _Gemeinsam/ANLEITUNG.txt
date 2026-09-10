@@ -30,6 +30,7 @@ EINMALIG
   keine lokale Bewertung, keine lokale Regelfassung,
   keinen Schnell-Editor,
   keine CI-Rezepte (Bewertung oder Offline-Editor),
+  keine alten Mistral-Tests,
   keinen Ollama-Client im Anhangspruefer,
   keine Fremd-KI (OpenAI/Anthropic).
   Bleibt ein alter Weg, sagt Installieren das klar.

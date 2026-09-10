@@ -24,7 +24,8 @@ auf Ollama, OpenAI oder Anthropic.
    erscheint eine Zeile („Bitte Pruefen.bat“).
 4. Status ohne Schlüssel: Pruefen.bat in diesem Ordner
    doppelklicken (Foundry, Nachbar-Tools, Restwege wie
-   Mistral, Schnell-Editor, CI-Rezepte, Anhang-Ollama, Fremd-KI;
+   Mistral, Schnell-Editor, CI-Rezepte, alte Mistral-Tests,
+   Anhang-Ollama, Fremd-KI;
    keine Schlüssel).
 5. Anderes Tool anbinden: `from llp_ai.company_ai import ask_ai, is_ai_ready`.
    Kein eigener OpenAI-/Ollama-Client.

@@ -735,12 +735,28 @@ LOCAL_FALLBACK_MISTRAL_MARKERS = (
     "Mistral überschritt",
     "Mistral war nicht verfügbar",
     "Mistral hat die Zeitgrenze",
+    "Lokales Mistral",
 )
 
 LOCAL_FALLBACK_RELS = (
     Path("app") / "desktop.py",
     Path("app") / "pipeline.py",
     Path("app") / "review_summary.py",
+    Path("app") / "support.py",
+)
+
+LEFTOVER_TEST_MARKERS = (
+    "11434",
+    "MISTRAL_BASE_URL",
+    "MISTRAL_MODEL",
+    "MISTRAL_TIMEOUT",
+    "/api/tags",
+    "/api/generate",
+    "import streamlit",
+    "LocalMistralProvider",
+    "sichere lokale Grundbereinigung",
+    "sichere lokale Fassung",
+    "Gründlich mit Mistral",
 )
 
 LOCAL_RULE_IMPORTS = (
@@ -773,6 +789,43 @@ def find_live_desktop_fallback(roots: list[Path]) -> Path | None:
                 path = tool / rel
                 if desktop_local_fallback_live(path):
                     return path
+    return None
+
+
+def leftover_test_live_text(text: str) -> bool:
+    """Alte Mistral-/Ollama-Tests nach dem Foundry-Tor zählen weiter."""
+    return any(marker in text for marker in LEFTOVER_TEST_MARKERS)
+
+
+def live_leftover_tests(tool_root: Path) -> list[Path]:
+    found: list[Path] = []
+    tests = tool_root / "tests"
+    if tests.is_dir():
+        for path in sorted(tests.rglob("*")):
+            if not path.is_file():
+                continue
+            if PARK_DIR_NAME in path.parts:
+                continue
+            if path.name.endswith(".llp-alt"):
+                continue
+            if leftover_test_live_text(
+                path.read_text(encoding="utf-8", errors="replace")
+            ):
+                found.append(path)
+    extra = tool_root / "app" / "evaluation_cases.json"
+    if extra.is_file() and leftover_test_live_text(
+        extra.read_text(encoding="utf-8", errors="replace")
+    ):
+        found.append(extra)
+    return found
+
+
+def find_live_leftover_tests(roots: list[Path]) -> Path | None:
+    for root in roots:
+        for name in TOOL_NAMES["text"]:
+            files = live_leftover_tests(root / name)
+            if files:
+                return files[0]
     return None
 
 
@@ -859,6 +912,7 @@ def report(start: Path | None = None) -> dict[str, object]:
     spec = find_live_spec(roots)
     build = find_live_build_script(roots)
     workflow = find_live_portable_workflow(roots)
+    leftover_tests = find_live_leftover_tests(roots)
     cloud = find_live_cloud_provider(roots)
     anhang_ollama = find_anhang_ollama(roots)
     return {
@@ -906,6 +960,7 @@ def report(start: Path | None = None) -> dict[str, object]:
         "text_spec": spec,
         "text_build": build,
         "text_workflow": workflow,
+        "text_leftover_tests": leftover_tests,
         "text_cloud": cloud,
         "pseudokrat": find_pseudokrat(roots),
     }
@@ -966,6 +1021,8 @@ def format_report(data: dict[str, object]) -> str:
         + ("noch da – Anwenden.bat" if data["text_web_js"] else "beiseite"),
         "  Packaging:       "
         + ("noch da – Anwenden.bat" if data["text_spec"] else "beiseite"),
+        "  Mistral-Tests:   "
+        + ("noch da – Anwenden.bat" if data["text_leftover_tests"] else "beiseite"),
         "  Original-Start:  "
         + ("noch da – Anwenden.bat" if data["text_original_cmd"] else "beiseite"),
         "  Alte EXE:        "
@@ -1113,6 +1170,11 @@ def format_report(data: dict[str, object]) -> str:
             "  Ein CI-Rezept (Bewertung oder Offline-Editor) liegt noch im Tool-Ordner."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
+    if data["text_leftover_tests"] is not None:
+        lines.append(
+            "  tests/ enthaelt noch Mistral- oder Ollama-Reste."
+            " Einmal text_verbessern_foundry\\Anwenden.bat."
+        )
     if data["text_cloud"] is not None:
         lines.append(
             "  Ein OpenAI- oder Anthropic-Adapter liegt noch im Tool-Ordner."
@@ -1207,6 +1269,8 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
         reasons.append("Build-Skript")
     if live_workflow_files(tool_root):
         reasons.append("CI-Rezept")
+    if live_leftover_tests(tool_root):
+        reasons.append("Tests")
     if live_cloud_providers(tool_root):
         reasons.append("Fremd-KI")
     provider = tool_root / "app" / "providers" / "foundry_provider.py"
@@ -1259,6 +1323,7 @@ def text_has_leftovers(
         or data["text_spec"] is not None
         or data["text_build"] is not None
         or data["text_workflow"] is not None
+        or data["text_leftover_tests"] is not None
         or data["text_cloud"] is not None
         or data["anhang_ollama"] is not None
         or (data["text_desktop"] is not None and data["text_provider"] is None)
@@ -1293,6 +1358,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
     desktop_pipeline_ok = data["text_desktop_pipeline"] is None
     evaluation_ok = data["text_evaluation_modus"] in {"abgeschaltet", "nicht gefunden"}
     pack_ok = data["text_spec"] is None and data["text_build"] is None and data["text_workflow"] is None
+    leftover_tests_ok = data["text_leftover_tests"] is None
     cloud_ok = data["text_cloud"] is None
     return (
         data["text_modus"] == "Foundry"
@@ -1322,6 +1388,7 @@ def text_foundry_ok(start: Path | None = None) -> bool:
         and desktop_pipeline_ok
         and evaluation_ok
         and pack_ok
+        and leftover_tests_ok
         and cloud_ok
     )
 

@@ -25,6 +25,7 @@ from pruefen_tools import (
     desktop_self_test_live_text,
     is_launchable_backup,
     leftovers_in_tool,
+    live_leftover_tests,
     live_workflow_files,
     CLOUD_PROVIDER_RELS,
 )
@@ -143,6 +144,7 @@ def apply(tool_root: Path) -> list[str]:
     done.extend(_park_exe(tool_root))
     done.extend(_park_packaging(tool_root))
     done.extend(_park_leftover_workflows(tool_root))
+    done.extend(_park_leftover_tests(tool_root))
     done.extend(_park_build_scripts(tool_root))
     ps1 = _patch_windows_start(tool_root)
     if ps1 is not None:
@@ -185,6 +187,10 @@ def apply(tool_root: Path) -> list[str]:
     if review.is_file():
         _patch_review_summary(review)
         done.append(str(review))
+    support = tool_root / SUPPORT_REL
+    if support.is_file():
+        _patch_support(support)
+        done.append(str(support))
 
     return done
 
@@ -247,6 +253,7 @@ EXE_REL_DIRS = (
 LOCAL_RULES_REL = Path("app") / "providers" / "local.py"
 FAST_EDITOR_REL = Path("app") / "providers" / "fast_editor.py"
 REVIEW_SUMMARY_REL = Path("app") / "review_summary.py"
+SUPPORT_REL = Path("app") / "support.py"
 REWRITE_SIG = (
     "    def rewrite(self, text: str, constraints: SemanticConstraints, "
     "options: TransformOptions) -> str:\n"
@@ -606,6 +613,20 @@ def _park_leftover_workflows(tool_root: Path) -> list[str]:
         if dest.exists():
             continue
         workflow.rename(dest)
+        parked.append(str(dest))
+    return parked
+
+
+def _park_leftover_tests(tool_root: Path) -> list[str]:
+    """Alte Mistral-/Ollama-Tests nicht im Tool-Ordner lassen."""
+    parked: list[str] = []
+    for path in live_leftover_tests(tool_root):
+        dest = path.with_name(path.name + ".llp-alt")
+        if dest.exists():
+            path.unlink()
+            parked.append(str(dest))
+            continue
+        path.rename(dest)
         parked.append(str(dest))
     return parked
 
@@ -1137,6 +1158,14 @@ def _disable_self_test(desk: str) -> str:
 
 LOCAL_FALLBACK_REPLACEMENTS = (
     (
+        "Lokales Mistral verfügbar",
+        "Foundry (Büro-KI) verfügbar",
+    ),
+    (
+        "Verarbeitung: lokal; kein Cloud-Fallback",
+        "Verarbeitung: nur Foundry; ohne Foundry bleibt der Text unverändert",
+    ),
+    (
         "Mistral überschritt die Zeitgrenze; geprüft wurde die sichere lokale Grundbereinigung.",
         "Foundry überschritt die Zeitgrenze; der Text bleibt unverändert.",
     ),
@@ -1229,6 +1258,13 @@ def _neutralize_local_fallback_copy(desk: str) -> str:
 
 def _patch_review_summary(path: Path) -> None:
     """Prüfungstext darf keine lokale Grundbereinigung und kein Mistral mehr versprechen."""
+    text = path.read_text(encoding="utf-8")
+    text = _neutralize_local_fallback_copy(text)
+    path.write_text(text, encoding="utf-8")
+
+
+def _patch_support(path: Path) -> None:
+    """Supporttext darf kein lokales Mistral mehr versprechen."""
     text = path.read_text(encoding="utf-8")
     text = _neutralize_local_fallback_copy(text)
     path.write_text(text, encoding="utf-8")

@@ -62,6 +62,7 @@ Sicherung, die alte Kommandozeile, den Desktop-
 Selbsttest, die lokale Bewertung, eine lokale
 Regelfassung, einen Schnell-Editor,
 CI-Rezepte (Bewertung/Offline-Editor),
+alte Mistral-Tests,
 einen Ollama-Client im Anhangspruefer
 oder Fremd-KI (OpenAI/Anthropic)
 nutzt.

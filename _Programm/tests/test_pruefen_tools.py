@@ -133,6 +133,7 @@ def test_report_erkennt_foundry_bei_text_verbessern(tmp_path: Path) -> None:
     assert "Offline-HTML:" in blob
     assert "Offline-JS:" in blob
     assert "Packaging:" in blob
+    assert "Mistral-Tests:" in blob
     assert module.text_foundry_ok(gemeinsam) is True
 
 
@@ -922,6 +923,47 @@ def test_report_foundry_aber_schnell_editor_regelimport_ist_nicht_ok(tmp_path: P
     assert module.text_foundry_ok(gemeinsam) is False
     assert module.text_has_leftovers(data) is True
     assert "Schnell-Editor" in module.leftovers_in_tool(tools / "rephraser")
+
+
+def test_report_foundry_aber_support_mistral_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    (tools / "rephraser" / "app" / "support.py").write_text(
+        'return "Lokales Mistral verfügbar: ja"\n',
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_local_fallback"] is not None
+    blob = module.format_report(data)
+    assert "Regelfassung" in blob or "lokale Fassung" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Regelfassung" in module.leftovers_in_tool(tools / "rephraser")
+
+
+def test_report_foundry_aber_mistral_tests_sind_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    tests = tools / "rephraser" / "tests"
+    tests.mkdir(parents=True)
+    (tests / "test_local_runtime.py").write_text(
+        "def test_mistral():\n"
+        '    assert url == "http://127.0.0.1:11434/api/tags"\n',
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_leftover_tests"] is not None
+    blob = module.format_report(data)
+    assert "Mistral-Tests" in blob or "tests/" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Tests" in module.leftovers_in_tool(tools / "rephraser")
 
 
 def test_report_foundry_aber_desktop_selbsttest_ist_nicht_ok(tmp_path: Path) -> None:

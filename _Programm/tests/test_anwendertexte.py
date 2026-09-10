@@ -33,6 +33,7 @@ def test_anleitung_kein_exe_copy_und_modus3_pflicht():
     assert "lokale regelfassung" in text
     assert "schnell-editor" in text
     assert "ci-rezepte" in text
+    assert "mistral-tests" in text
     assert "anhang-ollama" in text
     assert "fremd-ki" in text
 
@@ -103,6 +104,7 @@ def test_vorstellung_kein_pc_copy_keine_exe():
     assert "keine lokale regelfassung" in low
     assert "keinen schnell-editor" in low
     assert "keine ci-rezepte" in low
+    assert "mistral-tests" in low
     assert "keinen ollama-client im anhangspruefer" in low
     assert "keine fremd-ki" in low
     assert "bei jedem start" in low
@@ -146,6 +148,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "keine lokale regelfassung" in text
     assert "keinen schnell-editor" in text
     assert "keine ci-rezepte" in text
+    assert "mistral-tests" in text
     assert "keinen ollama-client im anhangspruefer" in text
     assert "keine fremd-ki" in text
     assert "vor teil 2" in text
@@ -164,6 +167,7 @@ def test_share_anleitung_fuer_kollegen():
     assert "aendert den text nicht" in lies or "ändert den text nicht" in lies
     assert "schnell-editor" in lies
     assert "ci-rezepte" in lies
+    assert "mistral-tests" in lies
     assert "anhang-ollama" in lies
     assert "fremd-ki" in lies
 
@@ -260,6 +264,7 @@ def test_werkzeuge_pseudokrat_ohne_foundry():
     assert "regelfassung" in text
     assert "schnell-editor" in text
     assert "ci-rezepte" in text or "bewertung/offline-editor" in text
+    assert "mistral-tests" in text
     assert "ollama-client im anhangspruefer" in text
     assert "fremd-ki" in text
     assert "sonst die sichere lokale" not in text
@@ -314,6 +319,7 @@ def test_text_verbessern_foundry_kit_liegt_bereit():
     assert "selbsttest" in lies
     assert "bewertung" in lies
     assert "ci-rezepte" in lies
+    assert "mistral-tests" in lies
     kit_start = (kit / "Starten.bat").read_text(encoding="utf-8").lower()
     assert "anwenden.py" in kit_start
     assert "--leise" in kit_start

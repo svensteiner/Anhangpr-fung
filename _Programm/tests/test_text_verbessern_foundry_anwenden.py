@@ -1338,6 +1338,67 @@ def test_anwenden_entfernt_schnell_editor_regelimport(tmp_path: Path) -> None:
     assert module.leftovers_in_tool(tool) == []
 
 
+def test_anwenden_entfernt_support_mistral(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    support = tool / "app" / "support.py"
+    support.write_text(
+        'return "Lokales Mistral verfügbar: ja"\n'
+        'return "Verarbeitung: lokal; kein Cloud-Fallback"\n',
+        encoding="utf-8",
+    )
+    assert "Regelfassung" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    leftover = support.read_text(encoding="utf-8")
+    assert "Lokales Mistral" not in leftover
+    assert "Verarbeitung: lokal; kein Cloud-Fallback" not in leftover
+    assert "Foundry" in leftover
+    assert module.leftovers_in_tool(tool) == []
+    support.write_text(
+        leftover + '\nreturn "Lokales Mistral verfügbar: nein"\n',
+        encoding="utf-8",
+    )
+    assert "Regelfassung" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    assert "Lokales Mistral" not in support.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_parkt_mistral_tests(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    tests = tool / "tests"
+    tests.mkdir()
+    leftover = tests / "test_local_runtime.py"
+    leftover.write_text(
+        "def test_mistral():\n"
+        '    monkeypatch.setenv("MISTRAL_BASE_URL", "http://127.0.0.1:11434")\n'
+        '    assert url == "http://127.0.0.1:11434/api/tags"\n',
+        encoding="utf-8",
+    )
+    clean = tests / "test_models.py"
+    clean.write_text("def test_ok():\n    assert True\n", encoding="utf-8")
+    assert "Tests" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    assert not leftover.is_file()
+    assert leftover.with_name(leftover.name + ".llp-alt").is_file()
+    assert clean.is_file()
+    assert "11434" not in clean.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
+    leftover.write_text(
+        'assert url == "http://127.0.0.1:11434/api/tags"\n',
+        encoding="utf-8",
+    )
+    assert "Tests" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    assert not leftover.is_file()
+    assert module.leftovers_in_tool(tool) == []
+
+
 def test_anwenden_ersetzt_einzelnen_mistral_return(tmp_path: Path) -> None:
     module = _load_anwenden()
     tool = _fake_rephraser(tmp_path)
