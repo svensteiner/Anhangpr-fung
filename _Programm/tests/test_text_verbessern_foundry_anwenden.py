@@ -114,6 +114,8 @@ class App:
         provider, strength = processing_settings(self.mode.get(), self.mistral_ready)
         self.processing_active = "mistral" in provider
         model_request = "mistral" in provider
+        elif "mistral" in provider:
+            message = f"Fertig – lokal überarbeitet ({len(result.audit.transformations)} Änderungen)."
         if fallback_kind is not None:
             result.audit.requested_provider = "rules+mistral-local"
             result.audit.options["requested_provider"] = "rules+mistral-local"
@@ -491,6 +493,7 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "from app.providers.foundry_provider import foundry_ready" in desktop
     assert 'return "rules+foundry", "substantial"' in desktop
     assert '"fast-editor"' not in desktop
+    assert '"mistral" in provider' not in desktop
     assert "if foundry_ready():" in desktop
     assert "if not mistral_ready:" not in desktop
     assert "thorough_ready = foundry_ready()" in desktop
@@ -1322,6 +1325,33 @@ def test_anwenden_entfernt_mistral_provider_name(tmp_path: Path) -> None:
     leftover = path.read_text(encoding="utf-8")
     assert 'name = "mistral-local"' not in leftover
     assert 'name = "foundry-off"' in leftover
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_entfernt_desktop_mistral_provider(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    desktop = tool / "app" / "desktop.py"
+    assert '"mistral" in provider' in desktop.read_text(encoding="utf-8")
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    leftover = desktop.read_text(encoding="utf-8")
+    assert '"mistral" in provider' not in leftover
+    assert "lokal überarbeitet" not in leftover
+    assert module.leftovers_in_tool(tool) == []
+    desktop.write_text(
+        leftover
+        + '\n        elif "mistral" in provider:\n'
+        + '            message = f"Fertig – lokal überarbeitet ({len(result.audit.transformations)} Änderungen)."\n',
+        encoding="utf-8",
+    )
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    leftover2 = desktop.read_text(encoding="utf-8")
+    assert '"mistral" in provider' not in leftover2
+    assert "lokal überarbeitet" not in leftover2
     assert module.leftovers_in_tool(tool) == []
 
 

@@ -1078,6 +1078,14 @@ def _patch_desktop(path: Path) -> None:
         'model_request = "mistral" in provider',
         'model_request = "foundry" in provider',
     )
+    desk = _replace_all_if_present(
+        desk,
+        '        elif "mistral" in provider:\n'
+        '            message = f"Fertig – lokal überarbeitet ({len(result.audit.transformations)} Änderungen)."\n',
+        "",
+    )
+    desk = _replace_all_if_present(desk, '"mistral" in provider', '"foundry" in provider')
+    desk = _replace_all_if_present(desk, "'mistral' in provider", '"foundry" in provider')
     desk = _replace_all(desk, '"rules+mistral-local"', '"rules+foundry"')
     desk = _replace_all_if_present(
         desk,
