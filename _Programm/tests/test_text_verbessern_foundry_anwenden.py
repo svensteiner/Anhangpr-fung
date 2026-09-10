@@ -435,6 +435,9 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "Der Text bleibt unverändert" in provider
     assert "or foundry." in pipeline
     assert "or mistral-local." not in pipeline
+    assert "mistral-local" not in pipeline
+    assert '"mistral" in active_provider.name' not in pipeline
+    assert '{"mistral"' not in pipeline
     assert 'if "mistral" not in active_provider.name:' not in pipeline
     assert "except ProviderError as error:\n        raise\n" in pipeline
 
@@ -1254,6 +1257,29 @@ def test_anwenden_entfernt_pipeline_regeln_name(tmp_path: Path) -> None:
     assert module.leftovers_in_tool(tool) == []
 
 
+def test_anwenden_entfernt_pipeline_mistral_alias(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    pipe = tool / "app" / "pipeline.py"
+    text = pipe.read_text(encoding="utf-8")
+    assert "mistral-local" not in text
+    pipe.write_text(
+        text
+        + '\n    if normalized in {"mistral", "mistral-local", "ollama"}:\n'
+        + "        return FoundryEditorialProvider()\n",
+        encoding="utf-8",
+    )
+    assert "Pipeline" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    leftover = pipe.read_text(encoding="utf-8")
+    assert "mistral-local" not in leftover
+    assert '{"mistral"' not in leftover
+    assert module.leftovers_in_tool(tool) == []
+
+
 def test_anwenden_entfernt_pipeline_grundbereinigung(tmp_path: Path) -> None:
     module = _load_anwenden()
     tool = _fake_rephraser(tmp_path)
@@ -1396,6 +1422,16 @@ def test_anwenden_parkt_mistral_tests(tmp_path: Path) -> None:
     ok2, msg2 = module.apply_foundry(tool)
     assert ok2, msg2
     assert not leftover.is_file()
+    assert module.leftovers_in_tool(tool) == []
+    support_test = tests / "test_support.py"
+    support_test.write_text(
+        'assert "Lokales Mistral verfügbar: ja" in report\n',
+        encoding="utf-8",
+    )
+    assert "Tests" in module.leftovers_in_tool(tool)
+    ok3, msg3 = module.apply_foundry(tool)
+    assert ok3, msg3
+    assert not support_test.is_file()
     assert module.leftovers_in_tool(tool) == []
 
 

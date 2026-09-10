@@ -615,6 +615,27 @@ def test_report_foundry_desktop_aber_regeln_pipeline_ist_nicht_ok(tmp_path: Path
     assert "Pipeline" in module.leftovers_in_tool(tools / "rephraser")
 
 
+def test_report_foundry_desktop_aber_mistral_alias_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    (tools / "rephraser" / "app" / "pipeline.py").write_text(
+        "from .providers.foundry_provider import FoundryEditorialProvider, HybridFoundryProvider\n"
+        "def get_provider(name):\n"
+        "    return FoundryEditorialProvider()\n"
+        '    if normalized in {"mistral", "mistral-local", "ollama"}:\n'
+        "        return FoundryEditorialProvider()\n",
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_pipeline_modus"] == "noch Mistral"
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Pipeline" in module.leftovers_in_tool(tools / "rephraser")
+
+
 def test_report_foundry_desktop_aber_regeln_name_ist_nicht_ok(tmp_path: Path) -> None:
     module = _load()
     tools = tmp_path / "AI Tools"

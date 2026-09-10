@@ -852,6 +852,29 @@ def _patch_pipeline(path: Path) -> None:
     )
     pipe = _replace_all_if_present(
         pipe,
+        '    if normalized in {"mistral", "mistral-local", "ollama"}:\n'
+        "        return FoundryEditorialProvider()\n",
+        "",
+    )
+    pipe = _replace_all_if_present(
+        pipe,
+        '    if normalized in {"auto", "hybrid", "rules+mistral-local"}:\n'
+        "        return HybridFoundryProvider()\n",
+        '    if normalized in {"auto", "hybrid"}:\n'
+        "        return HybridFoundryProvider()\n",
+    )
+    pipe = _replace_all_if_present(
+        pipe,
+        '("mistral" in active_provider.name or active_provider.name == "fast-editor")',
+        '("foundry" in active_provider.name)',
+    )
+    pipe = _replace_all_if_present(
+        pipe,
+        '"mistral" in active_provider.name',
+        '"foundry" in active_provider.name',
+    )
+    pipe = _replace_all_if_present(
+        pipe,
         "    except ProviderError as error:\n"
         '        if "mistral" not in active_provider.name:\n'
         "            raise\n"

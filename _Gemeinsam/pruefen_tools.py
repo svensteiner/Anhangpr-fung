@@ -306,7 +306,12 @@ def pipeline_modus(path: Path | None) -> str:
     if path is None:
         return "nicht gefunden"
     text = path.read_text(encoding="utf-8", errors="replace")
-    still_mistral = "return LocalMistralProvider()" in text
+    still_mistral = (
+        "return LocalMistralProvider()" in text
+        or "mistral-local" in text
+        or '"mistral" in active_provider.name' in text
+        or '{"mistral"' in text
+    )
     still_hybrid = "return HybridLocalProvider()" in text
     still_rules = (
         "return LocalRuleProvider()" in text
@@ -757,6 +762,10 @@ LEFTOVER_TEST_MARKERS = (
     "sichere lokale Grundbereinigung",
     "sichere lokale Fassung",
     "Gründlich mit Mistral",
+    "Lokales Mistral",
+    "mistral-test",
+    "mistral_available=",
+    "rules+mistral-local",
 )
 
 LOCAL_RULE_IMPORTS = (
