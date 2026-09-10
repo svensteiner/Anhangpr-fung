@@ -229,6 +229,8 @@ def providers_init_modus(path: Path | None) -> str:
     text = path.read_text(encoding="utf-8", errors="replace")
     if "LocalMistralProvider" in text or "HybridLocalProvider" in text:
         return "noch Mistral"
+    if "LocalRuleProvider" in text or "FastEditorialProvider" in text:
+        return "noch Regeln"
     if "FoundryEditorialProvider" in text:
         return "Foundry"
     return "nicht erkannt"
@@ -1055,9 +1057,9 @@ def format_report(data: dict[str, object]) -> str:
             "  TEXT VERBESSERN.original.cmd startet noch den alten Weg."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
-    if data["text_providers_init_modus"] in {"noch Mistral", "nicht erkannt"}:
+    if data["text_providers_init_modus"] in {"noch Mistral", "noch Regeln", "nicht erkannt"}:
         lines.append(
-            "  app/providers/__init__.py exportiert noch Mistral."
+            "  app/providers/__init__.py exportiert noch Mistral oder lokale Regeln."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
     if data["text_docs_modus"] in {"noch alt", "nicht erkannt"}:
@@ -1210,7 +1212,7 @@ def text_has_leftovers(
         or data["text_local_rules_modus"] in {"noch Regeln", "nicht erkannt"}
         or data["text_fast_editor_modus"] in {"noch Regeln", "nicht erkannt"}
         or data["text_pyproject_modus"] in {"noch API", "noch Streamlit", "noch CLI", "nicht erkannt"}
-        or data["text_providers_init_modus"] in {"noch Mistral", "nicht erkannt"}
+        or data["text_providers_init_modus"] in {"noch Mistral", "noch Regeln", "nicht erkannt"}
         or data["text_docs_modus"] in {"noch alt", "nicht erkannt"}
         or data["text_web_html"] is not None
         or data["text_web_js"] is not None

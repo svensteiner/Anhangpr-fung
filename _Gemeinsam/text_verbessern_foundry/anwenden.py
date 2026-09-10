@@ -875,24 +875,40 @@ def _strip_provider_name_assignments(text: str) -> str:
 def _patch_providers_init(path: Path) -> None:
     """from app.providers import LocalMistralProvider darf nicht mehr gehen."""
     text = path.read_text(encoding="utf-8")
-    if "FoundryEditorialProvider" in text and "LocalMistralProvider" not in text:
-        return
+    if "FoundryEditorialProvider" not in text or "LocalMistralProvider" in text:
+        text = _replace_all_if_present(
+            text,
+            "from .mistral_provider import LocalMistralProvider\n",
+            "from .foundry_provider import FoundryEditorialProvider, HybridFoundryProvider\n",
+        )
+        text = _replace_all_if_present(
+            text,
+            "from .hybrid import HybridLocalProvider\n",
+            "",
+        )
+        text = _replace_all_if_present(text, '    "LocalMistralProvider",\n', '    "FoundryEditorialProvider",\n')
+        text = _replace_all_if_present(text, '    "HybridLocalProvider",\n', '    "HybridFoundryProvider",\n')
     text = _replace_all_if_present(
         text,
-        "from .mistral_provider import LocalMistralProvider\n",
-        "from .foundry_provider import FoundryEditorialProvider, HybridFoundryProvider\n",
-    )
-    text = _replace_all_if_present(
-        text,
-        "from .hybrid import HybridLocalProvider\n",
+        "from .fast_editor import FastEditorialProvider\n",
         "",
     )
-    text = _replace_all_if_present(text, '    "LocalMistralProvider",\n', '    "FoundryEditorialProvider",\n')
-    text = _replace_all_if_present(text, '    "HybridLocalProvider",\n', '    "HybridFoundryProvider",\n')
-    if "LocalMistralProvider" in text or "HybridLocalProvider" in text:
+    text = _replace_all_if_present(
+        text,
+        "from .local import LocalRuleProvider\n",
+        "",
+    )
+    text = _replace_all_if_present(text, '    "FastEditorialProvider",\n', "")
+    text = _replace_all_if_present(text, '    "LocalRuleProvider",\n', "")
+    if (
+        "LocalMistralProvider" in text
+        or "HybridLocalProvider" in text
+        or "LocalRuleProvider" in text
+        or "FastEditorialProvider" in text
+    ):
         raise ValueError(
-            "app/providers/__init__.py exportiert noch LocalMistralProvider "
-            "oder HybridLocalProvider."
+            "app/providers/__init__.py exportiert noch LocalMistralProvider, "
+            "HybridLocalProvider, LocalRuleProvider oder FastEditorialProvider."
         )
     path.write_text(text, encoding="utf-8")
 

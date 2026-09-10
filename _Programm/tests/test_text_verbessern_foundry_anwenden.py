@@ -661,6 +661,8 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "FoundryEditorialProvider" in providers_init
     assert "LocalMistralProvider" not in providers_init
     assert "HybridLocalProvider" not in providers_init
+    assert "LocalRuleProvider" not in providers_init
+    assert "FastEditorialProvider" not in providers_init
     assert not (tool / "scripts" / "build_browser_standalone.py").is_file()
     assert (tool / "scripts" / "build_browser_standalone.py.llp-alt").is_file()
 
@@ -849,6 +851,30 @@ def test_anwenden_scheitert_wenn_mistral_export_bleibt(tmp_path: Path) -> None:
     ok, msg = module.apply_foundry(tool)
     assert ok is False
     assert "LocalMistralProvider" in msg or "exportiert" in msg
+
+
+def test_anwenden_entfernt_regeln_export(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    init = tool / "app" / "providers" / "__init__.py"
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    text = init.read_text(encoding="utf-8")
+    assert "LocalRuleProvider" not in text
+    assert "FastEditorialProvider" not in text
+    assert module.leftovers_in_tool(tool) == []
+    init.write_text(
+        text
+        + "\nfrom .local import LocalRuleProvider\n"
+        + '    "LocalRuleProvider",\n',
+        encoding="utf-8",
+    )
+    assert "Provider-Export" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    leftover = init.read_text(encoding="utf-8")
+    assert "LocalRuleProvider" not in leftover
+    assert module.leftovers_in_tool(tool) == []
 
 
 def test_anwenden_stellt_bewertung_ab(tmp_path: Path) -> None:

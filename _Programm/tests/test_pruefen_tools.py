@@ -1103,6 +1103,30 @@ def test_report_foundry_aber_mistral_export_ist_nicht_ok(tmp_path: Path) -> None
     assert "Provider-Export" in module.leftovers_in_tool(tools / "rephraser")
 
 
+def test_report_foundry_aber_regeln_export_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    init = tools / "rephraser" / "app" / "providers" / "__init__.py"
+    init.write_text(
+        "from .foundry_provider import FoundryEditorialProvider, HybridFoundryProvider\n"
+        "from .local import LocalRuleProvider\n"
+        "from .fast_editor import FastEditorialProvider\n"
+        '__all__ = ["FoundryEditorialProvider", "LocalRuleProvider", "FastEditorialProvider"]\n',
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_providers_init_modus"] == "noch Regeln"
+    blob = module.format_report(data)
+    assert "__init__.py" in blob
+    assert "lokale Regeln" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Provider-Export" in module.leftovers_in_tool(tools / "rephraser")
+
+
 def test_report_foundry_aber_original_cmd_ist_nicht_ok(tmp_path: Path) -> None:
     module = _load()
     tools = tmp_path / "AI Tools"
