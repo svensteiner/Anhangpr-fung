@@ -739,6 +739,8 @@ LOCAL_FALLBACK_MARKERS = (
     "lokale sprachmodell",
     "lokale, sichere textüberarbeitung",
     "sichere fassung",
+    "sofort lokal verbessert",
+    "lokal verbessert",
 )
 
 LOCAL_FALLBACK_MISTRAL_MARKERS = (

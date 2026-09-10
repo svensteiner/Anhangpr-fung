@@ -124,6 +124,8 @@ class App:
             )
         unused = model_request
         diagnostics = {"mistral_available": local_mistral_ready()}
+        self.result_status.configure(text="Text wird sofort lokal verbessert …")
+        message = f"Fertig – sofort lokal verbessert ({len(result.audit.transformations)} Änderungen)."
 
     def _worker(self, source, options):
             result = run_pipeline(source, options)
@@ -494,6 +496,7 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert 'return "rules+foundry", "substantial"' in desktop
     assert '"fast-editor"' not in desktop
     assert '"mistral" in provider' not in desktop
+    assert "lokal verbessert" not in desktop
     assert "if foundry_ready():" in desktop
     assert "if not mistral_ready:" not in desktop
     assert "thorough_ready = foundry_ready()" in desktop
@@ -1036,6 +1039,32 @@ def test_anwenden_entfernt_schnell_editor_regelaufruf(tmp_path: Path) -> None:
     ok2, msg2 = module.apply_foundry(tool)
     assert ok2, msg2
     assert "LocalRuleProvider().rewrite" not in path.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_entfernt_lokal_verbessert(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    desktop = tool / "app" / "desktop.py"
+    assert "lokal verbessert" in desktop.read_text(encoding="utf-8")
+    assert "Regelfassung" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    leftover = desktop.read_text(encoding="utf-8")
+    assert "lokal verbessert" not in leftover
+    assert "sofort lokal verbessert" not in leftover
+    assert module.leftovers_in_tool(tool) == []
+    desktop.write_text(
+        leftover
+        + '\n            self.result_status.configure(text="Text wird sofort lokal verbessert …")\n'
+        + '\n            message = f"Fertig – sofort lokal verbessert ({len(result.audit.transformations)} Änderungen)."\n',
+        encoding="utf-8",
+    )
+    assert "Regelfassung" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    leftover2 = desktop.read_text(encoding="utf-8")
+    assert "lokal verbessert" not in leftover2
     assert module.leftovers_in_tool(tool) == []
 
 

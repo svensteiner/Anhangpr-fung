@@ -1331,6 +1331,10 @@ LOCAL_FALLBACK_REPLACEMENTS = (
      "Foundry antwortet nicht. Der Text bleibt unverändert."),
     ("Lokale, sichere Textüberarbeitung ohne Cloud-Fallback.",
      "Nur Foundry. Ohne Foundry bleibt der Text unverändert."),
+    ("Text wird sofort lokal verbessert", "Foundry bearbeitet den Text"),
+    ("Fertig – sofort lokal verbessert", "Fertig – Foundry hat den Text überarbeitet"),
+    ("sofort lokal verbessert", "von Foundry überarbeitet"),
+    ("lokal verbessert", "von Foundry überarbeitet"),
 )
 
 
