@@ -838,6 +838,17 @@ def leftover_desktop_mistral(tool_root: Path) -> bool:
     return '"mistral" in provider' in text or "'mistral' in provider" in text
 
 
+def leftover_mistral_available(tool_root: Path) -> bool:
+    """Mistral-Name in Support und Desktop nach dem Foundry-Tor zählt weiter."""
+    for rel in (Path("app") / "support.py", Path("app") / "desktop.py"):
+        path = tool_root / rel
+        if path.is_file() and "mistral_available" in path.read_text(
+            encoding="utf-8", errors="replace"
+        ):
+            return True
+    return False
+
+
 def leftover_test_live_text(text: str) -> bool:
     """Alte Mistral-/Ollama-Tests nach dem Foundry-Tor zählen weiter."""
     return any(marker in text for marker in LEFTOVER_TEST_MARKERS)
@@ -956,6 +967,15 @@ def report(start: Path | None = None) -> dict[str, object]:
     for root in roots:
         for name in TOOL_NAMES["text"]:
             if leftover_desktop_mistral(root / name):
+                if mistral_modus in {"abgeschaltet", "nicht gefunden"}:
+                    mistral_modus = "noch Ollama"
+                break
+        else:
+            continue
+        break
+    for root in roots:
+        for name in TOOL_NAMES["text"]:
+            if leftover_mistral_available(root / name):
                 if mistral_modus in {"abgeschaltet", "nicht gefunden"}:
                     mistral_modus = "noch Ollama"
                 break
@@ -1314,7 +1334,7 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
     mistral = tool_root / "app" / "providers" / "mistral_provider.py"
     if mistral.is_file() and mistral_provider_modus(mistral) != "abgeschaltet":
         reasons.append("Mistral-Client")
-    elif leftover_desktop_mistral(tool_root):
+    elif leftover_desktop_mistral(tool_root) or leftover_mistral_available(tool_root):
         reasons.append("Mistral-Client")
     pyproject = tool_root / "pyproject.toml"
     if pyproject.is_file() and pyproject_modus(pyproject) != "abgeschaltet":

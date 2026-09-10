@@ -1095,8 +1095,9 @@ def _patch_desktop(path: Path) -> None:
     desk = _replace_all_if_present(
         desk,
         '"mistral_available": local_mistral_ready()',
-        '"mistral_available": foundry_ready()',
+        '"foundry_available": foundry_ready()',
     )
+    desk = _replace_all_if_present(desk, "mistral_available", "foundry_available")
     desk = _replace_all_if_present(
         desk,
         "Mistral derzeit nicht erreichbar – sichere lokale Fassung wird sofort erstellt",
@@ -1356,6 +1357,7 @@ def _patch_support(path: Path) -> None:
     """Supporttext darf kein lokales Mistral mehr versprechen."""
     text = path.read_text(encoding="utf-8")
     text = _neutralize_local_fallback_copy(text)
+    text = _replace_all_if_present(text, "mistral_available", "foundry_available")
     path.write_text(text, encoding="utf-8")
 
 

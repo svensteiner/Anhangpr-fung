@@ -510,7 +510,8 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert not (tool / "packaging" / "TextVerbessern.spec").is_file()
     assert (tool / "packaging" / "TextVerbessern.spec.llp-alt").is_file()
     assert "self.mistral_ready = local_mistral_ready()" not in desktop
-    assert '"mistral_available": foundry_ready()' in desktop
+    assert '"foundry_available": foundry_ready()' in desktop
+    assert "mistral_available" not in desktop
     assert "local_mistral_ready()" not in desktop
     assert "local_model_eligible(current_source, self._mistral_can_start())" not in desktop
     assert "preflight_local_mistral()" not in desktop
@@ -1521,6 +1522,42 @@ def test_anwenden_entfernt_schnell_editor_regelimport(tmp_path: Path) -> None:
     ok2, msg2 = module.apply_foundry(tool)
     assert ok2, msg2
     assert "LocalRuleProvider" not in path.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_entfernt_mistral_available(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    desktop = tool / "app" / "desktop.py"
+    support = tool / "app" / "support.py"
+    support.write_text(
+        "class SupportInfo:\n"
+        "    mistral_available: bool\n"
+        "    def as_text(self) -> str:\n"
+        '        return f"Foundry (Büro-KI) verfügbar: {\'ja\' if self.mistral_available else \'nein\'}"\n'
+        "def build_support_info(*, mistral_available: bool, diagnostic_log_available: bool):\n"
+        "    return SupportInfo(mistral_available=mistral_available)\n",
+        encoding="utf-8",
+    )
+    assert "mistral_available" in desktop.read_text(encoding="utf-8")
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    leftover_desk = desktop.read_text(encoding="utf-8")
+    leftover_support = support.read_text(encoding="utf-8")
+    assert "mistral_available" not in leftover_desk
+    assert "mistral_available" not in leftover_support
+    assert "foundry_available" in leftover_desk
+    assert "foundry_available" in leftover_support
+    assert module.leftovers_in_tool(tool) == []
+    support.write_text(
+        leftover_support + "\n    mistral_available: bool\n",
+        encoding="utf-8",
+    )
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    assert "mistral_available" not in support.read_text(encoding="utf-8")
     assert module.leftovers_in_tool(tool) == []
 
 
