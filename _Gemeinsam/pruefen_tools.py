@@ -175,6 +175,7 @@ def mistral_provider_modus(path: Path | None) -> str:
         or "MISTRAL_MODEL" in text
         or "MISTRAL_BASE_URL" in text
         or "MISTRAL_TIMEOUT_SECONDS" in text
+        or 'name = "mistral-local"' in text
     ):
         return "noch Ollama"
     if "LLP-FOUNDRY-TOR" in text and "LocalMistralProvider ist abgeschaltet" in text:
@@ -320,6 +321,7 @@ def pipeline_modus(path: Path | None) -> str:
         or "FastEditorialProvider().rewrite" in text
         or "LocalRuleProvider.name" in text
         or "FastEditorialProvider.name" in text
+        or '"fast-editor"' in text
     )
     foundry = "FoundryEditorialProvider" in text and "HybridFoundryProvider" in text
     if still_mistral or still_hybrid:
@@ -655,6 +657,8 @@ def text_cli_modus(path: Path | None) -> str:
         return "nicht gefunden"
     text = path.read_text(encoding="utf-8", errors="replace")
     if "Die alte CLI startet nicht" in text:
+        if 'default="fast-editor"' in text or 'choices=["fast-editor"' in text:
+            return "noch CLI"
         return "abgeschaltet"
     if "def cli(" in text and "run_pipeline" in text:
         return "noch CLI"
@@ -734,6 +738,7 @@ LOCAL_FALLBACK_MARKERS = (
     "lokale überarbeitung läuft",
     "lokale sprachmodell",
     "lokale, sichere textüberarbeitung",
+    "sichere fassung",
 )
 
 LOCAL_FALLBACK_MISTRAL_MARKERS = (
@@ -766,6 +771,7 @@ LEFTOVER_TEST_MARKERS = (
     "mistral-test",
     "mistral_available=",
     "rules+mistral-local",
+    "fast-editor",
 )
 
 LOCAL_RULE_IMPORTS = (
@@ -799,6 +805,16 @@ def find_live_desktop_fallback(roots: list[Path]) -> Path | None:
                 if desktop_local_fallback_live(path):
                     return path
     return None
+
+
+def leftover_fast_default(tool_root: Path) -> bool:
+    """TransformOptions darf nicht mehr still auf den Schnell-Editor fallen."""
+    models = tool_root / "app" / "models.py"
+    if not models.is_file():
+        return False
+    return 'provider: str = "fast-editor"' in models.read_text(
+        encoding="utf-8", errors="replace"
+    )
 
 
 def leftover_test_live_text(text: str) -> bool:
@@ -907,6 +923,15 @@ def report(start: Path | None = None) -> dict[str, object]:
     hybrid_mode = hybrid_modus(hybrid)
     local_rules_mode = local_rules_modus(local_rules)
     fast_editor_mode = fast_editor_modus(fast_editor)
+    for root in roots:
+        for name in TOOL_NAMES["text"]:
+            if leftover_fast_default(root / name):
+                if fast_editor_mode in {"abgeschaltet", "nicht gefunden"}:
+                    fast_editor_mode = "noch Regeln"
+                break
+        else:
+            continue
+        break
     pyproject_mode = pyproject_modus(pyproject)
     providers_init_mode = providers_init_modus(providers_init)
     docs_mode = start_docs_modus(roots=roots)
@@ -1225,6 +1250,8 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
         reasons.append("Lokal-Regeln")
     fast_editor = tool_root / "app" / "providers" / "fast_editor.py"
     if fast_editor.is_file() and fast_editor_modus(fast_editor) != "abgeschaltet":
+        reasons.append("Schnell-Editor")
+    elif leftover_fast_default(tool_root):
         reasons.append("Schnell-Editor")
     pipeline = tool_root / "app" / "pipeline.py"
     if pipeline.is_file() and pipeline_modus(pipeline) != "Foundry":

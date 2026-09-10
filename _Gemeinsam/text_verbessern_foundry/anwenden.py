@@ -191,6 +191,10 @@ def apply(tool_root: Path) -> list[str]:
     if support.is_file():
         _patch_support(support)
         done.append(str(support))
+    models = tool_root / MODELS_REL
+    if models.is_file():
+        _patch_models(models)
+        done.append(str(models))
 
     return done
 
@@ -254,6 +258,7 @@ LOCAL_RULES_REL = Path("app") / "providers" / "local.py"
 FAST_EDITOR_REL = Path("app") / "providers" / "fast_editor.py"
 REVIEW_SUMMARY_REL = Path("app") / "review_summary.py"
 SUPPORT_REL = Path("app") / "support.py"
+MODELS_REL = Path("app") / "models.py"
 REWRITE_SIG = (
     "    def rewrite(self, text: str, constraints: SemanticConstraints, "
     "options: TransformOptions) -> str:\n"
@@ -422,7 +427,17 @@ def _patch_leftover_docs(tool_root: Path) -> list[str]:
         updated = _replace_all_if_present(
             text,
             'choices=["fast-editor", "rules", "mistral-local"]',
+            'choices=["foundry"]',
+        )
+        updated = _replace_all_if_present(
+            updated,
             'choices=["fast-editor", "rules", "foundry"]',
+            'choices=["foundry"]',
+        )
+        updated = _replace_all_if_present(
+            updated,
+            'default="fast-editor"',
+            'default="foundry"',
         )
         updated = _disable_fastapi(updated)
         updated = _disable_cli(updated)
@@ -759,6 +774,7 @@ def _patch_mistral_provider(path: Path) -> None:
     text = text.replace("MISTRAL_BASE_URL", "FOUNDRY_OFF_BASE_URL")
     text = text.replace("MISTRAL_MODEL", "FOUNDRY_OFF_MODEL")
     text = text.replace("MISTRAL_TIMEOUT_SECONDS", "FOUNDRY_OFF_TIMEOUT_SECONDS")
+    text = _replace_all_if_present(text, 'name = "mistral-local"', 'name = "foundry-off"')
     path.write_text(text, encoding="utf-8")
 
 
@@ -816,15 +832,16 @@ def _patch_pipeline(path: Path) -> None:
             "from .providers.mistral_provider import LocalMistralProvider",
             foundry_imp,
         )
-    pipe = _ensure_line_after(
-        pipe,
-        "    if normalized in {\"fast\", \"fast-rules\", \"fast-editor\"}:\n"
-        "        return FastEditorialProvider()",
-        "    if normalized in {\"foundry\", \"company-ai\"}:\n"
-        "        return FoundryEditorialProvider()\n"
-        "    if normalized in {\"rules+foundry\"}:\n"
-        "        return HybridFoundryProvider()",
-    )
+    if '"foundry", "company-ai"' not in pipe:
+        pipe = _ensure_line_after(
+            pipe,
+            "    if normalized in {\"fast\", \"fast-rules\", \"fast-editor\"}:\n"
+            "        return FastEditorialProvider()",
+            "    if normalized in {\"foundry\", \"company-ai\"}:\n"
+            "        return FoundryEditorialProvider()\n"
+            "    if normalized in {\"rules+foundry\"}:\n"
+            "        return HybridFoundryProvider()",
+        )
     pipe = _replace_all_if_present(
         pipe,
         "        return LocalRuleProvider()",
@@ -848,7 +865,24 @@ def _patch_pipeline(path: Path) -> None:
     pipe = _replace_all_if_present(
         pipe,
         "select fast-editor, rules, or mistral-local.",
+        "select foundry.",
+    )
+    pipe = _replace_all_if_present(
+        pipe,
         "select fast-editor, rules, or foundry.",
+        "select foundry.",
+    )
+    pipe = _replace_all_if_present(
+        pipe,
+        '    if normalized in {"local", "rules", "rule-based"}:\n'
+        "        return FoundryEditorialProvider()\n",
+        "",
+    )
+    pipe = _replace_all_if_present(
+        pipe,
+        '    if normalized in {"fast", "fast-rules", "fast-editor"}:\n'
+        "        return FoundryEditorialProvider()\n",
+        "",
     )
     pipe = _replace_all_if_present(
         pipe,
@@ -1181,6 +1215,22 @@ def _disable_self_test(desk: str) -> str:
 
 LOCAL_FALLBACK_REPLACEMENTS = (
     (
+        "Sichere Fassung / manuelle Änderungen verwerfen",
+        "Fenster schließen",
+    ),
+    (
+        "Sichere Fassung jetzt",
+        "Nur Foundry",
+    ),
+    (
+        "sichere Fassung",
+        "unveränderte Fassung",
+    ),
+    (
+        "Sichere Fassung",
+        "Unveränderte Fassung",
+    ),
+    (
         "Lokales Mistral verfügbar",
         "Foundry (Büro-KI) verfügbar",
     ),
@@ -1290,6 +1340,17 @@ def _patch_support(path: Path) -> None:
     """Supporttext darf kein lokales Mistral mehr versprechen."""
     text = path.read_text(encoding="utf-8")
     text = _neutralize_local_fallback_copy(text)
+    path.write_text(text, encoding="utf-8")
+
+
+def _patch_models(path: Path) -> None:
+    """Ohne Angabe darf nicht still der Schnell-Editor gewählt werden."""
+    text = path.read_text(encoding="utf-8")
+    text = _replace_all_if_present(
+        text,
+        'provider: str = "fast-editor"',
+        'provider: str = "foundry"',
+    )
     path.write_text(text, encoding="utf-8")
 
 

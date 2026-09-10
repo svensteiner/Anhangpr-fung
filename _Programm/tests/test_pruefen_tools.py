@@ -636,6 +636,49 @@ def test_report_foundry_desktop_aber_mistral_alias_ist_nicht_ok(tmp_path: Path) 
     assert "Pipeline" in module.leftovers_in_tool(tools / "rephraser")
 
 
+def test_report_foundry_aber_mistral_name_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    (tools / "rephraser" / "app" / "providers" / "mistral_provider.py").write_text(
+        "class LocalMistralProvider:\n"
+        '    name = "mistral-local"\n'
+        "    def __init__(self):\n"
+        '        raise RuntimeError("LocalMistralProvider ist abgeschaltet. Nur Foundry (llp_ai).")  # LLP-FOUNDRY-TOR\n',
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_mistral_modus"] == "noch Ollama"
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert "Mistral-Client" in module.leftovers_in_tool(tools / "rephraser")
+
+
+def test_report_foundry_aber_fast_editor_default_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    (tools / "rephraser" / "app" / "providers" / "fast_editor.py").write_text(
+        "class FastEditorialProvider:\n"
+        "    def rewrite(self, text):\n"
+        "        raise RuntimeError(\n"
+        '            "Schnell-Editor ist abgeschaltet. Nur Foundry."\n'
+        "        )  # LLP-FOUNDRY-TOR\n",
+        encoding="utf-8",
+    )
+    (tools / "rephraser" / "app" / "models.py").write_text(
+        'provider: str = "fast-editor"\n',
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_fast_editor_modus"] == "noch Regeln"
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert "Schnell-Editor" in module.leftovers_in_tool(tools / "rephraser")
+
+
 def test_report_foundry_desktop_aber_regeln_name_ist_nicht_ok(tmp_path: Path) -> None:
     module = _load()
     tools = tmp_path / "AI Tools"

@@ -433,11 +433,12 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert "FastEditorialProvider().rewrite" not in pipeline
     assert "LocalRuleProvider" not in provider
     assert "Der Text bleibt unverändert" in provider
-    assert "or foundry." in pipeline
+    assert "select foundry." in pipeline
     assert "or mistral-local." not in pipeline
     assert "mistral-local" not in pipeline
     assert '"mistral" in active_provider.name' not in pipeline
     assert '{"mistral"' not in pipeline
+    assert '"fast-editor"' not in pipeline
     assert 'if "mistral" not in active_provider.name:' not in pipeline
     assert "except ProviderError as error:\n        raise\n" in pipeline
 
@@ -651,8 +652,9 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
         tool / "_llp_parked" / "web" / "app.js.llp-alt.txt"
     ).read_text(encoding="utf-8")
     cli = (tool / "app" / "main.py").read_text(encoding="utf-8")
-    assert 'choices=["fast-editor", "rules", "foundry"]' in cli
+    assert 'choices=["foundry"]' in cli
     assert "mistral-local" not in cli
+    assert "fast-editor" not in cli
     assert "uvicorn startet nicht" in cli
     assert "LLP-FOUNDRY-TOR" in cli
     assert "return run_pipeline(request.text, request.options)" not in cli
@@ -1277,6 +1279,86 @@ def test_anwenden_entfernt_pipeline_mistral_alias(tmp_path: Path) -> None:
     leftover = pipe.read_text(encoding="utf-8")
     assert "mistral-local" not in leftover
     assert '{"mistral"' not in leftover
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_entfernt_pipeline_fast_editor_alias(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    pipe = tool / "app" / "pipeline.py"
+    text = pipe.read_text(encoding="utf-8")
+    assert '"fast-editor"' not in text
+    pipe.write_text(
+        text
+        + '\n    if normalized in {"fast", "fast-rules", "fast-editor"}:\n'
+        + "        return FoundryEditorialProvider()\n",
+        encoding="utf-8",
+    )
+    assert "Pipeline" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    leftover = pipe.read_text(encoding="utf-8")
+    assert '"fast-editor"' not in leftover
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_entfernt_mistral_provider_name(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    path = tool / "app" / "providers" / "mistral_provider.py"
+    path.write_text(
+        "class LocalMistralProvider:\n"
+        '    name = "mistral-local"\n'
+        "    def __init__(self, base_url: str | None = None, model: str | None = None) -> None:\n"
+        '        raise RuntimeError("LocalMistralProvider ist abgeschaltet. Nur Foundry (llp_ai).")  # LLP-FOUNDRY-TOR\n',
+        encoding="utf-8",
+    )
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    leftover = path.read_text(encoding="utf-8")
+    assert 'name = "mistral-local"' not in leftover
+    assert 'name = "foundry-off"' in leftover
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_entfernt_fast_editor_default(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    models = tool / "app" / "models.py"
+    models.write_text(
+        "class TransformOptions:\n"
+        '    provider: str = "fast-editor"\n',
+        encoding="utf-8",
+    )
+    assert "Schnell-Editor" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    leftover = models.read_text(encoding="utf-8")
+    assert 'provider: str = "fast-editor"' not in leftover
+    assert 'provider: str = "foundry"' in leftover
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_entfernt_sichere_fassung(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    desktop = tool / "app" / "desktop.py"
+    text = desktop.read_text(encoding="utf-8")
+    desktop.write_text(
+        text + '\nself.run_button.configure(state="normal", text="Sichere Fassung jetzt")\n',
+        encoding="utf-8",
+    )
+    assert "Regelfassung" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    leftover = desktop.read_text(encoding="utf-8")
+    assert "Sichere Fassung" not in leftover
+    assert "sichere Fassung" not in leftover
     assert module.leftovers_in_tool(tool) == []
 
 
