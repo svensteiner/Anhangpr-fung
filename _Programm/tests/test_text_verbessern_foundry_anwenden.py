@@ -1254,6 +1254,90 @@ def test_anwenden_entfernt_pipeline_regeln_name(tmp_path: Path) -> None:
     assert module.leftovers_in_tool(tool) == []
 
 
+def test_anwenden_entfernt_pipeline_grundbereinigung(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    pipe = tool / "app" / "pipeline.py"
+    text = pipe.read_text(encoding="utf-8")
+    pipe.write_text(
+        text
+        + "\n                message=(\"Die lokale Schnellbearbeitung wurde wegen möglicher "
+        "inhaltlicher Änderungen verworfen. Ausgegeben wurde nur die sichere Grundbereinigung.\")\n"
+        + '\n                "Ausgegeben wurde die sichere lokale Schnellbearbeitung."\n',
+        encoding="utf-8",
+    )
+    assert "Regelfassung" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    leftover = pipe.read_text(encoding="utf-8")
+    assert "sichere Grundbereinigung" not in leftover
+    assert "sichere lokale Schnellbearbeitung" not in leftover
+    assert "lokale Schnellbearbeitung" not in leftover
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_entfernt_review_grundbereinigung(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    review = tool / "app" / "review_summary.py"
+    review.write_text(
+        'return "Mistral überschritt die Zeitgrenze; geprüft wurde die sichere lokale Grundbereinigung."\n'
+        'return "Mistral war nicht verfügbar; geprüft wurde die sichere lokale Grundbereinigung."\n'
+        'return "Angezeigt wird die sichere lokale Grundbereinigung."\n',
+        encoding="utf-8",
+    )
+    assert "Regelfassung" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    leftover = review.read_text(encoding="utf-8")
+    assert "sichere lokale" not in leftover.lower()
+    assert "Mistral überschritt" not in leftover
+    assert "Mistral war nicht verfügbar" not in leftover
+    assert "der Text bleibt unverändert" in leftover
+    assert module.leftovers_in_tool(tool) == []
+    review.write_text(
+        leftover + '\nreturn "Mistral war nicht verfügbar; geprüft wurde die sichere lokale Grundbereinigung."\n',
+        encoding="utf-8",
+    )
+    assert "Regelfassung" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    assert "Mistral war nicht verfügbar" not in review.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
+
+
+def test_anwenden_entfernt_schnell_editor_regelimport(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    path = tool / "app" / "providers" / "fast_editor.py"
+    path.write_text(
+        "from app.providers.local import LocalRuleProvider\n"
+        "class FastEditorialProvider:\n"
+        "    def rewrite(self, text: str, constraints: SemanticConstraints, "
+        "options: TransformOptions) -> str:\n"
+        '        raise RuntimeError("Schnell-Editor ist abgeschaltet. Nur Foundry.")  # LLP-FOUNDRY-TOR\n',
+        encoding="utf-8",
+    )
+    assert "Schnell-Editor" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    leftover = path.read_text(encoding="utf-8")
+    assert "from app.providers.local import LocalRuleProvider" not in leftover
+    assert "LocalRuleProvider" not in leftover
+    assert module.leftovers_in_tool(tool) == []
+    path.write_text(
+        leftover + "\nfrom app.providers.local import LocalRuleProvider\n",
+        encoding="utf-8",
+    )
+    assert "Schnell-Editor" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    assert "LocalRuleProvider" not in path.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
+
+
 def test_anwenden_ersetzt_einzelnen_mistral_return(tmp_path: Path) -> None:
     module = _load_anwenden()
     tool = _fake_rephraser(tmp_path)

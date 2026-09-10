@@ -861,6 +861,69 @@ def test_report_foundry_aber_lokale_desktop_fassung_ist_nicht_ok(tmp_path: Path)
     assert "Regelfassung" in module.leftovers_in_tool(tools / "rephraser")
 
 
+def test_report_foundry_aber_pipeline_grundbereinigung_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    (tools / "rephraser" / "app" / "pipeline.py").write_text(
+        "from .providers.foundry_provider import FoundryEditorialProvider, HybridFoundryProvider\n"
+        "def get_provider(name):\n"
+        "    return FoundryEditorialProvider()\n"
+        '    message = "Ausgegeben wurde nur die sichere Grundbereinigung."\n',
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_local_fallback"] is not None
+    blob = module.format_report(data)
+    assert "Regelfassung" in blob or "lokale Fassung" in blob
+    assert "Pipeline" in blob or "Prueftext" in blob or "lokale Fassung" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Regelfassung" in module.leftovers_in_tool(tools / "rephraser")
+
+
+def test_report_foundry_aber_review_grundbereinigung_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    (tools / "rephraser" / "app" / "review_summary.py").write_text(
+        'return "Mistral überschritt die Zeitgrenze; geprüft wurde die sichere lokale Grundbereinigung."\n',
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_local_fallback"] is not None
+    blob = module.format_report(data)
+    assert "Regelfassung" in blob or "lokale Fassung" in blob
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Regelfassung" in module.leftovers_in_tool(tools / "rephraser")
+
+
+def test_report_foundry_aber_schnell_editor_regelimport_ist_nicht_ok(tmp_path: Path) -> None:
+    module = _load()
+    tools = tmp_path / "AI Tools"
+    gemeinsam = tools / "_Gemeinsam"
+    gemeinsam.mkdir(parents=True)
+    _foundry_desktop(tools)
+    (tools / "rephraser" / "app" / "providers" / "fast_editor.py").write_text(
+        "from app.providers.local import LocalRuleProvider\n"
+        "class FastEditorialProvider:\n"
+        "    def rewrite(self, text: str, constraints: SemanticConstraints, "
+        "options: TransformOptions) -> str:\n"
+        '        raise RuntimeError("Schnell-Editor ist abgeschaltet. Nur Foundry.")  # LLP-FOUNDRY-TOR\n',
+        encoding="utf-8",
+    )
+    data = module.report(gemeinsam)
+    assert data["text_fast_editor_modus"] == "noch Regeln"
+    assert module.text_foundry_ok(gemeinsam) is False
+    assert module.text_has_leftovers(data) is True
+    assert "Schnell-Editor" in module.leftovers_in_tool(tools / "rephraser")
+
+
 def test_report_foundry_aber_desktop_selbsttest_ist_nicht_ok(tmp_path: Path) -> None:
     module = _load()
     tools = tmp_path / "AI Tools"

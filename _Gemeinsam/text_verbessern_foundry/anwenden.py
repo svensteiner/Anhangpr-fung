@@ -181,6 +181,10 @@ def apply(tool_root: Path) -> list[str]:
     if fast_editor.is_file():
         _disable_fast_editor(fast_editor)
         done.append(str(fast_editor))
+    review = tool_root / REVIEW_SUMMARY_REL
+    if review.is_file():
+        _patch_review_summary(review)
+        done.append(str(review))
 
     return done
 
@@ -242,6 +246,7 @@ EXE_REL_DIRS = (
 )
 LOCAL_RULES_REL = Path("app") / "providers" / "local.py"
 FAST_EDITOR_REL = Path("app") / "providers" / "fast_editor.py"
+REVIEW_SUMMARY_REL = Path("app") / "review_summary.py"
 REWRITE_SIG = (
     "    def rewrite(self, text: str, constraints: SemanticConstraints, "
     "options: TransformOptions) -> str:\n"
@@ -692,6 +697,16 @@ def _disable_fast_editor(path: Path) -> None:
             raise ValueError("Erwartete Stelle fehlt: FastEditorialProvider.rewrite")
         text = text.replace(REWRITE_SIG, FAST_EDITOR_STUB, 1)
     text = _strip_provider_rewrite_calls(text)
+    text = _replace_all_if_present(
+        text,
+        "from app.providers.local import LocalRuleProvider\n",
+        "",
+    )
+    text = _replace_all_if_present(
+        text,
+        "from .local import LocalRuleProvider\n",
+        "",
+    )
     path.write_text(text, encoding="utf-8")
 
 
@@ -854,6 +869,7 @@ def _patch_pipeline(path: Path) -> None:
         "",
     )
     pipe = _strip_provider_name_assignments(pipe)
+    pipe = _neutralize_local_fallback_copy(pipe)
     path.write_text(pipe, encoding="utf-8")
 
 
@@ -1120,6 +1136,53 @@ def _disable_self_test(desk: str) -> str:
 
 
 LOCAL_FALLBACK_REPLACEMENTS = (
+    (
+        "Mistral überschritt die Zeitgrenze; geprüft wurde die sichere lokale Grundbereinigung.",
+        "Foundry überschritt die Zeitgrenze; der Text bleibt unverändert.",
+    ),
+    (
+        "Mistral war nicht verfügbar; geprüft wurde die sichere lokale Grundbereinigung.",
+        "Foundry war nicht verfügbar; der Text bleibt unverändert.",
+    ),
+    (
+        "Der Text war für einen Modelldurchlauf zu lang; geprüft wurde die lokale Schnellfassung.",
+        "Der Text war für Foundry zu lang; der Text bleibt unverändert.",
+    ),
+    (
+        "Die sichere lokale Grundbereinigung wurde auf Wunsch sofort verwendet.",
+        "Der Text bleibt unverändert.",
+    ),
+    (
+        "Angezeigt wird die sichere lokale Grundbereinigung.",
+        "Angezeigt wird der unveränderte Text.",
+    ),
+    (
+        "Die lokale Schnellbearbeitung wurde wegen möglicher inhaltlicher Änderungen "
+        "verworfen. Ausgegeben wurde nur die sichere Grundbereinigung.",
+        "Eine lokale Bearbeitung ist abgeschaltet. Der Text bleibt unverändert.",
+    ),
+    (
+        "Der Text ist für einen einzelnen lokalen Modelldurchlauf zu lang. "
+        "Ausgegeben wurde die sichere lokale Schnellbearbeitung.",
+        "Der Text war für Foundry zu lang. Der Text bleibt unverändert.",
+    ),
+    (
+        "Das lokale Sprachmodell hat die Gesamtdauer überschritten. "
+        "Ausgegeben wurde nur die sichere Grundbereinigung.",
+        "Foundry hat die Zeitgrenze erreicht. Der Text bleibt unverändert.",
+    ),
+    (
+        "Das lokale Sprachmodell war nicht verfügbar. Ausgegeben wurde nur die sichere Grundbereinigung.",
+        "Foundry war nicht verfügbar. Der Text bleibt unverändert.",
+    ),
+    (
+        "Ausgegeben wurde die sichere lokale Schnellbearbeitung.",
+        "Der Text bleibt unverändert.",
+    ),
+    (
+        "Ausgegeben wurde nur die sichere Grundbereinigung.",
+        "Der Text bleibt unverändert.",
+    ),
     ("sichere lokale Fassung wird sofort erstellt", "der Text bleibt unverändert"),
     ("Sichere lokale Fassung wird sofort erstellt", "Der Text bleibt unverändert"),
     ("sichere lokale Fassung wird erstellt", "der Text bleibt unverändert"),
@@ -1129,8 +1192,18 @@ LOCAL_FALLBACK_REPLACEMENTS = (
     ("Die sichere lokale Grundbereinigung wurde manuell gewählt.", "Der Text bleibt unverändert."),
     ("sichere lokale Grundbereinigung", "unveränderter Text"),
     ("Sichere lokale Grundbereinigung", "Unveränderter Text"),
+    ("sichere lokale Schnellbearbeitung", "unveränderte Fassung"),
+    ("Sichere lokale Schnellbearbeitung", "Unveränderte Fassung"),
     ("sichere lokale Fassung", "unveränderter Text"),
     ("Sichere lokale Fassung", "Unveränderter Text"),
+    ("Mistral überschritt die Zeitgrenze", "Foundry überschritt die Zeitgrenze"),
+    ("Mistral war nicht verfügbar", "Foundry war nicht verfügbar"),
+    ("Das lokale Sprachmodell war nicht verfügbar", "Foundry war nicht verfügbar"),
+    ("Das lokale Sprachmodell hat die Gesamtdauer überschritten", "Foundry hat die Zeitgrenze erreicht"),
+    ("sichere Grundbereinigung", "unveränderte Fassung"),
+    ("Sichere Grundbereinigung", "Unveränderte Fassung"),
+    ("lokale Schnellbearbeitung", "Foundry-Bearbeitung"),
+    ("lokale Schnellfassung", "unveränderte Fassung"),
     ("vollständig lokal schnell bearbeitet", "der Text bleibt unverändert"),
     ("Schnelle lokale Bearbeitung ist verfügbar; gründlich nur mit Foundry.",
      "Foundry ist die einzige Bearbeitung; ohne Foundry bleibt der Text unverändert."),
@@ -1148,10 +1221,17 @@ LOCAL_FALLBACK_REPLACEMENTS = (
 
 
 def _neutralize_local_fallback_copy(desk: str) -> str:
-    """Alte Oberfläche darf keine lokale Fassung mehr versprechen."""
+    """Alte Oberfläche, Pipeline und Prüfungstext dürfen keine lokale Fassung mehr versprechen."""
     for old, new in LOCAL_FALLBACK_REPLACEMENTS:
         desk = _replace_all_if_present(desk, old, new)
     return desk
+
+
+def _patch_review_summary(path: Path) -> None:
+    """Prüfungstext darf keine lokale Grundbereinigung und kein Mistral mehr versprechen."""
+    text = path.read_text(encoding="utf-8")
+    text = _neutralize_local_fallback_copy(text)
+    path.write_text(text, encoding="utf-8")
 
 
 DESKTOP_MAIN_HINT = (

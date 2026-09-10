@@ -363,6 +363,11 @@ def _has_live_rewrite_call(text: str) -> bool:
     )
 
 
+def _has_local_rule_import(text: str) -> bool:
+    """Ungenutzter LocalRuleProvider-Import zählt weiter als Restweg."""
+    return any(token in text for token in LOCAL_RULE_IMPORTS)
+
+
 def local_rules_modus(path: Path | None) -> str:
     if path is None:
         return "nicht gefunden"
@@ -388,7 +393,7 @@ def fast_editor_modus(path: Path | None) -> str:
     if path is None:
         return "nicht gefunden"
     text = path.read_text(encoding="utf-8", errors="replace")
-    if _has_live_rewrite_call(text):
+    if _has_live_rewrite_call(text) or _has_local_rule_import(text):
         return "noch Regeln"
     if "LLP-FOUNDRY-TOR" in text and "Schnell-Editor ist abgeschaltet" in text:
         return "abgeschaltet"
@@ -714,19 +719,42 @@ def find_live_desktop_pipeline(roots: list[Path]) -> Path | None:
 
 LOCAL_FALLBACK_MARKERS = (
     "sichere lokale",
+    "sichere grundbereinigung",
     "lokale textverbesserung",
     "schnelle lokale bearbeitung",
     "lokal schnell bearbeitet",
     "lokale grundbereinigung",
+    "lokale schnellbearbeitung",
+    "lokale schnellfassung",
     "lokale überarbeitung läuft",
     "lokale sprachmodell",
     "lokale, sichere textüberarbeitung",
 )
 
+LOCAL_FALLBACK_MISTRAL_MARKERS = (
+    "Mistral überschritt",
+    "Mistral war nicht verfügbar",
+    "Mistral hat die Zeitgrenze",
+)
+
+LOCAL_FALLBACK_RELS = (
+    Path("app") / "desktop.py",
+    Path("app") / "pipeline.py",
+    Path("app") / "review_summary.py",
+)
+
+LOCAL_RULE_IMPORTS = (
+    "from app.providers.local import LocalRuleProvider",
+    "from .local import LocalRuleProvider",
+)
+
 
 def desktop_local_fallback_live_text(text: str) -> bool:
+    """Tote Versprechen einer lokalen Fassung nach dem Foundry-Tor zählen weiter."""
     low = text.lower()
-    return any(marker in low for marker in LOCAL_FALLBACK_MARKERS)
+    if any(marker in low for marker in LOCAL_FALLBACK_MARKERS):
+        return True
+    return any(marker in text for marker in LOCAL_FALLBACK_MISTRAL_MARKERS)
 
 
 def desktop_local_fallback_live(path: Path | None) -> bool:
@@ -740,9 +768,11 @@ def desktop_local_fallback_live(path: Path | None) -> bool:
 def find_live_desktop_fallback(roots: list[Path]) -> Path | None:
     for root in roots:
         for name in TOOL_NAMES["text"]:
-            desktop = root / name / "app" / "desktop.py"
-            if desktop_local_fallback_live(desktop):
-                return desktop
+            tool = root / name
+            for rel in LOCAL_FALLBACK_RELS:
+                path = tool / rel
+                if desktop_local_fallback_live(path):
+                    return path
     return None
 
 
@@ -1014,7 +1044,8 @@ def format_report(data: dict[str, object]) -> str:
         )
     if data["text_local_fallback"] is not None:
         lines.append(
-            "  app/desktop.py verspricht noch eine lokale Fassung."
+            "  Ein Text verspricht noch eine lokale Fassung"
+            " (Pipeline, Prueftext oder alte Oberflaeche)."
             " Einmal text_verbessern_foundry\\Anwenden.bat."
         )
     if data["text_desktop_pipeline"] is not None:
@@ -1108,8 +1139,11 @@ def leftovers_in_tool(tool_root: Path) -> list[str]:
         reasons.append("Oberflaeche")
     if desktop.is_file() and desktop_self_test_live(desktop):
         reasons.append("Selbsttest")
-    if desktop.is_file() and desktop_local_fallback_live(desktop):
-        reasons.append("Regelfassung")
+    for rel in LOCAL_FALLBACK_RELS:
+        fallback = tool_root / rel
+        if desktop_local_fallback_live(fallback):
+            reasons.append("Regelfassung")
+            break
     if desktop.is_file() and desktop_pipeline_live(desktop):
         reasons.append("Desktop-Pipeline")
     evaluation = tool_root / "app" / "evaluation.py"
