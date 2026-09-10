@@ -40,6 +40,9 @@ dev = [
 rtf = [
     "striprtf>=0.0.26",
 ]
+docx = [
+    "python-docx>=1.1.0",
+]
 ocr = [
     "easyocr>=1.7.0",
     "pymupdf>=1.24.0",
@@ -51,6 +54,7 @@ all = [
     "flask>=3.0.0",
     "python-docx>=1.1.0",
     "striprtf>=0.0.26",
+    "python-docx>=1.1.0",
 ]
 
 [project.scripts]
