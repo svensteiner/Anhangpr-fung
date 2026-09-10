@@ -808,13 +808,23 @@ def find_live_desktop_fallback(roots: list[Path]) -> Path | None:
 
 
 def leftover_fast_default(tool_root: Path) -> bool:
-    """TransformOptions darf nicht mehr still auf den Schnell-Editor fallen."""
+    """Schnell-Editor-Name nach dem Foundry-Tor zählt weiter."""
     models = tool_root / "app" / "models.py"
-    if not models.is_file():
-        return False
-    return 'provider: str = "fast-editor"' in models.read_text(
+    if models.is_file() and 'provider: str = "fast-editor"' in models.read_text(
         encoding="utf-8", errors="replace"
-    )
+    ):
+        return True
+    desktop = tool_root / "app" / "desktop.py"
+    if desktop.is_file() and '"fast-editor"' in desktop.read_text(
+        encoding="utf-8", errors="replace"
+    ):
+        return True
+    fast_editor = tool_root / "app" / "providers" / "fast_editor.py"
+    if fast_editor.is_file() and 'name = "fast-editor"' in fast_editor.read_text(
+        encoding="utf-8", errors="replace"
+    ):
+        return True
+    return False
 
 
 def leftover_test_live_text(text: str) -> bool:

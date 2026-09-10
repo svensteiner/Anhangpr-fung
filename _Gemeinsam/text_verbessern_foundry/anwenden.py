@@ -743,6 +743,7 @@ def _disable_fast_editor(path: Path) -> None:
         "from .local import LocalRuleProvider\n",
         "",
     )
+    text = _replace_all_if_present(text, 'name = "fast-editor"', 'name = "foundry-off"')
     path.write_text(text, encoding="utf-8")
 
 
@@ -1023,10 +1024,10 @@ def _patch_desktop(path: Path) -> None:
         '        return "rules+mistral-local", "substantial"\n'
         '    return "fast-editor", "medium"',
         '    if mode == MODE_SAFE:\n'
-        '        return "rules", "light"\n'
+        '        return "foundry", "light"\n'
         '    if mode == MODE_STRONG:\n'
         '        return "rules+foundry", "substantial"\n'
-        '    return "fast-editor", "medium"',
+        '    return "foundry", "medium"',
     )
     desk = _replace_once(
         desk,
@@ -1127,6 +1128,9 @@ def _patch_desktop(path: Path) -> None:
     desk = _replace_all_if_present(desk, DESKTOP_RUN_OLD, DESKTOP_RUN_STUB)
     desk = _disable_self_test(desk)
     desk = _neutralize_local_fallback_copy(desk)
+    desk = _replace_all_if_present(desk, 'return "fast-editor", "medium"', 'return "foundry", "medium"')
+    desk = _replace_all_if_present(desk, 'return "rules", "light"', 'return "foundry", "light"')
+    desk = _replace_all_if_present(desk, '"fast-editor"', '"foundry"')
     desk = _disable_desktop_pipeline(desk)
     path.write_text(desk, encoding="utf-8")
 

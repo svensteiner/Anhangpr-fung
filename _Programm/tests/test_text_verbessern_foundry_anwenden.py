@@ -490,6 +490,7 @@ def test_anwenden_stellt_text_verbessern_auf_foundry_um(tmp_path: Path) -> None:
     assert 'MODE_STRONG = "Gründlich mit Foundry (Büro-KI)"' in desktop
     assert "from app.providers.foundry_provider import foundry_ready" in desktop
     assert 'return "rules+foundry", "substantial"' in desktop
+    assert '"fast-editor"' not in desktop
     assert "if foundry_ready():" in desktop
     assert "if not mistral_ready:" not in desktop
     assert "thorough_ready = foundry_ready()" in desktop
@@ -1339,6 +1340,24 @@ def test_anwenden_entfernt_fast_editor_default(tmp_path: Path) -> None:
     leftover = models.read_text(encoding="utf-8")
     assert 'provider: str = "fast-editor"' not in leftover
     assert 'provider: str = "foundry"' in leftover
+    assert module.leftovers_in_tool(tool) == []
+    desktop = tool / "app" / "desktop.py"
+    text = desktop.read_text(encoding="utf-8")
+    desktop.write_text(text + '\n    return "fast-editor", "medium"\n', encoding="utf-8")
+    assert "Schnell-Editor" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    assert '"fast-editor"' not in desktop.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
+    fast = tool / "app" / "providers" / "fast_editor.py"
+    fast.write_text(
+        fast.read_text(encoding="utf-8") + '\n    name = "fast-editor"\n',
+        encoding="utf-8",
+    )
+    assert "Schnell-Editor" in module.leftovers_in_tool(tool)
+    ok3, msg3 = module.apply_foundry(tool)
+    assert ok3, msg3
+    assert 'name = "fast-editor"' not in fast.read_text(encoding="utf-8")
     assert module.leftovers_in_tool(tool) == []
 
 
