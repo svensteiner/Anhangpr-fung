@@ -1340,6 +1340,41 @@ def test_anwenden_entfernt_pipeline_fast_editor_alias(tmp_path: Path) -> None:
     assert module.leftovers_in_tool(tool) == []
 
 
+def test_anwenden_entfernt_mistral_default(tmp_path: Path) -> None:
+    module = _load_anwenden()
+    tool = _fake_rephraser(tmp_path)
+    path = tool / "app" / "providers" / "mistral_provider.py"
+    runtime = tool / "app" / "local_runtime.py"
+    path.write_text(
+        path.read_text(encoding="utf-8")
+        + '\n        self.model = os.getenv("FOUNDRY_OFF_MODEL", "mistral")\n',
+        encoding="utf-8",
+    )
+    runtime.write_text(
+        runtime.read_text(encoding="utf-8")
+        + '\n    model = os.getenv("FOUNDRY_OFF_MODEL", "mistral").split(":", 1)[0]\n',
+        encoding="utf-8",
+    )
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    ok, msg = module.apply_foundry(tool)
+    assert ok, msg
+    leftover = path.read_text(encoding="utf-8")
+    leftover_runtime = runtime.read_text(encoding="utf-8")
+    assert 'FOUNDRY_OFF_MODEL", "mistral"' not in leftover
+    assert 'FOUNDRY_OFF_MODEL", "mistral"' not in leftover_runtime
+    assert 'FOUNDRY_OFF_MODEL", "foundry-off"' in leftover
+    assert module.leftovers_in_tool(tool) == []
+    path.write_text(
+        leftover + '\n        self.model = os.getenv("FOUNDRY_OFF_MODEL", "mistral")\n',
+        encoding="utf-8",
+    )
+    assert "Mistral-Client" in module.leftovers_in_tool(tool)
+    ok2, msg2 = module.apply_foundry(tool)
+    assert ok2, msg2
+    assert 'FOUNDRY_OFF_MODEL", "mistral"' not in path.read_text(encoding="utf-8")
+    assert module.leftovers_in_tool(tool) == []
+
+
 def test_anwenden_entfernt_local_mistral_text(tmp_path: Path) -> None:
     module = _load_anwenden()
     tool = _fake_rephraser(tmp_path)

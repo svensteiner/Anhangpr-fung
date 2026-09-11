@@ -684,6 +684,12 @@ def _patch_local_runtime(path: Path) -> None:
     text = text.replace("MISTRAL_PREFLIGHT_TIMEOUT_SECONDS", "FOUNDRY_OFF_PREFLIGHT_TIMEOUT_SECONDS")
     text = text.replace("MISTRAL_TIMEOUT_SECONDS", "FOUNDRY_OFF_TIMEOUT_SECONDS")
     text = _replace_all_if_present(text, "Local Mistral", "Foundry-off")
+    text = _replace_all_if_present(
+        text, 'FOUNDRY_OFF_MODEL", "mistral"', 'FOUNDRY_OFF_MODEL", "foundry-off"'
+    )
+    text = _replace_all_if_present(
+        text, "FOUNDRY_OFF_MODEL', 'mistral'", "FOUNDRY_OFF_MODEL', 'foundry-off'"
+    )
     path.write_text(text, encoding="utf-8")
 
 
@@ -778,6 +784,12 @@ def _patch_mistral_provider(path: Path) -> None:
     text = text.replace("MISTRAL_TIMEOUT_SECONDS", "FOUNDRY_OFF_TIMEOUT_SECONDS")
     text = _replace_all_if_present(text, 'name = "mistral-local"', 'name = "foundry-off"')
     text = _replace_all_if_present(text, "Local Mistral", "Foundry-off")
+    text = _replace_all_if_present(
+        text, 'FOUNDRY_OFF_MODEL", "mistral"', 'FOUNDRY_OFF_MODEL", "foundry-off"'
+    )
+    text = _replace_all_if_present(
+        text, "FOUNDRY_OFF_MODEL', 'mistral'", "FOUNDRY_OFF_MODEL', 'foundry-off'"
+    )
     path.write_text(text, encoding="utf-8")
 
 
